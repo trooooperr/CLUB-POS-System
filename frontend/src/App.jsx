@@ -12,6 +12,7 @@ import InventoryPage from './pages/InventoryPage';
 import SettingsPage from './pages/SettingsPage';
 import { Menu } from 'lucide-react';
 import './index.css';
+import Toast from './components/Toast';
 
 function Shell() {
   const { currentUser, activeSection, settings, loading, error, loadData, sidebarOpen, setSidebarOpen, invoiceOrder } = useApp();
@@ -21,22 +22,34 @@ function Shell() {
   }, [settings.darkMode]);
 
   useEffect(() => { if (currentUser) loadData(); }, [currentUser, loadData]);
+  
+  // INACTIVITY TIMEOUT (30 mins)
+  const { showToast } = useApp();
+  useEffect(() => {
+    if (!currentUser) return;
+    let timeout;
+    const reset = () => {
+      clearTimeout(timeout);
+      timeout = setTimeout(() => {
+        showToast('Session expired due to inactivity', 'amber');
+        setTimeout(() => window.location.reload(), 2000); // Give time for toast
+      }, 30 * 60 * 1000); 
+    };
+    window.addEventListener('mousemove', reset);
+    window.addEventListener('keydown', reset);
+    reset();
+    return () => {
+      window.removeEventListener('mousemove', reset);
+      window.removeEventListener('keydown', reset);
+      clearTimeout(timeout);
+    };
+  }, [currentUser]);
 
   if (!currentUser) return <LoginPage />;
 
   const pages = { billing:<BillingPage/>, menu:<MenuPage/>, orders:<OrdersPage/>, sales:<SalesPage/>, workers:<WorkersPage/>, inventory:<InventoryPage/>, settings:<SettingsPage/> };
 
-  if (loading) return (
-    <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'100vh', flexDirection:'column', gap:14, background:'var(--bg)' }}>
-      <div style={{ width:46,height:46,borderRadius:12,background:'linear-gradient(135deg,#F59E0B,#FCD34D)',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:'Pacifico,cursive',fontWeight:900,fontSize:18,color:'#000' }}>HT</div>
-      <div style={{ fontSize:13, color:'var(--t1)' }}>Loading…</div>
-      <div style={{ width:90,height:2,background:'var(--s3)',borderRadius:2,overflow:'hidden' }}>
-        <div style={{ height:'100%',background:'var(--a)',borderRadius:2,animation:'lb 1.1s ease-in-out infinite' }}/>
-      </div>
-      <style>{`@keyframes lb{0%{width:0%;margin-left:0}50%{width:80%}100%{width:0%;margin-left:100%}}`}</style>
-    </div>
-  );
-
+  // No more full-screen blocking loader. Shell renders immediately.
   return (
     <div className="shell">
       <Sidebar/>
@@ -46,16 +59,44 @@ function Shell() {
           <button className="iBtn" onClick={()=>setSidebarOpen(o=>!o)}><Menu size={16}/></button>
           <span style={{ fontFamily:'Pacifico,cursive', color:'var(--a)', fontSize:14 }}>HumTum</span>
         </div>
+        
+        {loading && (
+          <div className="top-loader-line">
+            <div className="top-loader-progress"></div>
+          </div>
+        )}
+
         {error && (
           <div style={{ background:'rgba(239,68,68,0.07)', borderBottom:'1px solid rgba(239,68,68,0.18)', padding:'6px 18px', display:'flex', alignItems:'center', justifyContent:'space-between', fontSize:11, color:'var(--red)', flexShrink:0 }}>
             <span>⚠️ {error}</span>
             <button className="btn btn-danger btn-sm" onClick={loadData}>Retry</button>
           </div>
         )}
+
+        {currentUser?.mustChangePassword && activeSection !== 'settings' && (
+          <div style={{ background:'var(--amber)', color:'#000', padding:'8px 18px', textAlign:'center', fontSize:12, fontWeight:700 }}>
+            🔒 security update required: please change your password in settings to continue.
+          </div>
+        )}
         <main className="main">{pages[activeSection]||<BillingPage/>}</main>
       </div>
       {invoiceOrder && <InvoiceModal/>}
-      <style>{`@media(max-width:900px){#mbar{display:flex!important}}`}</style>
+      <Toast/>
+      <style>{`
+        @keyframes lineLoad {
+          0% { left: -40%; width: 40%; }
+          100% { left: 100%; width: 40%; }
+        }
+        .top-loader-line {
+          position: absolute; top: 0; left: 0; right: 0; height: 2px;
+          background: rgba(245, 158, 11, 0.1); z-index: 9999; overflow: hidden;
+        }
+        .top-loader-progress {
+          position: absolute; top: 0; height: 100%; background: var(--gold);
+          animation: lineLoad 1.5s infinite ease-in-out;
+        }
+        @media(max-width:900px){#mbar{display:flex!important}}
+      `}</style>
     </div>
   );
 }

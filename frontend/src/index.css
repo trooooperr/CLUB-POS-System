@@ -336,3 +336,27 @@ input:checked+.tslider:before { transform:translateX(18px) }
     padding: 12px;
   }
 }
+/* ── Settlement & Billing UI ─────────────────── */
+.settle-card { background:var(--s1); border:1px solid var(--b2); border-radius:var(--rl); overflow:hidden; box-shadow:0 15px 45px rgba(0,0,0,0.3); position:relative }
+.settle-banner { padding:24px 20px; text-align:center; position:relative; overflow:hidden; border-bottom: 1px solid var(--b0) }
+.settle-banner::before { content:''; position:absolute; inset:0; opacity:0.04; background:var(--accent-color, var(--a)); pointer-events:none }
+.settle-label { font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:0.12em; color:var(--t2); margin-bottom:8px }
+.settle-amount { font-size:32px; font-weight:900; letter-spacing:-0.02em; color:var(--t0); line-height:1 }
+.settle-currency { font-size:18px; font-weight:700; opacity:0.6; vertical-align:top; margin-right:4px }
+
+.settle-input-area { padding:20px 24px }
+.settle-field { background:var(--s2); border:1px solid var(--b1); border-radius:14px; padding:12px 20px; display:flex; align-items:center; transition:0.2s }
+.settle-field:focus-within { border-color:var(--a); box-shadow:0 0 0 3px var(--ag) }
+.settle-field input { background:none; border:none; color:var(--t0); font-size:24px; font-weight:800; width:100%; outline:none; font-family:var(--mono); padding:0 }
+.settle-field input::placeholder { color:var(--t2); font-weight:600; font-size: 18px }
+
+.settle-mode-row { display:flex; gap:8px; margin-bottom:12px }
+.settle-mode-btn { flex:1; height:42px; border-radius:12px; border:1px solid var(--b1); background:var(--s2); color:var(--t1); font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:0.02em; cursor:pointer; transition:0.2s }
+.settle-mode-btn.on { background:var(--a); border-color:var(--a); color:#000; box-shadow:0 4px 12px var(--ag) }
+
+.settle-footer { padding:10px 24px; display:flex; gap:10px; border-top:1px solid var(--b0) }
+.settle-btn-main { flex:3;  border-radius:14px; font-size:15px; font-weight:700; background:var(--a); color:#000; border:none; cursor:pointer; transition:0.2s }
+.settle-btn-main.ghost { background:none; border:2px solid var(--a); color:var(--a) }
+
+@keyframes fi { from{opacity:0} to{opacity:1} }
+@keyframes su { from{opacity:0;transform:translateY(20px) scale(0.98)} to{opacity:1;transform:translateY(0) scale(1)} }

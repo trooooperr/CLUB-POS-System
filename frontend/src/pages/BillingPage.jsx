@@ -15,7 +15,7 @@ function TableCard({ id, isActive, status, num, onClick }) {
 }
 
 /* IMAGE-FOCUS MENU ITEM */
-function MenuItem({ item, qty, add, rem }) {
+function MenuItem({ item, qty, add, rem, stock }) {
   const src = item.imageUrl?.startsWith('http') ? item.imageUrl
     : `https://placehold.co/320x320/171921/F59E0B?text=${encodeURIComponent(item.name.slice(0,1))}`;
   return (
@@ -25,7 +25,12 @@ function MenuItem({ item, qty, add, rem }) {
         <div className="m-gradient-overlay">
             <div className="m-price-tag">₹{item.price.toFixed(0)}</div>
         </div>
-        {!item.available && <div className="m-na-badge">Sold Out</div>}
+        {!item.available && <div className="sold-out-badge-top">SOLD OUT</div>}
+        {stock !== undefined && (
+          <div className="stock-badge" style={{ background: stock <= 5 ? 'var(--red)' : 'var(--s3)' }}>
+            Stock: {stock}
+          </div>
+        )}
       </div>
       <div className="mbody-modern">
         <div className="mname-modern">{item.name}</div>
@@ -41,28 +46,104 @@ function MenuItem({ item, qty, add, rem }) {
   );
 }
 
+
 function PayModal({ total, currency, onClose, onConfirm }) {
   const [paid, setPaid] = useState('');
   const p = parseFloat(paid) || 0;
+  const isPrintOnly = p === 0;
+
   return (
     <div className="moverlay">
-      <div className="mbox" style={{ maxWidth:320 }}>
-        <div className="mhead"><span>Settlement</span><button className="iBtn" onClick={onClose}><X size={15}/></button></div>
-        <div className="pay-banner">
-          <div className="pay-banner-total">{currency}{total.toFixed(0)}</div>
+      <div className="settle-card animate-su" style={{ maxWidth: 380 }}>
+
+        {/* Header */}
+        <div className="settle-banner" style={{ padding: '18px 18px 20px' }}>
+          <button 
+            onClick={onClose} 
+            className="iBtn"
+            style={{ position: 'absolute', top: 10, right: 10 }}
+          >
+            <X size={16}/>
+          </button>
+
+          <div className="settle-label" style={{ fontSize: 12, color: 'var(--t2)' }}>
+            Total Payable
+          </div>
+
+          <div className="settle-amount" style={{ marginTop: 4 }}>
+            <span className="settle-currency">{currency}</span>
+            {total.toLocaleString()}
+          </div>
         </div>
-        <div className="fgroup"><input type="number" value={paid} onChange={e=>setPaid(e.target.value)} placeholder="Amount Received" style={{height:45, fontSize:16, textAlign:'center'}} /></div>
-        <div style={{ display:'flex', gap:8, marginTop:10 }}>
-          <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Cancel</button>
-          <button className="btn btn-primary" style={{flex:1}} onClick={()=>onConfirm(p||total)}>Bill Now</button>
+
+        {/* Body */}
+        <div className="settle-input-area" style={{ padding: '16px 18px' }}>
+
+          <label 
+            className="lbl" 
+            style={{ fontSize: 11, color: 'var(--t2)', marginBottom: 6, display: 'block' }}
+          >
+            Amount Received
+          </label>
+          <div>
+            <input
+              type="text"   
+              inputMode="decimal"
+              value={paid}
+              onChange={(e) => setPaid(e.target.value)}
+              placeholder={total.toFixed(0)}
+              autoFocus
+              style={{
+                border: 'none',
+                outline: 'none',
+                background: 'transparent',
+                flex: 1,
+                fontSize: 18,
+                fontWeight: 900,
+                color: 'var(--t1)'
+              }}
+            />
+          </div>
+
+          {/* Info */}
+          <div style={{ marginTop: 12, fontSize: 12, color: 'var(--t2)' }}>
+            {isPrintOnly 
+              ? 'No payment entered. Order will be held.' 
+              : `Received ${currency}${p.toLocaleString()}`
+            }
+          </div>
+
         </div>
+
+        {/* Footer */}
+        <div 
+          className="settle-footer"
+          style={{ padding: '14px 18px', display: 'flex', gap: 8 }}
+        >
+          <button 
+            className="btn btn-ghost btn-lg"
+            style={{ flex: 1, borderRadius: 10 }}
+            onClick={onClose}
+          >
+            Back
+          </button>
+
+          <button 
+            className={`settle-btn-main ${isPrintOnly ? 'ghost' : ''}`}
+            style={{ flex: 1, borderRadius: 10 }}
+            onClick={() => onConfirm(p)}
+          >
+            {isPrintOnly ? 'Hold' : 'Confirm'}
+          </button>
+        </div>
+
       </div>
     </div>
   );
 }
 
 export default function BillingPage() {
-  const { tableBills, activeTableId, selectTable, updateTableItem, clearTable, setTableField, billTotals, filteredMenu, categories, categoryFilter, setCategoryFilter, menuSearch, setMenuSearch, menuItems, getTableStatus, generateBill, settings, NUM_TABLES } = useApp();
+  const { tableBills, activeTableId, selectTable, updateTableItem, clearTable, setTableField, billTotals, filteredMenu, categories, categoryFilter, setCategoryFilter, menuSearch, setMenuSearch, menuItems, inventory, getTableStatus, generateBill, settings, NUM_TABLES } = useApp();
   const [pm, setPm] = useState('cash');
   const [payModal, setPayModal] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -72,11 +153,18 @@ export default function BillingPage() {
   const { subtotal, sgst, cgst, grandTotal } = billTotals;
   const c = settings.currency;
 
+  const [billError, setBillError] = useState('');
+
   const doGen = async paid => {
-    setPayModal(false); setBusy(true);
+    setPayModal(false); setBusy(true); setBillError('');
     const r = await generateBill(pm, paid);
     setBusy(false);
-    setMobileBillOpen(false);
+    if (r.error) {
+      setBillError(r.error);
+      setTimeout(() => setBillError(''), 5000);
+    } else {
+      setMobileBillOpen(false);
+    }
   };
 
   return (
@@ -107,11 +195,15 @@ export default function BillingPage() {
           </div>
 
           <div className="items-grid-modern">
-            {filteredMenu.map(item=>(
-              <MenuItem key={item._id} item={item} qty={table.items.find(i=>i._id===item._id)?.quantity||0}
-                add={(id,a)=>updateTableItem(activeTableId,id,a,menuItems)}
-                rem={(id,a)=>updateTableItem(activeTableId,id,a,menuItems)}/>
-            ))}
+            {filteredMenu.map(item=>{
+              const stockItem = inventory?.find(inv => inv.name.toLowerCase().trim() === item.name.toLowerCase().trim());
+              return (
+                <MenuItem key={item._id} item={item} qty={table.items.find(i=>i._id===item._id)?.quantity||0}
+                  stock={stockItem?.stock}
+                  add={(id,a)=>updateTableItem(activeTableId,id,a,menuItems)}
+                  rem={(id,a)=>updateTableItem(activeTableId,id,a,menuItems)}/>
+              );
+            })}
           </div>
         </div>
 
@@ -166,8 +258,14 @@ export default function BillingPage() {
               {PM.map(m=><option key={m} value={m}>{m.toUpperCase()}</option>)}
             </select>
 
-            <button className="btn btn-primary btn-lg full-w" onClick={()=>setPayModal(true)} disabled={table.items.length===0}>
-              Generate Bill
+            {billError && (
+              <div style={{ background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.2)', borderRadius:8, padding:'7px 11px', fontSize:11, color:'#EF4444', marginBottom:6 }}>
+                ⚠️ {billError}
+              </div>
+            )}
+
+            <button className="btn btn-primary btn-lg full-w" onClick={()=>setPayModal(true)} disabled={table.items.length===0 || busy}>
+              {busy ? 'Processing…' : 'Generate Bill'}
             </button>
           </div>
         </div>
@@ -709,6 +807,126 @@ export default function BillingPage() {
 .tstatus-dot.free {
   background: #22c55e;
   box-shadow: 0 0 6px #22c55e;
+}
+.mhead-pro {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--b2);
+}
+.settle-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+  color: var(--t0);
+}
+.settle-icon { color: var(--gold); }
+.close-btn-pro {
+  background: none; border: none; color: var(--t2); cursor: pointer;
+  padding: 4px; border-radius: 50%; display: flex; align-items: center;
+}
+.close-btn-pro:hover { background: var(--b2); color: var(--t0); }
+
+.pay-banner-pro {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.1), rgba(217, 119, 6, 0.05));
+  margin: 20px;
+  padding: 20px;
+  border-radius: 12px;
+  text-align: center;
+  border: 1px solid rgba(245, 158, 11, 0.2);
+}
+.pay-banner-label { font-size: 11px; text-transform: uppercase; color: var(--gold); font-weight: 700; letter-spacing: 0.05em; margin-bottom: 4px; }
+.pay-banner-total { font-size: 32px; font-weight: 900; color: var(--t0); font-family: monospace; }
+
+.fgroup-settle { padding: 0 20px 20px; }
+.settle-label { display: block; font-size: 11px; color: var(--t2); margin-bottom: 8px; font-weight: 600; text-transform: uppercase; }
+.input-with-icon {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.input-currency {
+  position: absolute;
+  left: 14px;
+  color: var(--t2);
+  font-weight: 700;
+}
+.fgroup-settle input {
+  width: 100%;
+  background: var(--b2);
+  border: 1px solid var(--b3);
+  border-radius: 10px;
+  padding: 12px 12px 12px 30px;
+  color: var(--t0);
+  font-size: 18px;
+  font-weight: 700;
+  transition: all 0.2s;
+}
+.fgroup-settle input:focus { border-color: var(--gold); outline: none; box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.15); }
+.settle-hint { font-size: 10px; color: var(--t3); margin-top: 8px; text-align: center; }
+
+.settle-actions {
+  display: flex;
+  gap: 12px;
+  padding: 0 20px 20px;
+}
+.btn-cancel-pro {
+  flex: 1;
+  background: var(--b2);
+  border: 1px solid var(--b3);
+  color: var(--t1);
+  padding: 12px;
+  border-radius: 10px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn-confirm-pro {
+  flex: 2;
+  padding: 12px;
+  border-radius: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.btn-confirm-pro.solid { background: var(--gold); color: #000; border: none; }
+.btn-confirm-pro.solid:hover { background: #fbbf24; transform: translateY(-1px); }
+.btn-confirm-pro.ghost { background: none; border: 2px solid var(--gold); color: var(--gold); }
+.btn-confirm-pro.ghost:hover { background: rgba(245, 158, 11, 0.1); }
+
+@keyframes fade-in {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+.animate-fade-in { animation: fade-in 0.2s ease-out; }
+.sold-out-badge-top {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: var(--red);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 900;
+  padding: 4px 10px;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+  z-index: 10;
+  border: 1px solid rgba(255,255,255,0.2);
+}
+.stock-badge {
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #fff;
+  background: rgba(0,0,0,0.6);
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(255,255,255,0.1);
+  z-index: 5;
 }
 `}</style>
     </div>

@@ -54,13 +54,23 @@ async function isRedisHealthy() {
 
 /**
  * Get cache
+ * NOTE: Upstash REST client already returns parsed JSON objects,
+ *       so we do NOT need JSON.parse here.
  */
 async function getCache(key) {
   try {
     if (!client) return null;
 
     const val = await client.get(key);
-    return val ? JSON.parse(val) : null;
+    if (val === null || val === undefined) return null;
+
+    // Upstash returns already-parsed objects when data was stored as JSON string.
+    // If it's already an object/array, return directly. Otherwise try parse.
+    if (typeof val === 'object') return val;
+    if (typeof val === 'string') {
+      try { return JSON.parse(val); } catch { return val; }
+    }
+    return val;
   } catch (e) {
     return null;
   }
@@ -74,19 +84,20 @@ async function setCache(key, value, ttl = 300) {
     if (!client) return;
 
     await client.set(key, JSON.stringify(value), {
-      ex: ttl, // ⚠️ lowercase 'ex' in Upstash
+      ex: ttl,
     });
   } catch (e) {}
 }
 
 /**
- * Delete cache
+ * Delete cache — supports single key or array of keys
  */
-async function deleteCache(key) {
+async function deleteCache(keys) {
   try {
     if (!client) return;
 
-    await client.del(key);
+    const keyArray = Array.isArray(keys) ? keys : [keys];
+    await Promise.all(keyArray.map(k => client.del(k)));
   } catch (e) {}
 }
 

@@ -1,11 +1,11 @@
 const mongoose = require('mongoose');
 
 const orderSchema = new mongoose.Schema({
-  billNo:        { type: String, required: true },
-  date:          { type: Date, default: Date.now },
+  billNo:        { type: String, required: true, index: true },
+  date:          { type: Date, default: Date.now, index: true },
   grandTotal:    { type: Number, required: true },
   paidAmount:    { type: Number, default: 0 },
-  dueAmount:     { type: Number, default: 0 },
+  dueAmount:     { type: Number, default: 0, index: true },
   paymentMode:   { type: String, required: true },
   tableNo:       { type: Number, required: true },
   items:         [{ name: String, quantity: Number, price: Number }],

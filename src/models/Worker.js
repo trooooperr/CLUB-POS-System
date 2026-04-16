@@ -15,7 +15,9 @@ const workerSchema = new mongoose.Schema({
       message: props => `${props.value} is not a valid 10-digit phone number!`
     }
   },
+  email: { type: String, default: '', trim: true, lowercase: true },
   joiningDate: { type: Date, default: Date.now },
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
 }, { timestamps: true });
 
 module.exports = mongoose.model('Worker', workerSchema);

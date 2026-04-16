@@ -11,11 +11,6 @@ beforeAll(async () => {
   await mongoose.connect(mongo.getUri());
 });
 
-afterAll(async () => {
-  await mongoose.connection.close();
-  await mongo.stop();
-});
-
 describe('Health API', () => {
   it('should return ok', async () => {
     const res = await request(app).get('/api/health');
@@ -23,4 +18,9 @@ describe('Health API', () => {
     expect(res.statusCode).toBe(200);
     expect(res.body.status).toBe('ok');
   });
+});
+
+afterAll(async () => {
+  await mongoose.connection.close();
+  await mongo.stop();
 });

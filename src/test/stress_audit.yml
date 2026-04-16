@@ -1,0 +1,51 @@
+config:
+  target: "http://localhost:3000"
+  phases:
+    - duration: 60
+      arrivalRate: 5
+      name: "Warm-up"
+    - duration: 120
+      arrivalRate: 20
+      rampTo: 100
+      name: "High Load Stress Test"
+  defaults:
+    headers:
+      Content-Type: "application/json"
+
+scenarios:
+  - name: "Concurrent Order & Management Flow"
+    flow:
+      - post:
+          url: "/api/auth/login"
+          json:
+            username: "admin"
+            password: "admin123"
+          capture:
+            - json: "$.token"
+              as: "token"
+      - get:
+          url: "/api/menu"
+          headers:
+            Authorization: "Bearer {{ token }}"
+      - post:
+          url: "/api/orders"
+          headers:
+            Authorization: "Bearer {{ token }}"
+          json:
+            tableNo: 10
+            items:
+              - name: "Kingfisher Ultra"
+                quantity: 2
+                price: 200
+            subtotal: 400
+            sgst: 10
+            cgst: 10
+            discount: 0
+            grandTotal: 420
+            paidAmount: 420
+            dueAmount: 0
+            paymentMode: "cash"
+      - get:
+          url: "/api/orders"
+          headers:
+            Authorization: "Bearer {{ token }}"

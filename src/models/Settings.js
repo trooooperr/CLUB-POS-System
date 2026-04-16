@@ -11,7 +11,7 @@ const settingsSchema = new mongoose.Schema({
   thankYouMsg:    { type: String, default: '' },
   darkMode:       { type: Boolean, default: true },
   adminEmail:     { type: String, default: '' },
-  senderEmail:    { type: String, default: '2k23.cs2312451@gmail.com' },
+  senderEmail:    { type: String, default: '' },
   senderPassword: { type: String, default: '' },
   inventoryCategories: { type: [String], default: ['Spirits','Beer','Wine','Food','Mixers'] },
   menuCategories:      { type: [String], default: ['Spirits','Beer','Wine','Food','Mixers'] },

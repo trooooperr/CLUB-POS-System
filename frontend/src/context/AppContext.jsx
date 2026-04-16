@@ -1,9 +1,10 @@
 import React, { createContext, useContext, useState, useMemo, useCallback, useEffect } from 'react';
-import { apiUrl } from '../lib/api';
+import { apiUrl, authFetch } from '../lib/api';
 
 const AppContext = createContext(null);
 const TABLES_KEY = 'humtum_table_bills';
 const AUTH_KEY   = 'humtum_auth';
+const TOKEN_KEY  = 'humtum_token';
 
 // ── Role hierarchy ──────────────────────────────────────────────
 // admin > manager > staff  (admin can access all lower role views)
@@ -24,16 +25,14 @@ export const ROLE_HIERARCHY = {
     label: 'Staff',
     level: 1,
     color: '#22C55E',
-    permissions: ['billing','orders']
+    permissions: ['billing','orders','inventory']
   },
 };
 
-// Hard-coded credentials (in production replace with DB-backed auth)
-export const USERS = [
-  { id:1, name:'Owner',    username:'admin',   password:'admin123',   role:'admin'   },
-  { id:2, name:'Manager', username:'manager', password:'manager123', role:'manager' },
-  { id:3, name:'Staff',   username:'staff',   password:'staff123',   role:'staff'   },
-];
+const MENU_CACHE = 'ht_menu_cache';
+const SETTINGS_CACHE = 'ht_settings_cache';
+const WORKERS_CACHE = 'ht_workers_cache';
+const INVENTORY_CACHE = 'ht_inventory_cache';
 
 const NUM_TABLES = 12;
 
@@ -77,7 +76,7 @@ function saveTableBills(bills) {
 
 async function safeFetch(url) {
   try {
-    const res = await fetch(url);
+    const res = await authFetch(url);
     if (!res.ok) { console.error(`API ${res.status}: ${url}`); return []; }
     const data = await res.json();
     return Array.isArray(data) ? data : [];
@@ -94,27 +93,52 @@ export function AppProvider({ children }) {
   });
 
   // ── Settings ────────────────────────────────────────────────────
-  const [settings, setSettings] = useState(DEFAULT_SETTINGS);
-  const saveSettings = useCallback(async (updates) => {
+  const [settings, setSettings] = useState(() => {
     try {
-      const res = await fetch(apiUrl('/api/settings'), {
+      const cached = localStorage.getItem(SETTINGS_CACHE);
+      return cached ? { ...DEFAULT_SETTINGS, ...JSON.parse(cached) } : DEFAULT_SETTINGS;
+    } catch { return DEFAULT_SETTINGS; }
+  });
+
+  const saveSettings = useCallback(async (updates) => {
+    const previousSettings = settings;
+    // Optimistic update
+    setSettings(prev => {
+      const next = { ...prev, ...updates };
+      localStorage.setItem(SETTINGS_CACHE, JSON.stringify(next));
+      return next;
+    });
+
+    try {
+      const res = await authFetch(apiUrl('/api/settings'), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updates)
       });
       if (!res.ok) throw new Error('Failed to save settings');
-        const saved = await res.json();
-        setSettings({ ...DEFAULT_SETTINGS, ...saved });
+      const saved = await res.json();
+      // Sync with server response
+      setSettings(prev => {
+        const next = { ...DEFAULT_SETTINGS, ...prev, ...saved };
+        localStorage.setItem(SETTINGS_CACHE, JSON.stringify(next));
+        return next;
+      });
       return saved;
     } catch (err) {
+      // Rollback on error
+      setSettings(previousSettings);
+      localStorage.setItem(SETTINGS_CACHE, JSON.stringify(previousSettings));
       console.error('Save settings error', err);
+      throw err;
     }
-  }, []);
+  }, [settings]);
 
   useEffect(() => {
+    // Only fetch settings if logged in
+    if (!currentUser) return;
     (async () => {
       try {
-        const res = await fetch(apiUrl('/api/settings'));
+        const res = await authFetch(apiUrl('/api/settings'));
         if (res.ok) {
           const data = await res.json();
           setSettings({ ...DEFAULT_SETTINGS, ...data });
@@ -124,19 +148,26 @@ export function AppProvider({ children }) {
     // Expose menu context update for InventoryPage
     window.updateMenuContext = (menuData) => {
       if (menuData) setMenuItems(menuData);
-      else fetch(apiUrl('/api/menu')).then(r=>r.json()).then(setMenuItems);
+      else authFetch(apiUrl('/api/menu')).then(r=>r.json()).then(setMenuItems).catch(()=>{});
     };
     return () => { delete window.updateMenuContext; };
-  }, []);
+  }, [currentUser]);
 
   // ── UI ──────────────────────────────────────────────────────────
   const [activeSection, setActiveSection] = useState('billing');
   const [sidebarOpen,   setSidebarOpen]   = useState(false);
 
   // ── Data ────────────────────────────────────────────────────────
-  const [menuItems,    setMenuItems]    = useState([]);
+  const [menuItems,    setMenuItems]    = useState(() => {
+    try { return JSON.parse(localStorage.getItem(MENU_CACHE)) || []; } catch { return []; }
+  });
   const [orderHistory, setOrderHistory] = useState([]);
-  const [workers,      setWorkers]      = useState([]);
+  const [workers,      setWorkers]      = useState(() => {
+    try { return JSON.parse(localStorage.getItem(WORKERS_CACHE)) || []; } catch { return []; }
+  });
+  const [inventory,    setInventory]    = useState(() => {
+    try { return JSON.parse(localStorage.getItem(INVENTORY_CACHE)) || []; } catch { return []; }
+  });
   const [loading,      setLoading]      = useState(true);
   const [error,        setError]        = useState(null);
 
@@ -154,19 +185,73 @@ export function AppProvider({ children }) {
   const [categoryFilter,  setCategoryFilter]  = useState('All');
   const [menuSearch,      setMenuSearch]      = useState('');
   const [invoiceOrder,    setInvoiceOrder]    = useState(null);
+  
+  // ── Notifications ───────────────────────────────────────────────
+  const [toast, setToast] = useState(null); // { msg, type }
+  const showToast = useCallback((msg, type = 'success') => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 3000);
+  }, []);
 
   // ── Auth helpers ────────────────────────────────────────────────
-  const login = useCallback((username, password) => {
-    const user = USERS.find(u => u.username === username && u.password === password);
-    if (!user) return { error: 'Invalid username or password' };
-    localStorage.setItem(AUTH_KEY, JSON.stringify(user));
-    setCurrentUser(user);
-    return { success: true };
+  const login = useCallback(async (username, password) => {
+    try {
+      const res = await fetch(apiUrl('/api/auth/login'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+      });
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        return { error: data.error || 'Invalid username or password' };
+      }
+
+      // Store token and user info
+      localStorage.setItem(TOKEN_KEY, data.token);
+      localStorage.setItem(AUTH_KEY, JSON.stringify(data.user));
+      setCurrentUser(data.user);
+      return { success: true };
+    } catch (err) {
+      return { error: 'Network error. Please check your connection.' };
+    }
   }, []);
 
   const logout = useCallback(() => {
     localStorage.removeItem(AUTH_KEY);
+    localStorage.removeItem(TOKEN_KEY);
     setCurrentUser(null);
+  }, []);
+
+  // ── Forgot Password ───────────────────────────────────────────
+  const forgotPassword = useCallback(async (email) => {
+    try {
+      const res = await fetch(apiUrl('/api/auth/forgot-password'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json();
+      if (!res.ok) return { error: data.error || 'Failed to send OTP' };
+      return { success: true, message: data.message };
+    } catch (err) {
+      return { error: 'Network error' };
+    }
+  }, []);
+
+  const resetPassword = useCallback(async (email, otp, newPassword) => {
+    try {
+      const res = await fetch(apiUrl('/api/auth/reset-password'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, otp, newPassword }),
+      });
+      const data = await res.json();
+      if (!res.ok) return { error: data.error || 'Failed to reset password' };
+      return { success: true, message: data.message };
+    } catch (err) {
+      return { error: 'Network error' };
+    }
   }, []);
 
   const role = currentUser?.role || 'staff';
@@ -181,19 +266,43 @@ export function AppProvider({ children }) {
     return myLevel >= tgtLevel;
   }, [role]);
 
-  // ── Data loading ────────────────────────────────────────────────
-  const loadData = useCallback(async () => {
-    setLoading(true);
+  // ── Data loading (with Promise.allSettled for resilience) ──────
+  // ── Data loading (with Promise.allSettled for resilience) ──────
+  const loadData = useCallback(async (isSilent = false) => {
+    if (!isSilent) setLoading(true);
     setError(null);
-    const [menuData, ordersData, workersData] = await Promise.all([
-      safeFetch(apiUrl('/api/menu')),
-      safeFetch(apiUrl('/api/orders')),
-      safeFetch(apiUrl('/api/workers')),
-    ]);
-    setMenuItems(menuData);
-    setOrderHistory([...ordersData].sort((a,b) => new Date(b.date)-new Date(a.date)));
-    setWorkers(workersData);
-    setLoading(false);
+    try {
+      const results = await Promise.allSettled([
+        safeFetch(apiUrl('/api/menu')),
+        safeFetch(apiUrl('/api/orders')),
+        safeFetch(apiUrl('/api/workers')),
+        safeFetch(apiUrl('/api/inventory')),
+      ]);
+
+      const menuData      = results[0].status === 'fulfilled' ? results[0].value : [];
+      const ordersData    = results[1].status === 'fulfilled' ? results[1].value : [];
+      const workersData   = results[2].status === 'fulfilled' ? results[2].value : [];
+      const inventoryData = results[3].status === 'fulfilled' ? results[3].value : [];
+
+      setMenuItems(menuData);
+      setOrderHistory([...ordersData].sort((a,b) => new Date(b.date)-new Date(a.date)));
+      setWorkers(workersData);
+      setInventory(inventoryData);
+
+      localStorage.setItem(MENU_CACHE, JSON.stringify(menuData));
+      localStorage.setItem(WORKERS_CACHE, JSON.stringify(workersData));
+      localStorage.setItem(INVENTORY_CACHE, JSON.stringify(inventoryData));
+
+      // Check if any failed
+      const failed = results.filter(r => r.status === 'rejected');
+      if (failed.length > 0 && !isSilent) {
+        setError('Some data failed to load. Try refreshing.');
+      }
+    } catch (err) {
+      if (!isSilent) setError('Failed to load data. Please retry.');
+    } finally {
+      if (!isSilent) setLoading(false);
+    }
   }, []);
 
   // ── Table helpers ────────────────────────────────────────────────
@@ -267,18 +376,16 @@ export function AppProvider({ children }) {
     return 'occupied';
   }, [tableBills]);
 
-  // ── Generate bill (clears table ONLY after successful save) ──────
+  // ── Generate bill (with proper error handling) ──────────────────
   const generateBill = useCallback(async (paymentMode, paidAmount) => {
     const table = tableBills[activeTableId];
     if (!table || table.items.length === 0) return { error: 'No items in bill' };
-    const today      = new Date().toISOString().slice(0,10);
-    const todaysOrds = (Array.isArray(orderHistory)?orderHistory:[]).filter(o=>o.date?.startsWith(today));
-    const billNo     = (todaysOrds.length + 1).toString().padStart(4,'0');
+
     const { subtotal, sgst, cgst, discountAmount, grandTotal } = billTotals;
     const paid = parseFloat(paidAmount) || grandTotal;
     const due  = Math.max(0, grandTotal - paid);
+
     const orderData = {
-      billNo,
       tableNo: parseInt(activeTableId.substring(1)),
       items:   table.items.map(i => ({ name:i.name, quantity:i.quantity, price:i.price })),
       subtotal, sgst, cgst,
@@ -291,12 +398,18 @@ export function AppProvider({ children }) {
       customerPhone: table.customerPhone || '',
       customerName:  table.customerName  || '',
     };
+
     try {
-      const res = await fetch(apiUrl('/api/orders'), {
+      const res = await authFetch(apiUrl('/api/orders'), {
         method:'POST', headers:{'Content-Type':'application/json'},
         body: JSON.stringify(orderData)
       });
-      if (!res.ok) throw new Error('Failed to save order');
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || `Server error (${res.status})`);
+      }
+
       const saved = await res.json();
       setOrderHistory(prev => [saved, ...(Array.isArray(prev)?prev:[])]);
       setInvoiceOrder(saved);
@@ -305,23 +418,38 @@ export function AppProvider({ children }) {
       else setTableField(activeTableId, 'dueAmount', due);
       return { success:true, order:saved };
     } catch (err) {
-      return { error: err.message };
+      console.error('Generate bill error:', err);
+      return { error: err.message || 'Failed to generate bill' };
     }
   }, [tableBills, activeTableId, orderHistory, billTotals, clearTable, setTableField]);
 
   // ── Menu CRUD ────────────────────────────────────────────────────
   const saveMenuItem = useCallback(async (data, id) => {
-    const method = id ? 'PUT' : 'POST';
-    const url    = id ? apiUrl(`/api/menu/${id}`) : apiUrl('/api/menu');
-    const res    = await fetch(url, { method, headers:{'Content-Type':'application/json'}, body:JSON.stringify(data) });
-    if (!res.ok) throw new Error('Failed to save menu item');
-    const saved = await res.json();
-    setMenuItems(prev => id ? prev.map(i=>i._id===id?saved:i) : [...prev, saved]);
-    return saved;
-  }, []);
+    const previousMenu = menuItems;
+    if (id) {
+      // Optimistic update for toggles/edits
+      setMenuItems(prev => prev.map(i => i._id === id ? { ...i, ...data } : i));
+    }
+
+    try {
+      const method = id ? 'PUT' : 'POST';
+      const url    = id ? apiUrl(`/api/menu/${id}`) : apiUrl('/api/menu');
+      const res    = await authFetch(url, { method, headers:{'Content-Type':'application/json'}, body:JSON.stringify(data) });
+      
+      if (!res.ok) throw new Error('Failed to save menu item');
+      
+      const saved = await res.json();
+      setMenuItems(prev => id ? prev.map(i => i._id === id ? saved : i) : [...prev, saved]);
+      return saved;
+    } catch (err) {
+      if (id) setMenuItems(previousMenu); // Rollback
+      console.error('Save menu item error:', err);
+      throw err;
+    }
+  }, [menuItems]);
 
   const deleteMenuItem = useCallback(async (id) => {
-    const res = await fetch(apiUrl(`/api/menu/${id}`), { method:'DELETE' });
+    const res = await authFetch(apiUrl(`/api/menu/${id}`), { method:'DELETE' });
     if (!res.ok) throw new Error('Failed to delete');
     setMenuItems(prev => prev.filter(i=>i._id!==id));
   }, []);
@@ -330,7 +458,7 @@ export function AppProvider({ children }) {
   const saveWorker = useCallback(async (data, id) => {
     const method = id ? 'PUT' : 'POST';
     const url    = id ? apiUrl(`/api/workers/${id}`) : apiUrl('/api/workers');
-    const res    = await fetch(url, { method, headers:{'Content-Type':'application/json'}, body:JSON.stringify(data) });
+    const res    = await authFetch(url, { method, headers:{'Content-Type':'application/json'}, body:JSON.stringify(data) });
     if (!res.ok) throw new Error('Failed to save worker');
     const saved = await res.json();
     setWorkers(prev => id ? prev.map(w=>w._id===id?saved:w) : [...prev, saved]);
@@ -338,14 +466,41 @@ export function AppProvider({ children }) {
   }, []);
 
   const deleteWorker = useCallback(async (id) => {
-    const res = await fetch(apiUrl(`/api/workers/${id}`), { method:'DELETE' });
+    const res = await authFetch(apiUrl(`/api/workers/${id}`), { method:'DELETE' });
     if (!res.ok) throw new Error('Failed to delete');
     setWorkers(prev => prev.filter(w=>w._id!==id));
+  }, []);
+
+  const updateWorkerStatus = useCallback((id, isActive) => {
+    setWorkers(prev => prev.map(w => {
+      if (w.userId?._id === id || w.userId === id) {
+        return { ...w, userId: { ...w.userId, isActive } };
+      }
+      return w;
+    }));
+  }, []);
+
+  const settleOrder = useCallback(async (orderId, paidAmount, paymentMode) => {
+    try {
+      const res = await authFetch(apiUrl(`/api/orders/${orderId}/settle`), {
+        method:'PATCH',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ paidAmount, paymentMode })
+      });
+      if (!res.ok) throw new Error('Failed to settle order');
+      const saved = await res.json();
+      setOrderHistory(prev => prev.map(o => o._id === orderId ? saved : o));
+      return saved;
+    } catch (err) {
+      console.error('Settle order error:', err);
+      throw err;
+    }
   }, []);
 
   return (
     <AppContext.Provider value={{
       currentUser, login, logout,
+      forgotPassword, resetPassword,
       role, can, canAccessRole, ROLE_HIERARCHY,
       settings, saveSettings,
       activeSection, setActiveSection,
@@ -357,10 +512,11 @@ export function AppProvider({ children }) {
       billTotals, filteredMenu, categories,
       categoryFilter, setCategoryFilter,
       menuSearch, setMenuSearch,
-      getTableStatus, generateBill,
+      getTableStatus, generateBill, settleOrder,
       invoiceOrder, setInvoiceOrder,
       saveMenuItem, deleteMenuItem,
-      saveWorker, deleteWorker,
+      saveWorker, deleteWorker, updateWorkerStatus,
+      toast, showToast,
       NUM_TABLES,
     }}>
       {children}

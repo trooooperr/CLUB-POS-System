@@ -44,24 +44,29 @@ const Tip = ({ active, payload, label }) => {
 };
 
 function DateField({ value, onChange, inputRef, label }) {
+  const triggerPicker = () => {
+    if (inputRef?.current) {
+      if (typeof inputRef.current.showPicker === 'function') {
+        inputRef.current.showPicker();
+      } else {
+        inputRef.current.focus();
+      }
+    }
+  };
+
   return (
     <div className="sales-date-field">
       <span className="sales-date-label">{label}</span>
-      <input
-        type="date"
-        value={value}
-        onChange={onChange}
-        className="d-input unified-date-input"
-        ref={inputRef}
-      />
-      <button
-        type="button"
-        className="sales-calendar-trigger"
-        aria-label={`Open ${label} date picker`}
-        onClick={() => inputRef?.current?.showPicker && inputRef.current.showPicker()}
-      >
-        <CalendarDays size={15} />
-      </button>
+      <div className="sales-date-input-wrapper">
+        <input
+          type="date"
+          value={value}
+          onChange={onChange}
+          className="d-input unified-date-input"
+          ref={inputRef}
+        />
+        <CalendarDays size={13} className="sales-calendar-icon" onClick={triggerPicker} />
+      </div>
     </div>
   );
 }
@@ -139,9 +144,9 @@ export default function SalesPage() {
             ))}
           </div>
 
-           <div className={`unified-pill-box date-box-res ${range === 'custom' ? 'active-border' : ''}`}>
+           <div className={`unified-pill-box date-box-res ${range === 'custom' ? 'active-border' : ''}`} style={{ gap: 12, paddingLeft: 12, paddingRight: 12 }}>
              <DateField label="From" value={startDate} onChange={e => handleDateChange('start', e.target.value)} inputRef={startInputRef} />
-             <ArrowRight size={12} className="txt-t2" />
+             <ArrowRight size={14} style={{ color: 'var(--t2)', flexShrink: 0 }} />
              <DateField label="To" value={endDate} onChange={e => handleDateChange('end', e.target.value)} inputRef={endInputRef} />
            </div>
         </div>
@@ -242,48 +247,50 @@ export default function SalesPage() {
         }
         .unified-date-input::-webkit-calendar-picker-indicator {
           opacity: 0;
+          position: absolute;
+          width: 100%;
+          height: 100%;
+          cursor: pointer;
         }
         .unified-date-input {
-          color-scheme: light;
+          flex: 1;
+          color-scheme: dark;
+          font-family: inherit;
+          cursor: pointer;
         }
         .lm .unified-date-input {
           color-scheme: light;
         }
-        body:not(.lm) .unified-date-input {
-          color-scheme: dark;
-        }
         .sales-date-field {
-          display: grid;
-          grid-template-columns: auto 1fr auto;
+          display: flex;
           align-items: center;
           gap: 8px;
           min-width: 0;
         }
         .sales-date-label {
           font-size: 10px;
-          font-weight: 700;
+          font-weight: 800;
           text-transform: uppercase;
-          letter-spacing: 0.08em;
+          letter-spacing: 0.1em;
           color: var(--t2);
+          white-space: nowrap;
         }
-        .sales-calendar-trigger {
-          width: 28px;
-          height: 28px;
+        .sales-date-input-wrapper {
+          position: relative;
+          display: flex;
+          align-items: center;
+          background: var(--s1);
           border: 1px solid var(--b1);
           border-radius: 8px;
-          background: var(--s1);
-          color: var(--t1);
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
+          padding: 0 10px;
+          height: 34px;
+          min-width: 120px;
+        }
+        .sales-calendar-icon {
+          color: var(--t2);
           cursor: pointer;
-          transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
         }
-        .sales-calendar-trigger:hover {
-          background: var(--s3);
-          color: var(--t0);
-          border-color: var(--b2);
-        }
+        .sales-calendar-icon:hover { color: var(--a); }
 
         .kpi-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
         .charts-equal-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }

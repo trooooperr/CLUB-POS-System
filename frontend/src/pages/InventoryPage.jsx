@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, X, ChevronDown, ChevronUp, Search } from 'lucide-react';
 import { useApp } from '../context/AppContext';
-import { apiUrl } from '../lib/api';
+import { apiUrl, authFetch } from '../lib/api';
 
 const UNITS = ['Bottles','Cans','Litre','ml','Kg','Gram','Pieces'];
 
@@ -108,7 +108,8 @@ function StockModal({ item, onClose, onSave }) {
 
 /* MAIN */
 export default function InventoryPage() {
-  const { settings } = useApp();
+  const { settings, role, can } = useApp();
+  const isAdmin = role === 'admin' || role === 'manager';
   const categories = Array.isArray(settings.inventoryCategories) && settings.inventoryCategories.length > 0
     ? settings.inventoryCategories
     : ['General'];
@@ -119,7 +120,7 @@ export default function InventoryPage() {
   const [cat, setCat] = useState('All');
 
   useEffect(() => {
-    fetch(apiUrl('/api/inventory')).then(r=>{
+    authFetch(apiUrl('/api/inventory')).then(r=>{
       if (!r.ok) throw new Error('Failed to fetch inventory');
       return r.json();
     }).then(data => {
@@ -131,61 +132,79 @@ export default function InventoryPage() {
   }, []);
 
   const adjust = async (id, val) => {
+    // Optimistic local state update
+    const previousInventory = inventory;
+    setInventory(prev => prev.map(i => 
+      i._id === id ? { ...i, stock: Math.max(0, i.stock + val) } : i
+    ));
+
     try {
-      const res = await fetch(apiUrl(`/api/inventory/${id}/stock`), {
+      const res = await authFetch(apiUrl(`/api/inventory/${id}/stock`), {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ quantityChange: val })
       });
       if (!res.ok) throw new Error('Failed to update stock');
+      
       const updated = await res.json();
+      // Sync with final server state
       setInventory(prev => prev.map(i => i._id === id ? updated : i));
-      // Optionally: update menu in context if you use context for menu
       if (window.updateMenuContext) window.updateMenuContext();
     } catch (err) {
+      setInventory(previousInventory); // Rollback
       console.error('Stock update error', err);
     }
   };
 
   const handleSave = async (data, setModalError, closeModal) => {
+    const previousInventory = inventory;
+    
+    // Minimal optimistic local update for edits
+    if (data._id) {
+       setInventory(prev => prev.map(i => i._id === data._id ? { ...i, ...data } : i));
+    }
+    
+    if (closeModal) closeModal(); // Close UI immediately
+
     try {
       let res;
       if (data._id) {
-        res = await fetch(apiUrl(`/api/inventory/${data._id}`), {
+        res = await authFetch(apiUrl(`/api/inventory/${data._id}`), {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(data)
         });
       } else {
-        res = await fetch(apiUrl('/api/inventory'), {
+        res = await authFetch(apiUrl('/api/inventory'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(data)
         });
       }
+      
       if (!res.ok) {
+        setInventory(previousInventory); // Rollback
         let errMsg = 'Failed to save';
         try {
           const text = await res.text();
           errMsg = JSON.parse(text).message || errMsg;
-        } catch {
-          // If not JSON, show a friendly message
-          errMsg = 'Server error or not reachable. Please check backend.';
-        }
-        if (setModalError) setModalError(errMsg);
+        } catch {}
+        alert(errMsg);
         return;
       }
-      // Always reload inventory and menu after save
-      const [inv, menu] = await Promise.all([
-        fetch(apiUrl('/api/inventory')).then(r=>r.json()),
-        fetch(apiUrl('/api/menu')).then(r=>r.json())
-      ]);
-      setInventory(Array.isArray(inv) ? inv : []);
-      if (window.updateMenuContext) window.updateMenuContext(menu);
-      if (closeModal) closeModal();
+      
+      const saved = await res.json();
+      // Apply the final saved object
+      setInventory(prev => {
+        if (data._id) return prev.map(i => i._id === data._id ? saved : i);
+        return [...prev, saved];
+      });
+      
+      if (window.updateMenuContext) window.updateMenuContext();
     } catch (err) {
-      if (setModalError) setModalError('Save error: ' + err.message);
+      setInventory(previousInventory);
       console.error('Save error', err);
+      alert('Save failed: ' + err.message);
     }
   }
 
@@ -200,9 +219,11 @@ export default function InventoryPage() {
       {/* HEADER */}
       <div style={{ display:'flex', justifyContent:'space-between', marginBottom:12 }}>
         <h2 className="ph-title">Inventory</h2>
-        <button className="btn btn-primary" onClick={()=>setModal('add')}>
-          <Plus size={16}/> Add
-        </button>
+        {isAdmin && (
+          <button className="btn btn-primary" onClick={()=>setModal('add')}>
+            <Plus size={16}/> Add
+          </button>
+        )}
       </div>
 
       {/* SEARCH */}
@@ -256,11 +277,17 @@ export default function InventoryPage() {
                 </div>
               </div>
 
-              <div className="invActions">
-                <button className="btn btn-danger btn-sm" onClick={()=>adjust(i._id,-1)}>-</button>
-                <button className="btn btn-success btn-sm" onClick={()=>adjust(i._id,1)}>+</button>
-                <button className="btn btn-blue btn-sm" onClick={()=>setModal(i)}>Edit</button>
-              </div>
+              {isAdmin ? (
+                <div className="invActions">
+                  <button className="btn btn-danger btn-sm" onClick={()=>adjust(i._id,-1)}>-</button>
+                  <button className="btn btn-success btn-sm" onClick={()=>adjust(i._id,1)}>+</button>
+                  <button className="btn btn-blue btn-sm" onClick={()=>setModal(i)}>Edit</button>
+                </div>
+              ) : (
+                <div className="invActions view-only-label" style={{ padding: '4px 0', fontSize: 11, color: 'var(--t3)', fontStyle: 'italic' }}>
+                  Read-only Access
+                </div>
+              )}
 
               <div className="expand" onClick={()=>setExpanded(open?null:i._id)}>
                 {open ? <ChevronUp size={14}/> : <ChevronDown size={14}/>} 
@@ -287,7 +314,7 @@ export default function InventoryPage() {
               <th>Unit</th>
               <th>Stock</th>
               <th>Status</th>
-              <th>Actions</th>
+              {isAdmin && <th>Actions</th>}
             </tr>
           </thead>
 
@@ -301,11 +328,13 @@ export default function InventoryPage() {
                   <td>{i.unit}</td>
                   <td>{i.stock}</td>
                   <td><span className={`badge ${s.cls}`}>{s.text}</span></td>
-                  <td className="action-cell">
-                    <button className="btn btn-danger btn-sm" onClick={()=>adjust(i._id,-1)}>-</button>
-                    <button className="btn btn-success btn-sm" onClick={()=>adjust(i._id,1)}>+</button>
-                    <button className="btn btn-blue btn-sm" onClick={()=>setModal(i)}>Edit</button>
-                  </td>
+                  {isAdmin && (
+                    <td className="action-cell">
+                      <button className="btn btn-danger btn-sm" onClick={()=>adjust(i._id,-1)}>-</button>
+                      <button className="btn btn-success btn-sm" onClick={()=>adjust(i._id,1)}>+</button>
+                      <button className="btn btn-blue btn-sm" onClick={()=>setModal(i)}>Edit</button>
+                    </td>
+                  )}
                 </tr>
               );
             })}

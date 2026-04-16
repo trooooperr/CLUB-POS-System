@@ -3,26 +3,42 @@ const cors = require('cors');
 const bodyParser = require('body-parser');
 const path = require('path');
 const fs = require('fs');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 const { isRedisHealthy } = require('./src/lib/redis');
+const { requireAuth } = require('./src/middleware/auth');
 
 const app = express();
 
 app.disable('x-powered-by');
 
+// ── Security headers ────────────────────────────────────────────
+app.use(helmet({
+  contentSecurityPolicy: false,  // Allow inline styles/scripts in frontend
+  crossOriginEmbedderPolicy: false,
+}));
+
+// ── CORS ────────────────────────────────────────────────────────
 app.use(cors({ origin: true, credentials: true }));
-app.use(bodyParser.json());
 
-app.use('/api/menu', require('./src/routes/menu'));
-app.use('/api/orders', require('./src/routes/orders'));
-app.use('/api/workers', require('./src/routes/workers'));
-app.use('/api/reports', require('./src/routes/reports'));
-app.use('/api/settings', require('./src/routes/settings'));
-app.use('/api/inventory', require('./src/routes/inventory'));
+// ── Body parsing ────────────────────────────────────────────────
+app.use(bodyParser.json({ limit: '2mb' }));
 
-// HEALTH (NO GLOBAL STATE)
+// ── Rate limiting on auth endpoints ─────────────────────────────
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,   // 15 minutes
+  max: 20,                      // 20 attempts per window
+  message: { error: 'Too many login attempts, please try again after 15 minutes' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// ── Public routes (no auth required) ────────────────────────────
+app.use('/api/auth', authLimiter, require('./src/routes/auth'));
+
+// ── Health checks (no auth required) ────────────────────────────
 app.get('/api/health', async (req, res) => {
   const redis = await isRedisHealthy();
-
   res.json({
     status: 'ok',
     redis,
@@ -34,7 +50,17 @@ app.get('/ready', (req, res) => {
   res.json({ ready: true });
 });
 
-// static
+// ── Protected API routes (auth required) ────────────────────────
+const { router: reportsRouter } = require('./src/routes/reports');
+
+app.use('/api/menu',      requireAuth, require('./src/routes/menu'));
+app.use('/api/orders',    requireAuth, require('./src/routes/orders'));
+app.use('/api/workers',   requireAuth, require('./src/routes/workers'));
+app.use('/api/reports',   requireAuth, reportsRouter);
+app.use('/api/settings',  requireAuth, require('./src/routes/settings'));
+app.use('/api/inventory', requireAuth, require('./src/routes/inventory'));
+
+// ── Static files (frontend dist) ────────────────────────────────
 const frontendDist = path.join(__dirname, 'frontend', 'dist');
 
 app.use(express.static(frontendDist));

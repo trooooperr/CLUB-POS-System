@@ -138,6 +138,9 @@ export default function MenuPage() {
               </div>
             ) : (
               <>
+                {!item.available && (
+                  <div className="sold-out-badge">SOLD OUT</div>
+                )}
                 <div className="menu-card-top">
                   <div><div className="menu-item-name">{item.name}</div><span className="badge-mini">{item.category}</span></div>
                   <div className="menu-item-price">₹{item.price.toFixed(0)}</div>
@@ -176,6 +179,7 @@ export default function MenuPage() {
                       <input type="checkbox" checked={item.available} onChange={e => saveMenuItem({ available: e.target.checked }, item._id)} />
                       <span className="slider round"></span>
                     </label>
+                    {!item.available && <span style={{ color:'var(--red)', fontSize:9, fontWeight:800, marginLeft:5 }}>SOLD OUT</span>}
                   </td>
                   <td style={{ textAlign:'center' }}>
                     {confirmDel === item._id ? (
@@ -257,6 +261,22 @@ export default function MenuPage() {
   .lbl {
     font-size: 13px;
   }
+}
+.sold-out-badge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: var(--red);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 6px;
+  z-index: 10;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+}
+.menu-mobile-card:has(.sold-out-badge) {
+  opacity: 0.8;
 }
         `
       }</style>

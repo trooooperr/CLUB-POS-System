@@ -1,20 +1,26 @@
 const request = require('supertest');
 const app = require('../../app');
 const User = require('../models/User');
-const MenuItem = require('../models/MenuItem');
+const Settings = require('../models/Settings');
 const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');
 const { generateToken } = require('../middleware/auth');
 
 let mongo;
 
-describe('Menu API', () => {
+describe('Settings API', () => {
   let token;
 
   beforeAll(async () => {
     mongo = await MongoMemoryServer.create();
     await mongoose.connect(mongo.getUri());
     
+    // Seed settings
+    await Settings.create({
+      restaurantName: 'HumTum POS',
+      currency: '₹'
+    });
+
     const user = await User.create({
       name: 'Admin',
       username: 'admin',
@@ -22,13 +28,6 @@ describe('Menu API', () => {
       role: 'admin'
     });
     token = generateToken(user);
-
-    await MenuItem.create({
-      name: 'Test Pizza',
-      category: 'Main Course',
-      price: 200,
-      available: true
-    });
   }, 30000);
 
   afterAll(async () => {
@@ -36,18 +35,26 @@ describe('Menu API', () => {
     await mongo.stop();
   });
 
-  it('should fetch menu with valid auth', async () => {
+  it('should fetch business settings', async () => {
     const res = await request(app)
-      .get('/api/menu')
+      .get('/api/settings')
       .set('Authorization', `Bearer ${token}`);
-
+    
     expect(res.statusCode).toBe(200);
-    expect(Array.isArray(res.body)).toBe(true);
-    expect(res.body.length).toBeGreaterThan(0);
+    expect(res.body.restaurantName).toBe('HumTum POS');
   });
 
-  it('should return 401 without auth', async () => {
-    const res = await request(app).get('/api/menu');
-    expect(res.statusCode).toBe(401);
+  it('should update business settings', async () => {
+    const res = await request(app)
+      .put('/api/settings')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        restaurantName: 'HumTum Updated',
+        sgstRate: 3.5
+      });
+    
+    expect(res.statusCode).toBe(200);
+    expect(res.body.restaurantName).toBe('HumTum Updated');
+    expect(res.body.sgstRate).toBe(3.5);
   });
 });
