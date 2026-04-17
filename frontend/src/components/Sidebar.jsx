@@ -31,7 +31,7 @@ export default function Sidebar() {
             <div className="logo-name" style={{ fontFamily:'Pacifico,cursive', color:'var(--a)' }}>
               {settings.restaurantName?.split(' ').slice(0,2).join(' ') || 'HumTum'}
             </div>
-            <div className="logo-sub">Bar & Restaurant POS</div>
+            <div className="logo-sub">Bar & Restaurant</div>
           </div>
           <button className="iBtn" style={{ padding:4 }} onClick={()=>setSidebarOpen(false)}><X size={12}/></button>
         </div>
