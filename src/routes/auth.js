@@ -328,7 +328,7 @@ async function seedDefaultUsers() {
   try {
     console.log('📦 Synchronizing default users...');
     const defaults = [
-      { name: 'Owner', username: 'admin', passwordHash: 'admin123', role: 'admin', email: process.env.ADMIN_EMAIL || 'alokgupta1605@gmail.com' },
+      { name: 'Owner', username: 'admin', passwordHash: 'admin123', role: 'admin', email: process.env.ADMIN_EMAIL || 'shubhampriy11@gmail.com' },
     ];
 
     for (const u of defaults) {
