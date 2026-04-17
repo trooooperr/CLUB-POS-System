@@ -1,8 +1,11 @@
-const rawBase =
-  import.meta.env.VITE_API_URL ||
-  window.location.origin; 
+const rawBase = import.meta.env.VITE_API_URL || '';
 
-export const API_BASE = rawBase.replace(/\/$/, '');
+// SAFETY: If VITE_API_URL is accidentally set to localhost BUT we are on a real domain (like Render),
+// ignore the localhost setting and use the current window origin instead.
+const useLocationOrigin = !rawBase || 
+  (rawBase.includes('localhost') && !window.location.hostname.includes('localhost'));
+
+export const API_BASE = (useLocationOrigin ? window.location.origin : rawBase).replace(/\/$/, '');
 
 export function apiUrl(path) {
   if (!path.startsWith('/')) {
