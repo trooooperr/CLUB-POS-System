@@ -133,7 +133,7 @@ function PayModal({ total, currency, onClose, onConfirm }) {
             style={{ flex: 1, borderRadius: 10 }}
             onClick={() => onConfirm(p)}
           >
-            {isPrintOnly ? 'Hold' : 'Confirm'}
+            {isPrintOnly ? 'Print' : 'Print'}
           </button>
         </div>
 
