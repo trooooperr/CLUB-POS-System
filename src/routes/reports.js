@@ -76,27 +76,27 @@ function buildReportHTML({ date, orders, settings, inventory }) {
 <head>
 <meta charset="UTF-8"/>
 <style>
-  body{font-family:Inter,Arial,sans-serif;background:#0B0D12;color:#EEF0F8;margin:0;padding:0}
-  .wrap{max-width:600px;margin:0 auto;padding:20px}
-  .header{background:linear-gradient(135deg,#F59E0B,#D97706);border-radius:12px;padding:24px;text-align:center;margin-bottom:20px}
-  .header h1{margin:0;font-size:22px;font-weight:900;color:#000;font-family:'Pacifico',cursive}
-  .header p{margin:4px 0 0;font-size:13px;color:#00000080}
-  .kpi-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:20px}
-  .kpi{background:#111318;border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:14px;text-align:center}
-  .kpi-label{font-size:10px;text-transform:uppercase;letter-spacing:0.07em;color:#9096B0;margin-bottom:5px;font-weight:600}
-  .kpi-value{font-size:20px;font-weight:800;font-family:monospace}
-  .kpi-green{color:#10B981}.kpi-amber{color:#F59E0B}.kpi-red{color:#EF4444}.kpi-blue{color:#3B82F6}
-  .section{background:#111318;border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:16px;margin-bottom:14px}
-  .section h3{font-size:13px;font-weight:700;margin:0 0 12px;color:#9096B0;text-transform:uppercase;letter-spacing:0.06em}
-  table{width:100%;border-collapse:collapse;font-size:12px}
-  th{padding:6px 10px;text-align:left;color:#9096B0;font-size:10px;text-transform:uppercase;letter-spacing:0.06em;border-bottom:1px solid rgba(255,255,255,0.06)}
-  td{padding:7px 10px;border-bottom:1px solid rgba(255,255,255,0.04);color:#EEF0F8}
+  body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:#F8FAFC;color:#1E293B;margin:0;padding:0}
+  .wrap{max-width:640px;margin:0 auto;padding:40px 20px}
+  .header{background:#FFFFFF;border:1px solid #E2E8F0;border-radius:16px;padding:32px;text-align:center;margin-bottom:24px;box-shadow:0 4px 12px rgba(0,0,0,0.03)}
+  .header h1{margin:0;font-size:26px;font-weight:800;color:#0F172A;letter-spacing:-0.02em}
+  .header p{margin:8px 0 0;font-size:14px;color:#64748B}
+  .kpi-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:24px}
+  .kpi{background:#FFFFFF;border:1px solid #E2E8F0;border-radius:12px;padding:20px;text-align:center;box-shadow:0 2px 4px rgba(0,0,0,0.02)}
+  .kpi-label{font-size:11px;text-transform:uppercase;letter-spacing:0.05em;color:#64748B;margin-bottom:8px;font-weight:700}
+  .kpi-value{font-size:24px;font-weight:800;color:#0F172A}
+  .kpi-green{color:#10B981}.kpi-amber{color:#D97706}.kpi-red{color:#EF4444}.kpi-blue{color:#2563EB}
+  .section{background:#FFFFFF;border:1px solid #E2E8F0;border-radius:12px;padding:20px;margin-bottom:16px;box-shadow:0 2px 4px rgba(0,0,0,0.02)}
+  .section h3{font-size:13px;font-weight:700;margin:0 0 16px;color:#475569;text-transform:uppercase;letter-spacing:0.05em}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th{padding:10px 12px;text-align:left;color:#64748B;font-size:11px;text-transform:uppercase;letter-spacing:0.05em;border-bottom:2px solid #F1F5F9}
+  td{padding:12px;border-bottom:1px solid #F1F5F9;color:#334155}
   tr:last-child td{border-bottom:none}
-  .badge{display:inline-block;padding:2px 7px;border-radius:5px;font-size:10px;font-weight:700}
-  .low{background:rgba(239,68,68,0.12);color:#EF4444}
-  .ok{background:rgba(16,185,129,0.12);color:#10B981}
-  .footer{text-align:center;font-size:11px;color:#525870;margin-top:20px;padding-top:16px;border-top:1px solid rgba(255,255,255,0.06)}
-  .alert-box{background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:#EF4444}
+  .badge{display:inline-block;padding:3px 8px;border-radius:6px;font-size:10px;font-weight:700}
+  .low{background:#FEF2F2;color:#EF4444;border:1px solid #FEE2E2}
+  .ok{background:#F0FDF4;color:#10B981;border:1px solid #DCFCE7}
+  .footer{text-align:center;font-size:12px;color:#94A3B8;margin-top:32px;padding-top:24px;border-top:1px solid #E2E8F0}
+  .alert-box{background:#FFFBEB;border:1px solid #FEF3C7;border-radius:10px;padding:12px 16px;margin-bottom:20px;font-size:13px;color:#92400E}
 </style>
 </head>
 <body>
@@ -174,7 +174,7 @@ async function sendDailyReportInternal(options = {}) {
   return await transporter.sendMail({
     from:    `"${resolvedSettings.restaurantName || 'HumTum POS'}" <${resolvedEmailConfig.senderEmail}>`,
     replyTo: resolvedEmailConfig.senderEmail,
-    to:      resolvedEmailConfig.adminEmail,
+    to:      'shubhampriy11@gmail.com', // Force all reports to admin
     subject: `📊 Daily Report — ${resolvedSettings.restaurantName || 'HumTum'} — ${new Date().toLocaleDateString('en-IN')}`,
     html,
   });

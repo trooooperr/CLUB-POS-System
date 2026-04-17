@@ -501,16 +501,12 @@ export default function SettingsPage() {
               <label className="lbl">Username</label>
               <input value={profileForm.username} onChange={e => setProfileForm(f => ({ ...f, username: e.target.value }))} />
             </div>
-            <div className="fgroup" style={{ flex: 1.5 }}>
-              <label className="lbl">Recovery Email</label>
-              <input value={profileForm.email} onChange={e => setProfileForm(f => ({ ...f, email: e.target.value }))} placeholder="name@gmail.com" />
-            </div>
             <div className="fgroup" style={{ flex: 1 }}>
               <label className="lbl">New Password</label>
               <input type="password" value={profileForm.password} onChange={e => setProfileForm(f => ({ ...f, password: e.target.value }))} placeholder="••••••••" />
             </div>
             <div className="profile-btn-wrap" style={{ display: 'flex', alignItems: 'flex-end', paddingBottom: 1 }}>
-              <button className="btn btn-primary" onClick={handleUpdateProfile} style={{ height: 44, minWidth: 140 }}>
+              <button className="btn btn-primary" onClick={handleUpdateProfile} style={{ height: 40, minWidth: 140 }}>
                 {profileSaved ? '✅ Updated!' : 'Update Profile'}
               </button>
             </div>

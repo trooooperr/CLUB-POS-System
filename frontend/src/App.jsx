@@ -73,11 +73,6 @@ function Shell() {
           </div>
         )}
 
-        {currentUser?.mustChangePassword && activeSection !== 'settings' && (
-          <div style={{ background:'var(--amber)', color:'#000', padding:'8px 18px', textAlign:'center', fontSize:12, fontWeight:700 }}>
-            🔒 security update required: please change your password in settings to continue.
-          </div>
-        )}
         <main className="main">{pages[activeSection]||<BillingPage/>}</main>
       </div>
       {invoiceOrder && <InvoiceModal/>}

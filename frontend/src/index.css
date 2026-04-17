@@ -246,7 +246,7 @@ input:checked+.tslider:before { transform:translateX(18px) }
 
 /* ── Mobile ───────────────────────────────────── */
 @media(max-width:900px) {
-  .sbar  { position:fixed; top:0; bottom:0; left:-232px; transition:left 0.25s ease }
+  .sbar  { position:fixed; top:0; bottom:0; left:-232px; transition:left 0.25s ease; z-index:2000 }
   .sbar.open { left:0 }
   .main  { padding:12px }
   .tgrid { grid-template-columns:repeat(3,1fr) }

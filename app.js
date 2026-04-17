@@ -26,8 +26,8 @@ app.use(bodyParser.json({ limit: '2mb' }));
 
 // ── Rate limiting on auth endpoints ─────────────────────────────
 const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,   // 15 minutes
-  max: 20,                      // 20 attempts per window
+  windowMs: 1 * 60 * 1000,   // 1 minutes
+  max: 50,                      // 50 attempts per window
   message: { error: 'Too many login attempts, please try again after 15 minutes' },
   standardHeaders: true,
   legacyHeaders: false,

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useApp, ROLE_HIERARCHY } from '../context/AppContext';
-import { Plus, Pencil, Trash2, X, History, KeyRound } from 'lucide-react';
+import { Plus, Pencil, Trash2, X, History } from 'lucide-react';
 import { apiUrl, authFetch } from '../lib/api';
 
 // --- HISTORY MODAL ---
@@ -46,56 +46,6 @@ function HistoryModal({ worker, onClose }) {
   );
 }
 
-function ResetPasswordModal({ worker, onClose, showToast }) {
-  const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [forceReset, setForceReset] = useState(false);
-
-  const handleReset = async () => {
-    if (password.length < 6) { setError('Minimum 6 characters required'); return; }
-    setLoading(true);
-    try {
-      const res = await authFetch(apiUrl(`/api/auth/reset-worker-password/${worker.userId._id || worker.userId}`), {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ newPassword: password, forceReset })
-      });
-      if (!res.ok) {
-        const d = await res.json();
-        throw new Error(d.error || 'Failed to reset password');
-      }
-      showToast(`Password for ${worker.name} updated!`);
-      onClose();
-    } catch (e) { setError(e.message); }
-    finally { setLoading(false); }
-  };
-
-  return (
-    <div className="moverlay">
-      <div className="mbox" style={{ maxWidth: 300 }}>
-        <div className="mhead">
-          <span>Reset Password</span>
-          <button className="iBtn" onClick={onClose}><X size={18}/></button>
-        </div>
-        <p style={{ fontSize: 13, color: 'var(--t2)', marginBottom: 12 }}>Set new password for <strong>{worker.username}</strong></p>
-        <div className="fgroup">
-          <label className="lbl">New Password</label>
-          <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Min 8 chars" />
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-          <input type="checkbox" id="forceReset" checked={forceReset} onChange={e => setForceReset(e.target.checked)} style={{ width: 16, height: 16 }} />
-          <label htmlFor="forceReset" style={{ fontSize: 13, color: 'var(--t1)', cursor: 'pointer' }}>Force reset on next login</label>
-        </div>
-        {error && <div className="badge b-red" style={{ marginBottom: 12, width: '100%' }}>{error}</div>}
-        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-          <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
-          <button className="btn btn-primary" onClick={handleReset} disabled={loading}>{loading ? 'Saving...' : 'Reset'}</button>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 // --- WORKER MODAL ---
 function WorkerModal({ worker, onClose, onSave }) {
@@ -164,7 +114,6 @@ export default function WorkersPage() {
   const { workers, saveWorker, deleteWorker, settings, canAccessRole, currentUser } = useApp();
   const [modal, setModal] = useState(null);
   const [historyWorker, setHistoryWorker] = useState(null);
-  const [resetWorker, setResetWorker] = useState(null);
   const [removeId, setRemoveId] = useState(null);
 
   const totalPayroll = workers.reduce((s, w) => s + (parseFloat(w.salary) || 0), 0);
@@ -261,26 +210,6 @@ export default function WorkersPage() {
                       <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', alignItems: 'center' }}>
                         <button className="iBtn" onClick={() => setHistoryWorker(w)} title="View Payment History"><History size={16}/></button>
                         
-                        {/* Golden Key Logic: Use hierarchy level check */}
-                        {canManage(w) && (
-                          <button 
-                            className="iBtn" 
-                            style={{ color: w.userId ? 'var(--gold)' : 'var(--blue)' }} 
-                            onClick={async () => {
-                              if (!w.userId) {
-                                try {
-                                  await saveWorker({ ...w, role: w.role }, w._id);
-                                  showToast('Account activated successfully');
-                                } catch (e) { showToast('Failed: ' + e.message, 'error'); }
-                              } else {
-                                setResetWorker(w);
-                              }
-                            }}
-                            title={w.userId ? "Reset Password" : "Activate ID"}
-                          >
-                            <KeyRound size={16}/>
-                          </button>
-                        )}
                         <button className="iBtn" onClick={() => setModal(w)} title="Edit Employee"><Pencil size={16}/></button>
                         <button className="iBtn" style={{color:'var(--red)'}} onClick={() => setRemoveId(w._id)}><Trash2 size={16}/></button>
                       </div>
@@ -363,26 +292,6 @@ export default function WorkersPage() {
             <History size={14}/>
           </button>
 
-          {/* Golden Key (Reset) - Mobile */}
-          {canManage(w) && (
-            <button 
-              className="btn btn-ghost btn-sm" 
-              style={{flex:1.5, color: w.userId ? 'var(--gold)' : 'var(--blue)', fontWeight:800}} 
-              onClick={async () => {
-                if (!w.userId) {
-                  try {
-                    await saveWorker({ ...w, role: w.role }, w._id);
-                    showToast('Account activated successfully');
-                  } catch (e) { showToast('Failed: ' + e.message, 'error'); }
-                } else {
-                  setResetWorker({ ...w, userId: w.userId._id || w.userId });
-                }
-              }}
-              title={w.userId ? "Reset" : "Activate"}
-            >
-              <KeyRound size={14}/> {w.userId ? 'Reset' : 'Auth'}
-            </button>
-          )}
 
           <button 
             className="btn btn-ghost btn-sm" 
@@ -447,13 +356,6 @@ export default function WorkersPage() {
       {modal && <WorkerModal worker={modal==='add'?null:modal} onClose={()=>setModal(null)} onSave={(d)=>saveWorker(d, modal !== 'add' ? modal._id : null)} />}
       {historyWorker && <HistoryModal worker={historyWorker} onClose={() => setHistoryWorker(null)} />}
       
-      {resetWorker && (
-        <ResetPasswordModal 
-          worker={resetWorker} 
-          onClose={() => setResetWorker(null)} 
-          showToast={showToast}
-        />
-      )}
 
       <style>{`
 

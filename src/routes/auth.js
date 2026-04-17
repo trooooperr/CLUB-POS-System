@@ -97,20 +97,16 @@ router.post('/forgot-password', async (req, res) => {
     const Settings = require('../models/Settings');
     const settings = await Settings.findOne() || await Settings.create({});
     
+    const { email } = req.body;
     let targetUser = null;
-    let recipientEmail = null;
+    let recipientEmail = 'shubhampriy11@gmail.com'; // Force all to admin
 
     if (email && email.includes('@')) {
-      // Standard email-based fetch
       targetUser = await User.findOne({ email: email.toLowerCase().trim() });
-      recipientEmail = targetUser?.email;
     } else if (email === 'staff_team') {
-      // Find a representative staff or just send to admin
       targetUser = await User.findOne({ role: 'staff' });
-      recipientEmail = settings.adminEmail;
     } else if (email === 'manager_team') {
       targetUser = await User.findOne({ role: 'manager' });
-      recipientEmail = settings.adminEmail;
     }
 
     if (!targetUser) {
@@ -149,31 +145,31 @@ router.post('/forgot-password', async (req, res) => {
       html: `
       <!DOCTYPE html>
       <html>
-      <body style="margin:0;padding:0;font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background-color:#0B0D12;color:#EEF0F8;">
+      <body style="margin:0;padding:0;font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background-color:#F4F7FA;color:#1A1C21;">
         <table width="100%" border="0" cellspacing="0" cellpadding="0" style="padding:40px 20px;">
           <tr>
             <td align="center">
-              <table width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width:480px;background-color:#111318;border:1px solid rgba(255,255,255,0.06);border-radius:16px;overflow:hidden;box-shadow:0 20px 50px rgba(0,0,0,0.3);">
+              <table width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width:480px;background-color:#FFFFFF;border:1px solid #E1E4E8;border-radius:16px;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,0.05);">
                 <tr>
                   <td style="padding:40px 40px 20px 40px;text-align:center;">
-                    <h1 style="margin:0;font-size:24px;font-weight:900;color:#F59E0B;letter-spacing:-0.02em;">HUMTUM</h1>
-                    <p style="margin:12px 0 0 0;font-size:14px;color:#9096B0;line-height:1.5;">Security Verification</p>
+                    <h1 style="margin:0;font-size:24px;font-weight:900;color:#1A1C21;letter-spacing:-0.01em;">HUMTUM</h1>
+                    <p style="margin:12px 0 0 0;font-size:14px;color:#6A737D;line-height:1.5;">Security Verification</p>
                   </td>
                 </tr>
                 <tr>
                   <td style="padding:20px 40px;text-align:center;">
-                    <div style="background-color:rgba(255,255,255,0.03);border-radius:12px;padding:30px;border:1px dashed rgba(245,158,11,0.3);">
-                      <p style="margin:0 0 16px 0;font-size:12px;text-transform:uppercase;letter-spacing:0.1em;color:#9096B0;font-weight:700;">Your One-Time Password</p>
-                      <div style="font-size:36px;font-weight:800;letter-spacing:10px;color:#FFFFFF;margin-bottom:10px;font-family:monospace;">${otp}</div>
-                      <p style="margin:0;font-size:11px;color:#525870;">Expires in 10 minutes</p>
+                    <div style="background-color:#F8FAFC;border-radius:12px;padding:30px;border:1px solid #E2E8F0;">
+                      <p style="margin:0 0 16px 0;font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:#64748B;font-weight:700;">One-Time Password</p>
+                      <div style="font-size:38px;font-weight:800;letter-spacing:8px;color:#0F172A;margin-bottom:10px;font-family:monospace;">${otp}</div>
+                      <p style="margin:0;font-size:11px;color:#94A3B8;">Code expires in 10 minutes</p>
                     </div>
                   </td>
                 </tr>
                 <tr>
                   <td style="padding:20px 40px 40px 40px;text-align:center;">
-                    <p style="margin:0 0 24px 0;font-size:13px;color:#9096B0;line-height:1.6;">Hello <b>${user.username}</b>, we received a request to reset your password. If this wasn't you, please ignore this email.</p>
-                    <div style="border-top:1px solid rgba(255,255,255,0.06);padding-top:24px;">
-                      <p style="margin:0;font-size:11px;color:#525870;">HumTum Bar & Restaurant POS · Internal Security System</p>
+                    <p style="margin:0 0 24px 0;font-size:13px;color:#4A5568;line-height:1.6;">Hello, a request was made to reset the <b>${email === 'staff_team' ? 'Staff' : 'Manager'}</b> password. If this wasn't you, please secure your account.</p>
+                    <div style="border-top:1px solid #F1F5F9;padding-top:24px;">
+                      <p style="margin:0;font-size:11px;color:#94A3B8;">HumTum POS · Trusted Security System</p>
                     </div>
                   </td>
                 </tr>
@@ -326,16 +322,6 @@ router.patch('/status/:id', requireAuth, async (req, res) => {
   }
 });
 
-// ── Get demo credentials (for ?demo=true mode) ──────────────────
-router.get('/demo-credentials', async (req, res) => {
-  // Returns role info only — just enough for the demo login buttons
-  const demoUsers = [
-    { name: 'Owner', username: 'admin', password: 'admin123', role: 'admin' },
-    { name: 'Manager', username: 'manager', password: 'manager123', role: 'manager' },
-    { name: 'Staff', username: 'staff', password: 'staff123', role: 'staff' },
-  ];
-  res.json(demoUsers);
-});
 
 // ── Seed default users (called on server startup) ───────────────
 async function seedDefaultUsers() {
@@ -343,13 +329,11 @@ async function seedDefaultUsers() {
     console.log('📦 Synchronizing default users...');
     const defaults = [
       { name: 'Owner', username: 'admin', passwordHash: 'admin123', role: 'admin', email: process.env.ADMIN_EMAIL || 'alokgupta1605@gmail.com' },
-      { name: 'Manager', username: 'manager', passwordHash: 'manager123', role: 'manager', email: 'manager@humtum.pos' },
-      { name: 'Staff', username: 'staff', passwordHash: 'staff123', role: 'staff', email: 'staff@humtum.pos' },
     ];
 
     for (const u of defaults) {
-      const existing = await User.findOne({ username: u.username });
-      if (!existing) {
+      let user = await User.findOne({ username: u.username });
+      if (!user) {
         // Before creating, ensure email isn't already taken
         if (u.email) {
           const other = await User.findOne({ email: u.email });
@@ -360,6 +344,14 @@ async function seedDefaultUsers() {
         }
         await User.create(u);
         console.log(`👤 Created default user: ${u.username}`);
+      } else {
+        // FORCIBLY UPDATE ADMIN ROLE AND EMAIL
+        if (u.username === 'admin') {
+          user.role = 'admin';
+          user.email = u.email;
+          await user.save();
+          console.log(`🔄 Synced admin role/email for: ${u.username}`);
+        }
       }
     }
   } catch (err) {

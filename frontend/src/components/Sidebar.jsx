@@ -21,7 +21,7 @@ export default function Sidebar() {
 
   return (
     <>
-      {sidebarOpen && <div onClick={()=>setSidebarOpen(false)} style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', zIndex:19 }}/>}
+      {sidebarOpen && <div onClick={()=>setSidebarOpen(false)} style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', zIndex:1999 }}/>}
 
       <aside className={`sbar${sidebarOpen?' open':''}`}>
         {/* Logo */}
