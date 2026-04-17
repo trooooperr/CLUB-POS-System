@@ -348,7 +348,17 @@ async function seedDefaultUsers() {
         // FORCIBLY UPDATE ADMIN ROLE AND EMAIL
         if (u.username === 'admin') {
           user.role = 'admin';
-          user.email = u.email;
+          // Check if the target email is already taken by someone ELSE
+          if (u.email && user.email !== u.email) {
+            const other = await User.findOne({ email: u.email });
+            if (other) {
+              console.warn(`⚠️ Cannot sync admin email ${u.email}: already taken by ${other.username}`);
+            } else {
+              user.email = u.email;
+            }
+          } else if (u.email) {
+            user.email = u.email;
+          }
           await user.save();
           console.log(`🔄 Synced admin role/email for: ${u.username}`);
         }

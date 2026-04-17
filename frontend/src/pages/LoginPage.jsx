@@ -139,7 +139,7 @@ export default function LoginPage() {
                 style={{ 
                   width:'100%', 
                   marginTop:12, 
-                  background: 'amber', 
+                  background: 'var(--amber)', 
                   color: '#000',
                   height: 50,
                   fontSize: 14,
