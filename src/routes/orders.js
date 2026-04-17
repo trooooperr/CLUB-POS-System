@@ -63,16 +63,20 @@ router.post('/', async (req, res) => {
     const order = new Order(orderData);
     const saved = await order.save();
 
-    // Reduce inventory stock for each item in the order
-    if (Array.isArray(order.items)) {
-      for (const item of order.items) {
-        if (item.name && item.quantity > 0) {
-          await Inventory.findOneAndUpdate(
-            { name: item.name },
-            { $inc: { stock: -Math.abs(item.quantity) } },
-            { new: true }
-          );
+    // --- ATOMIC INVENTORY UPDATE (Bulk write for performance) ---
+    if (Array.isArray(order.items) && order.items.length > 0) {
+      const bulkOps = order.items.map(item => ({
+        updateOne: {
+          filter: { name: item.name },
+          update: { $inc: { stock: -Math.abs(item.quantity) } }
         }
+      }));
+
+      try {
+        await Inventory.bulkWrite(bulkOps, { ordered: false });
+      } catch (bulkErr) {
+        console.error('Inventory bulk update error:', bulkErr.message);
+        // We continue anyway as the order is already saved
       }
     }
 

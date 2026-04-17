@@ -103,10 +103,12 @@ router.post('/forgot-password', async (req, res) => {
 
     if (email && email.includes('@')) {
       targetUser = await User.findOne({ email: email.toLowerCase().trim() });
-    } else if (email === 'staff_team') {
-      targetUser = await User.findOne({ role: 'staff' });
+    } else if (email === 'admin_account') {
+      targetUser = await User.findOne({ role: 'admin' });
     } else if (email === 'manager_team') {
       targetUser = await User.findOne({ role: 'manager' });
+    } else if (email === 'staff_team') {
+      targetUser = await User.findOne({ role: 'staff' });
     }
 
     if (!targetUser) {
@@ -141,7 +143,7 @@ router.post('/forgot-password', async (req, res) => {
     await transporter.sendMail({
       from: `"HumTum Security" <${senderEmail}>`,
       to: recipientEmail,
-      subject: `🔐 Reset Code: ${email === 'staff_team' ? 'Staff' : 'Manager'}`,
+      subject: `🔐 Reset Code: ${email === 'admin_account' ? 'Admin' : email === 'staff_team' ? 'Staff' : 'Manager'}`,
       html: `
       <!DOCTYPE html>
       <html>
@@ -167,7 +169,7 @@ router.post('/forgot-password', async (req, res) => {
                 </tr>
                 <tr>
                   <td style="padding:20px 40px 40px 40px;text-align:center;">
-                    <p style="margin:0 0 24px 0;font-size:13px;color:#4A5568;line-height:1.6;">Hello, a request was made to reset the <b>${email === 'staff_team' ? 'Staff' : 'Manager'}</b> password. If this wasn't you, please secure your account.</p>
+                    <p style="margin:0 0 24px 0;font-size:13px;color:#4A5568;line-height:1.6;">Hello, a request was made to reset the <b>${email === 'admin_account' ? 'Admin' : email === 'staff_team' ? 'Staff' : 'Manager'}</b> password. If this wasn't you, please secure your account.</p>
                     <div style="border-top:1px solid #F1F5F9;padding-top:24px;">
                       <p style="margin:0;font-size:11px;color:#94A3B8;">HumTum POS · Trusted Security System</p>
                     </div>

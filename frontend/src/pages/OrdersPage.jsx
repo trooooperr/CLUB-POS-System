@@ -381,7 +381,7 @@ export default function OrdersPage() {
           color: var(--t0);
           outline: none;
           font-size: 13px;
-          font-weight: 600;
+          font-weight: 300;
           cursor: pointer;
           width: 100px;
           padding: 0;
@@ -391,7 +391,7 @@ export default function OrdersPage() {
           opacity: 0;
         }
         .unified-date-input {
-          min-width: 0;
+ 
           color-scheme: light;
         }
         .lm .unified-date-input {

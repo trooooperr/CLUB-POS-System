@@ -150,7 +150,7 @@ export default function BillingPage() {
   const [mobileBillOpen, setMobileBillOpen] = useState(false);
 
   const table = tableBills[activeTableId] || { items:[], customerPhone:'', customerName:'' };
-  const { subtotal, sgst, cgst, grandTotal } = billTotals;
+  const { subtotal, sgst, cgst, grandTotal, roundOff } = billTotals;
   const c = settings.currency;
 
   const [billError, setBillError] = useState('');
@@ -241,6 +241,12 @@ export default function BillingPage() {
             <div className="bill-summary-card">
               <div className="s-row"><span>Subtotal</span><span>{c}{subtotal.toFixed(0)}</span></div>
               <div className="s-row"><span>Tax</span><span>{c}{(sgst+cgst).toFixed(0)}</span></div>
+              {roundOff !== 0 && (
+                <div className="s-row" style={{ color: 'var(--t3)', fontSize: '11px', fontStyle: 'italic' }}>
+                  <span>Round Off</span>
+                  <span>{roundOff > 0 ? '+' : ''}{roundOff.toFixed(2)}</span>
+                </div>
+              )}
               <div className="s-row">
                 <span>Discount</span>
                 <input

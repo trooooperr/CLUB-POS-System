@@ -11,8 +11,6 @@ export default function InvoiceModal() {
   if (!invoiceOrder) return null;
   const o = invoiceOrder;
   const s = settings;
-  const roundedTotal = Math.round(o.grandTotal);
-  const roundOffAmount = (roundedTotal - o.grandTotal).toFixed(2);
 
 const handlePrint = () => {
     const roundedGrandTotal = Math.round(o.grandTotal);
@@ -100,7 +98,7 @@ const handlePrint = () => {
           <div class="row"><span>SGST (2.5%)</span><span>${o.sgst.toFixed(2)}</span></div>
           <div class="row"><span>CGST (2.5%)</span><span>${o.cgst.toFixed(2)}</span></div>
           ${o.discount > 0 ? `<div class="row"><span>DISCOUNT</span><span>-${o.discount.toFixed(2)}</span></div>` : ''}
-          ${Number(roundOffAmount) !== 0 ? `<div class="row"><span>ROUND OFF</span><span>${roundOffAmount}</span></div>` : ''}
+          ${(o.roundOff || 0) !== 0 ? `<div class="row"><span>ROUND OFF</span><span>${(o.roundOff > 0 ? '+' : '')}${o.roundOff.toFixed(2)}</span></div>` : ''}
 
           <div class="total-container">
             <div class="total-label">NET PAYABLE AMOUNT ${s.currency}${roundedGrandTotal}</div>
@@ -154,7 +152,7 @@ ${
   o.discount > 0
     ? `Discount: -${s.currency}${o.discount.toFixed(2)}\n`
     : ""
-}Round Off: ${roundOffAmount}
+} ${(o.roundOff || 0) !== 0 ? `Round Off: ${(o.roundOff > 0 ? '+' : '')}${o.roundOff.toFixed(2)}\n` : ""}
 
 *TOTAL: ${s.currency}${Math.round(o.grandTotal)}*
 ━━━━━━━━━━━━━━━━━━━━
@@ -231,7 +229,7 @@ ${s.thankYouMsg}
                 <div className="sum-row"><span>SGST (2.5%)</span><span>{s.currency}{o.sgst.toFixed(2)}</span></div>
                 <div className="sum-row"><span>CGST (2.5%)</span><span>{s.currency}{o.cgst.toFixed(2)}</span></div>
                 {o.discount > 0 && <div className="sum-row discount"><span>Discount</span><span>-{s.currency}{o.discount.toFixed(2)}</span></div>}
-                <div className="sum-row"> <span>Round-Off</span><span>{roundOffAmount}</span></div>
+                {(o.roundOff || 0) !== 0 && <div className="sum-row"> <span>Round-Off</span><span>{o.roundOff > 0 ? '+' : ''}{o.roundOff.toFixed(2)}</span></div>}
                 <div className="grand-total-box">
                   <div className="grand-label">AMOUNT PAYABLE</div>
                   <div className="grand-value">{s.currency}{o.grandTotal.toFixed(2)}</div>

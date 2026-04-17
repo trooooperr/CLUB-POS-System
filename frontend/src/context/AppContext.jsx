@@ -347,11 +347,13 @@ export function AppProvider({ children }) {
     const sgst     = subtotal * (settings.sgstRate / 100);
     const cgst     = subtotal * (settings.cgstRate / 100);
     const dv       = (table.discount || '').trim();
-    const discountAmount = dv.endsWith('%')
+    const discountAmount = Math.round(dv.endsWith('%')
       ? subtotal * (parseFloat(dv)/100) || 0
-      : parseFloat(dv) || 0;
-    const grandTotal = Math.max(0, subtotal + sgst + cgst - discountAmount);
-    return { subtotal, sgst, cgst, discountAmount, grandTotal };
+      : parseFloat(dv) || 0);
+    const rawTotal = subtotal + sgst + cgst - discountAmount;
+    const grandTotal = Math.round(Math.max(0, rawTotal));
+    const roundOff = (grandTotal - rawTotal);
+    return { subtotal, sgst, cgst, discountAmount, grandTotal, roundOff };
   }, [tableBills, activeTableId, settings]);
 
   // ── Filtered menu ────────────────────────────────────────────────
@@ -381,7 +383,7 @@ export function AppProvider({ children }) {
     const table = tableBills[activeTableId];
     if (!table || table.items.length === 0) return { error: 'No items in bill' };
 
-    const { subtotal, sgst, cgst, discountAmount, grandTotal } = billTotals;
+    const { subtotal, sgst, cgst, discountAmount, grandTotal, roundOff } = billTotals;
     const paid = parseFloat(paidAmount) || grandTotal;
     const due  = Math.max(0, grandTotal - paid);
 
@@ -390,6 +392,7 @@ export function AppProvider({ children }) {
       items:   table.items.map(i => ({ name:i.name, quantity:i.quantity, price:i.price })),
       subtotal, sgst, cgst,
       discount:      discountAmount,
+      roundOff,
       grandTotal,
       paidAmount:    paid,
       dueAmount:     due,

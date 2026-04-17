@@ -93,6 +93,23 @@ export default function LoginPage() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   <button 
                     type="button" 
+                    className={`btn ${fpEmail === 'admin_account' ? 'btn-primary' : 'btn-ghost'}`} 
+                    style={{ width: '100%', justifyContent: 'flex-start', height: 48, padding: '0 16px' }}
+                    onClick={() => { setFpEmail('admin_account'); setFpError(''); }}
+                  >
+                    <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+                      <div style={{ width:32, height:32, borderRadius:8, background:'rgba(245,158,11,0.1)', display:'flex', alignItems:'center', justifyContent:'center', color:'var(--amber)' }}>
+                        <Lock size={18}/>
+                      </div>
+                      <div style={{ textAlign:'left' }}>
+                        <div style={{ fontSize:13, fontWeight:700 }}>Owner Account</div>
+                        <div style={{ fontSize:10, opacity:0.6 }}>Reset Primary Admin</div>
+                      </div>
+                    </div>
+                  </button>
+
+                  <button 
+                    type="button" 
                     className={`btn ${fpEmail === 'manager_team' ? 'btn-primary' : 'btn-ghost'}`} 
                     style={{ width: '100%', justifyContent: 'flex-start', height: 48, padding: '0 16px' }}
                     onClick={() => { setFpEmail('manager_team'); setFpError(''); }}
@@ -139,7 +156,7 @@ export default function LoginPage() {
                 style={{ 
                   width:'100%', 
                   marginTop:12, 
-                  background: 'var(--amber)', 
+                  background: 'amber', 
                   color: '#000',
                   height: 50,
                   fontSize: 14,
