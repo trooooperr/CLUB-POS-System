@@ -277,7 +277,7 @@ ${s.thankYouMsg}
 
       <style>{`
         .invoice-premium-modal {
-          width: 95%; max-width: 350px; height: 94vh; 
+          width: 95%; max-width: 350px; height: auto; max-height: 94vh; 
           display: flex; flex-direction: column; background: #08090a; 
           border: 1px solid #1c1e21; border-radius: 28px; padding: 0 !important; overflow: hidden;
         }
