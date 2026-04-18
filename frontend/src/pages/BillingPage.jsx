@@ -198,8 +198,8 @@ export default function BillingPage() {
               return (
                 <MenuItem key={item._id} item={item} qty={table.items.find(i=>i._id===item._id)?.quantity||0}
                   stock={stockItem?.stock}
-                  add={(id,a)=>updateTableItem(activeTableId,id,a,menuItems)}
-                  rem={(id,a)=>updateTableItem(activeTableId,id,a,menuItems)}/>
+                  add={(id,a)=>updateTableItem(activeTableId,id,a,allSellableItems)}
+                  rem={(id,a)=>updateTableItem(activeTableId,id,a,allSellableItems)}/>
               );
             })}
           </div>
@@ -226,9 +226,9 @@ export default function BillingPage() {
                 <div key={item._id} className="b-item-row">
                   <span className="b-item-name">{item.name}</span>
                   <div className="b-item-ctrl">
-                    <button onClick={()=>updateTableItem(activeTableId,item._id,'decrease',menuItems)}>−</button>
+                    <button onClick={()=>updateTableItem(activeTableId,item._id,'decrease',allSellableItems)}>−</button>
                     <span>{item.quantity}</span>
-                    <button onClick={()=>updateTableItem(activeTableId,item._id,'increase',menuItems)}>+</button>
+                    <button onClick={()=>updateTableItem(activeTableId,item._id,'increase',allSellableItems)}>+</button>
                   </div>
                   <span className="b-item-price">{c}{(item.price*item.quantity).toFixed(0)}</span>
                 </div>
