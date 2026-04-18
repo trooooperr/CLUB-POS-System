@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useApp, ROLE_HIERARCHY } from '../context/AppContext';
-import { Save, Check, Send, KeyRound, ShieldAlert, Users, Trash2 } from 'lucide-react';
+import { Save, Check, Send, KeyRound, ShieldAlert, Users, Trash2, Database, RefreshCw } from 'lucide-react';
 import { apiUrl, authFetch } from '../lib/api';
 
 const RC = { admin: '#F59E0B', manager: '#3B82F6', staff: '#10B981' };
@@ -176,6 +176,18 @@ export default function SettingsPage() {
   };
 
 
+
+  const handleSyncData = async () => {
+    try {
+      showToast('Syncing with Cloud DB...', 'success');
+      const res = await authFetch(apiUrl('/api/admin/clear-cache'), { method: 'POST' });
+      if (!res.ok) throw new Error('Failed to clear cache');
+      await loadData();
+      showToast('Cache cleared! Data is now up to date.');
+    } catch (e) {
+      showToast('Sync error: ' + e.message, 'error');
+    }
+  };
 
   const handleSaveEmail = async () => {
     try {
@@ -421,6 +433,20 @@ export default function SettingsPage() {
             </div>
           </div>
         )}
+
+        {/* DATA SYNC SECTION */}
+        <div className="card card-p settings-full" style={{ border: '1px solid var(--b2)' }}>
+          <div className="sdiv" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Database size={16} /> Data Synchronization
+          </div>
+          <p style={{ fontSize: 13, color: 'var(--t2)', marginBottom: 15 }}>
+            If you have manually added or edited items directly in the Cloud Database (MongoDB), 
+            use this button to clear the application cache and synchronize the live website.
+          </p>
+          <button className="btn btn-primary" onClick={handleSyncData} style={{ height: 44, width: '100%', maxWidth: 200 }}>
+            Sync Cloud Data
+          </button>
+        </div>
 
         {/* PROFILE SECTION */}
         <div className="card card-p settings-full" style={{ border: '1px solid var(--b2)' }}>

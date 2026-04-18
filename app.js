@@ -59,6 +59,7 @@ app.use('/api/workers',   requireAuth, require('./src/routes/workers'));
 app.use('/api/reports',   requireAuth, reportsRouter);
 app.use('/api/settings',  requireAuth, require('./src/routes/settings'));
 app.use('/api/inventory', requireAuth, require('./src/routes/inventory'));
+app.use('/api/admin',    requireAuth, require('./src/routes/admin'));
 
 // ── Static files (frontend dist) ────────────────────────────────
 const frontendDist = path.join(__dirname, 'frontend', 'dist');
