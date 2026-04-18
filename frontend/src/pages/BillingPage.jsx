@@ -15,7 +15,7 @@ function TableCard({ id, isActive, status, num, onClick }) {
 }
 
 /* IMAGE-FOCUS MENU ITEM */
-function MenuItem({ item, qty, add, rem, stock }) {
+function MenuItem({ item, qty, add, rem, stock, minStock }) {
   const src = item.imageUrl?.startsWith('http') ? item.imageUrl
     : `https://placehold.co/320x320/171921/F59E0B?text=${encodeURIComponent(item.name.slice(0,1))}`;
   return (
@@ -25,7 +25,7 @@ function MenuItem({ item, qty, add, rem, stock }) {
         <div className="m-price-tag" style={{ position:'absolute', bottom:8, left:8, zIndex:5 }}>₹{item.price.toFixed(0)}</div>
         {!item.available && <div className="sold-out-badge-top" style={{ top: 8, left: 8, right: 'auto' }}>SOLD OUT</div>}
         {stock !== undefined && stock > 0 && (
-          <div className={`stock-badge ${stock <= 5 ? 'low' : ''}`} style={{ top: 8, right: 8 }}>
+          <div className={`stock-badge ${stock <= (minStock || 5) ? 'low' : ''}`} style={{ top: 8, right: 8 }}>
             Stock: {stock}
           </div>
         )}
@@ -198,6 +198,7 @@ export default function BillingPage() {
               return (
                 <MenuItem key={item._id} item={item} qty={table.items.find(i=>i._id===item._id)?.quantity||0}
                   stock={stockItem?.stock}
+                  minStock={stockItem?.minStock}
                   add={(id,a)=>updateTableItem(activeTableId,id,a,allSellableItems)}
                   rem={(id,a)=>updateTableItem(activeTableId,id,a,allSellableItems)}/>
               );

@@ -43,7 +43,7 @@ async function warmupCache() {
     const Inventory = require('./src/models/Inventory');
     const Worker = require('./src/models/Worker');
     
-    const [menuItems, settings, inventory, workers] = await Promise.all([
+    let [menuItems, settings, inventory, workers] = await Promise.all([
       MenuItem.find().sort({ category: 1, name: 1 }),
       (async () => {
         const existing = await Settings.findOne();
@@ -53,6 +53,33 @@ async function warmupCache() {
       Worker.find().sort({ name: 1 })
     ]);
 
+    // Baseline seeding if DB is completely empty (as requested)
+    if (menuItems.length === 0 && inventory.length === 0) {
+      console.log('🌱 Seeding minimal baseline items...');
+      
+      const baseInv = [
+        { name: 'Kingfisher Premium', category: 'Beer', unit: 'Bottles', stock: 24, minStock: 6, price: 180 },
+        { name: 'Coke 330ml', category: 'Soft Drink', unit: 'Cans', stock: 48, minStock: 12, price: 40 },
+        { name: 'Red Label 750ml', category: 'Whiskey', unit: 'Bottles', stock: 5, minStock: 2, price: 1800 }
+      ];
+      const baseMenu = [
+        { name: 'Veg Manchurian', category: 'Starters', price: 140, available: true },
+        { name: 'Chicken Momos', category: 'Starters', price: 160, available: true },
+        { name: 'Chilli Paneer', category: 'Starters', price: 180, available: true }
+      ];
+
+      await Promise.all([
+        Inventory.insertMany(baseInv),
+        MenuItem.insertMany(baseMenu)
+      ]);
+
+      // Re-fetch after seeding
+      [menuItems, inventory] = await Promise.all([
+        MenuItem.find().sort({ category: 1, name: 1 }),
+        Inventory.find().sort({ category: 1, name: 1 })
+      ]);
+    }
+
     await Promise.all([
       setCache('menu:all', menuItems, 300),
       setCache('settings:current', settings, 300),
@@ -61,7 +88,7 @@ async function warmupCache() {
     ]);
     console.log('🔥 Cache warmed up');
   } catch (err) {
-    console.log('Cache warmup skipped:', err.message);
+    console.log('Cache warmup failed:', err.message);
   }
 }
 
