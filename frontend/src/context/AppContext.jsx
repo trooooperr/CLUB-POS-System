@@ -167,16 +167,10 @@ export function AppProvider({ children }) {
   const [sidebarOpen,   setSidebarOpen]   = useState(false);
 
   // ── Data ────────────────────────────────────────────────────────
-  const [menuItems,    setMenuItems]    = useState(() => {
-    try { return JSON.parse(localStorage.getItem(MENU_CACHE)) || []; } catch { return []; }
-  });
+  const [menuItems,    setMenuItems]    = useState([]);
   const [orderHistory, setOrderHistory] = useState([]);
-  const [workers,      setWorkers]      = useState(() => {
-    try { return JSON.parse(localStorage.getItem(WORKERS_CACHE)) || []; } catch { return []; }
-  });
-  const [inventory,    setInventory]    = useState(() => {
-    try { return JSON.parse(localStorage.getItem(INVENTORY_CACHE)) || []; } catch { return []; }
-  });
+  const [workers,      setWorkers]      = useState([]);
+  const [inventory,    setInventory]    = useState([]);
   const [loading,      setLoading]      = useState(true);
   const [error,        setError]        = useState(null);
 
@@ -280,16 +274,13 @@ export function AppProvider({ children }) {
 
       if (results[0].status === 'fulfilled') {
         setMenuItems(results[0].value);
-        localStorage.setItem(MENU_CACHE, JSON.stringify(results[0].value));
       }
       if (results[1].status === 'fulfilled') setOrderHistory([...results[1].value].sort((a,b)=>new Date(b.date)-new Date(a.date)));
       if (results[2].status === 'fulfilled') {
         setWorkers(results[2].value);
-        localStorage.setItem(WORKERS_CACHE, JSON.stringify(results[2].value));
       }
       if (results[3].status === 'fulfilled') {
         setInventory(results[3].value);
-        localStorage.setItem(INVENTORY_CACHE, JSON.stringify(results[3].value));
       }
       if (results[4].status === 'fulfilled' && results[4].value && !Array.isArray(results[4].value)) {
         setSettings(results[4].value);
