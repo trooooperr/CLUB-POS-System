@@ -365,50 +365,19 @@ export function AppProvider({ children }) {
     return { subtotal, sgst, cgst, discountAmount, grandTotal, roundOff };
   }, [tableBills, activeTableId, settings]);
 
-  // ── All sellable items (Menu + Inventory drink items) ─────────────
-  const allSellableItems = useMemo(() => {
-    const menu = menuItems || [];
-    const inv  = inventory || [];
-
-    const getImg = (item) => {
-      if (item.imageUrl && item.imageUrl.startsWith('http')) return item.imageUrl;
-      const cat = item.category?.toLowerCase() || '';
-      if (cat.includes('beer')) return 'https://images.unsplash.com/photo-1608270586620-248524c67de9?w=320';
-      if (cat.includes('liquor')) return 'https://images.unsplash.com/photo-1527281400683-19dd761dc442?w=320';
-      if (cat.includes('soft') || cat.includes('can')) return 'https://images.unsplash.com/photo-1622708782522-d19597a94c21?w=320';
-      if (cat.includes('main') || cat.includes('starter')) return 'https://images.unsplash.com/photo-1546833999-b9f581a1996d?w=320';
-      return `https://placehold.co/320x320/171921/F59E0B?text=${encodeURIComponent(item.name?.slice(0,1) || 'I')}`;
-    };
-
-    const drinkItems = inv.map(i => ({ 
-      ...i, 
-      imageUrl: getImg(i),
-      available: i.stock > 0, 
-      isInventory: true 
-    }));
-    
-    const processedMenu = menu.map(m => ({
-      ...m,
-      imageUrl: getImg(m),
-      available: m.available !== false,
-      isInventory: false
-    }));
-
-    return [...processedMenu, ...drinkItems];
-  }, [menuItems, inventory]);
-
+  // ── Filtered menu ────────────────────────────────────────────────
   const filteredMenu = useMemo(() => {
-    return allSellableItems.filter(item => {
+    if (!Array.isArray(menuItems)) return [];
+    return menuItems.filter(item => {
       const mc = categoryFilter === 'All' || item.category === categoryFilter;
       const ms = item.name.toLowerCase().includes(menuSearch.toLowerCase());
       return mc && ms;
     });
-  }, [allSellableItems, categoryFilter, menuSearch]);
+  }, [menuItems, categoryFilter, menuSearch]);
 
   const categories = useMemo(() => {
     const mc = Array.isArray(settings.menuCategories) ? settings.menuCategories : [];
-    const ic = Array.isArray(settings.inventoryCategories) ? settings.inventoryCategories : [];
-    return ['All', ...new Set([...mc, ...ic])];
+    return ['All', ...mc];
   }, [settings]);
 
   const getTableStatus = useCallback((tableId) => {
