@@ -51,7 +51,6 @@ const DEFAULT_SETTINGS = {
 };
 
 function initTables() {
-  localStorage.removeItem(TABLES_KEY); // FORCE CLEAR STALE LOCAL DATA ONCE
   const t = {};
   for (let i = 1; i <= NUM_TABLES; i++) {
     t[`T${i}`] = { items:[], discount:'', customerPhone:'', customerName:'', startTime:null, dueAmount:0 };

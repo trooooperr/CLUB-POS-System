@@ -276,6 +276,15 @@ export default function BillingPage() {
         </div>
       </div>
 
+      {/* DIAGNOSTIC FOOTER */}
+      <div style={{
+        position: 'fixed', bottom: 10, left: 10, background: 'rgba(239, 158, 11, 0.9)', 
+        color: '#000', padding: '8px 15px', borderRadius: 10, fontSize: 12, zIndex: 9999,
+        fontWeight: 'bold', boxShadow: '0 4px 15px rgba(0,0,0,0.3)', pointerEvents: 'none'
+      }}>
+        SYSTEM DEBUG >> Table: {activeTableId || 'NONE'} | Bill Items: {table.items.length} | Menu Items: {allSellableItems.length}
+      </div>
+
       {payModal && <PayModal total={grandTotal} currency={c} onClose={()=>setPayModal(false)} onConfirm={doGen}/>}
 
       <style>{`
