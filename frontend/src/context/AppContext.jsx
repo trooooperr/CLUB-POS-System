@@ -322,12 +322,12 @@ export function AppProvider({ children }) {
 
     const drinkItems = inv
       .filter(i => {
-        const cat = (i.category || '').toLowerCase();
-        const nam = (i.name || '').toLowerCase();
-        const keywords = ['soda','beer','alcohol','soft','bev','whiskey','vodka','wine','gin','rum','mixer','juice','liquor','energy','cold','drink','spirit','pint','bottle','can'];
-        const isDrink = keywords.some(k => cat.includes(k) || nam.includes(k));
+        const isDrink = ['Soda','Beer','Alcohol','Soft Drink','Beverage','Whiskey','Vodka','Wine','Gin','Rum','Mixer','Juice'].some(c => 
+          i.category?.toLowerCase().includes(c.toLowerCase()) || 
+          i.name?.toLowerCase().includes(c.toLowerCase())
+        );
         // Only merge if not already in menu to avoid duplicates
-        return isDrink && !menu.some(m => m.name.toLowerCase() === (i.name || '').toLowerCase());
+        return isDrink && !menu.some(m => m.name.toLowerCase() === i.name.toLowerCase());
       })
       .map(i => ({ 
         ...i, 
