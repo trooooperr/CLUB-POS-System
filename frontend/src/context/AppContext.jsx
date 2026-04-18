@@ -539,7 +539,7 @@ export function AppProvider({ children }) {
       loading, error, loadData,
       tableBills, activeTableId, selectTable,
       updateTableItem, clearTable, setTableField,
-      allSellableItems, billTotals, filteredMenu, categories,
+      billTotals, filteredMenu, categories,
       categoryFilter, setCategoryFilter,
       menuSearch, setMenuSearch,
       getTableStatus, generateBill, settleOrder,
