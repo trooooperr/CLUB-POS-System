@@ -51,6 +51,7 @@ const DEFAULT_SETTINGS = {
 };
 
 function initTables() {
+  localStorage.removeItem(TABLES_KEY); // FORCE CLEAR STALE LOCAL DATA ONCE
   const t = {};
   for (let i = 1; i <= NUM_TABLES; i++) {
     t[`T${i}`] = { items:[], discount:'', customerPhone:'', customerName:'', startTime:null, dueAmount:0 };
@@ -308,42 +309,35 @@ export function AppProvider({ children }) {
   // ── Table helpers ────────────────────────────────────────────────
   const selectTable = useCallback((id) => setActiveTableId(id), []);
 
-  const updateTableItem = useCallback(async (tableId, itemId, action, itemsArray) => {
-    if (!tableId) {
-      console.warn('updateTableItem: No tableId provided.');
-      return;
-    }
+  const updateTableItem = useCallback((tableId, itemId, action, itemsArray) => {
+    if (!tableId) return;
 
     setTableBills(prev => {
-      const currentTable = prev[tableId] || { 
-        items: [], 
-        discount: '', 
-        customerPhone: '', 
-        customerName: '', 
-        startTime: null, 
-        dueAmount: 0 
+      const current = prev[tableId] || { 
+        items: [], discount: '', customerPhone: '', customerName: '', startTime: null, dueAmount: 0 
       };
 
-      const table = { ...currentTable, items: [...currentTable.items] };
-      const idx   = table.items.findIndex(i => String(i._id) === String(itemId));
-      const item  = (Array.isArray(itemsArray) ? itemsArray : []).find(i => String(i._id) === String(itemId));
+      const tableItems = [...current.items];
+      const itemsList = Array.isArray(itemsArray) ? itemsArray : [];
+      
+      const idx = tableItems.findIndex(i => String(i._id) === String(itemId));
+      const masterItem = itemsList.find(i => String(i._id) === String(itemId));
 
       if (action === 'increase') {
         if (idx >= 0) {
-          table.items[idx] = { ...table.items[idx], quantity: (table.items[idx].quantity || 0) + 1 };
-        } else if (item) {
-          table.items.push({ ...item, quantity: 1 });
+          tableItems[idx] = { ...tableItems[idx], quantity: (tableItems[idx].quantity || 0) + 1 };
+        } else if (masterItem) {
+          tableItems.push({ ...masterItem, quantity: 1 });
         }
-        if (!table.startTime) table.startTime = new Date().toISOString();
-      } else if (action === 'decrease') {
-        if (idx >= 0) {
-          if (table.items[idx].quantity <= 1) table.items.splice(idx, 1);
-          else table.items[idx] = { ...table.items[idx], quantity: table.items[idx].quantity - 1 };
-        }
-      } else if (action === 'remove') {
-        if (idx >= 0) table.items.splice(idx, 1);
+        if (!current.startTime) current.startTime = new Date().toISOString();
+      } else if (action === 'decrease' && idx >= 0) {
+        if (tableItems[idx].quantity <= 1) tableItems.splice(idx, 1);
+        else tableItems[idx] = { ...tableItems[idx], quantity: tableItems[idx].quantity - 1 };
+      } else if (action === 'remove' && idx >= 0) {
+        tableItems.splice(idx, 1);
       }
-      return { ...prev, [tableId]: table };
+
+      return { ...prev, [tableId]: { ...current, items: tableItems } };
     });
   }, [setTableBills]);
 

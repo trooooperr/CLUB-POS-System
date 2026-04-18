@@ -34,9 +34,9 @@ function MenuItem({ item, qty, add, rem, stock, minStock }) {
         <div className="mname-modern">{item.name}</div>
         {item.available && (
           <div className="mctrl-modern">
-            <button className="qbtn-m" onClick={()=>rem(item._id,'decrease')}>−</button>
+            <button className="qbtn-m" onClick={()=>rem(String(item._id),'decrease')}>−</button>
            <span className="qnum-m" style={{ fontSize: '14px' }}>{qty}</span>
-            <button className="qbtn-m" onClick={()=>add(item._id,'increase')}>+</button>
+            <button className="qbtn-m" onClick={()=>add(String(item._id),'increase')}>+</button>
           </div>
         )}
       </div>
