@@ -178,8 +178,17 @@ export default function BillingPage() {
       </div>
 
       <div className="billing-main-grid">
+        {!activeTableId && (
+          <div className="no-table-overlay">
+             <div className="nt-card animate-su">
+                <ShoppingCart size={40} color="var(--amber)" />
+                <h3>No Table Selected</h3>
+                <p>Please select a table from the top bar to start adding items to a bill.</p>
+             </div>
+          </div>
+        )}
         {/* LEFT: MENU SECTION */}
-        <div className="menu-side">
+        <div className="menu-side" style={{ opacity: activeTableId ? 1 : 0.4, pointerEvents: activeTableId ? 'auto' : 'none' }}>
           <div className="filter-bar-sticky">
             <div className="search-wrap-mini">
               <Search size={14} />
@@ -215,8 +224,8 @@ export default function BillingPage() {
 
           <div className="bill-scroll-content">
             <div className="bill-header-row">
-               <span>Table {activeTableId.substring(1)}</span>
-               <button onClick={()=>clearTable(activeTableId)} className="trash-btn"><Trash2 size={14}/></button>
+               <span>Table {activeTableId ? activeTableId.substring(1) : ''}</span>
+               {activeTableId && <button onClick={()=>clearTable(activeTableId)} className="trash-btn"><Trash2 size={14}/></button>}
             </div>
             
             <input className="mini-input" value={table.customerName||''} onChange={e=>setTableField(activeTableId,'customerName',e.target.value)} placeholder="Customer Name" />

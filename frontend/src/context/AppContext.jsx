@@ -308,14 +308,30 @@ export function AppProvider({ children }) {
   // ── Table helpers ────────────────────────────────────────────────
   const selectTable = useCallback((id) => setActiveTableId(id), []);
 
-  const updateTableItem = useCallback(async (tableId, itemId, action, items) => {
+  const updateTableItem = useCallback(async (tableId, itemId, action, itemsArray) => {
+    if (!tableId) return;
+
     setTableBills(prev => {
-      const table = { ...prev[tableId], items: [...prev[tableId].items] };
+      // Ensure the table structure exists
+      const currentTable = prev[tableId] || { 
+        items: [], 
+        discount: '', 
+        customerPhone: '', 
+        customerName: '', 
+        startTime: null, 
+        dueAmount: 0 
+      };
+
+      const table = { ...currentTable, items: [...currentTable.items] };
       const idx   = table.items.findIndex(i => i._id === itemId);
-      const item  = (Array.isArray(items) ? items : []).find(i => i._id === itemId);
+      const item  = (Array.isArray(itemsArray) ? itemsArray : []).find(i => i._id === itemId);
+
       if (action === 'increase') {
-        if (idx >= 0) table.items[idx] = { ...table.items[idx], quantity: table.items[idx].quantity + 1 };
-        else if (item) table.items.push({ ...item, quantity: 1 });
+        if (idx >= 0) {
+          table.items[idx] = { ...table.items[idx], quantity: (table.items[idx].quantity || 0) + 1 };
+        } else if (item) {
+          table.items.push({ ...item, quantity: 1 });
+        }
         if (!table.startTime) table.startTime = new Date().toISOString();
       } else if (action === 'decrease') {
         if (idx >= 0) {

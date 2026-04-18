@@ -399,3 +399,27 @@ input:checked+.tslider:before { transform:translateX(18px) }
 .m-price-tag {
   z-index: 4;
 }
+
+/* NO TABLE OVERLAY */
+.no-table-overlay {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(8, 9, 10, 0.6);
+  backdrop-filter: blur(4px);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.nt-card {
+  background: var(--s1);
+  border: 1px solid var(--b2);
+  padding: 40px 20px;
+  border-radius: 24px;
+  text-align: center;
+  max-width: 320px;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+}
+.nt-card h3 { margin: 15px 0 8px; color: var(--t0); font-size: 18px; }
+.nt-card p { color: var(--t2); font-size: 13px; line-height: 1.5; }
