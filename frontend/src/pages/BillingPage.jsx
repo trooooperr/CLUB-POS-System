@@ -178,17 +178,8 @@ export default function BillingPage() {
       </div>
 
       <div className="billing-main-grid">
-        {!activeTableId && (
-          <div className="no-table-overlay">
-             <div className="nt-card animate-su">
-                <ShoppingCart size={40} color="var(--amber)" />
-                <h3>No Table Selected</h3>
-                <p>Please select a table from the top bar to start adding items to a bill.</p>
-             </div>
-          </div>
-        )}
         {/* LEFT: MENU SECTION */}
-        <div className="menu-side" style={{ opacity: activeTableId ? 1 : 0.4, pointerEvents: activeTableId ? 'auto' : 'none' }}>
+        <div className="menu-side">
           <div className="filter-bar-sticky">
             <div className="search-wrap-mini">
               <Search size={14} />
