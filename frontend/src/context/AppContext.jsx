@@ -309,7 +309,7 @@ export function AppProvider({ children }) {
   // ── Table helpers ────────────────────────────────────────────────
   const selectTable = useCallback((id) => setActiveTableId(id), []);
 
-  const updateTableItem = useCallback((tableId, itemId, action, itemsArray) => {
+  const updateTableItem = useCallback((tableId, itemId, action) => {
     if (!tableId) return;
 
     setTableBills(prev => {
@@ -318,10 +318,8 @@ export function AppProvider({ children }) {
       };
 
       const tableItems = [...current.items];
-      const itemsList = Array.isArray(itemsArray) ? itemsArray : [];
-      
       const idx = tableItems.findIndex(i => String(i._id) === String(itemId));
-      const masterItem = itemsList.find(i => String(i._id) === String(itemId));
+      const masterItem = allSellableItems.find(i => String(i._id) === String(itemId));
 
       if (action === 'increase') {
         if (idx >= 0) {
@@ -339,7 +337,7 @@ export function AppProvider({ children }) {
 
       return { ...prev, [tableId]: { ...current, items: tableItems } };
     });
-  }, [setTableBills]);
+  }, [setTableBills, allSellableItems]);
 
   const clearTable = useCallback((tableId) => {
     setTableBills(prev => ({
