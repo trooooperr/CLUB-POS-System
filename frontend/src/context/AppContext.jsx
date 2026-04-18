@@ -306,6 +306,61 @@ export function AppProvider({ children }) {
     return myLevel >= tgtLevel;
   }, [role]);
 
+  // ── All sellable items (Menu + Inventory drink items) ─────────────
+  const allSellableItems = useMemo(() => {
+    const menu = menuItems || [];
+    const inv  = inventory || [];
+
+    const getImg = (item) => {
+      if (item.imageUrl && item.imageUrl.startsWith('http')) return item.imageUrl;
+      const cat = item.category?.toLowerCase() || '';
+      if (cat.includes('beer')) return 'https://images.unsplash.com/photo-1608270586620-248524c67de9?w=320';
+      if (cat.includes('liquor')) return 'https://images.unsplash.com/photo-1527281400683-19dd761dc442?w=320';
+      if (cat.includes('soft') || cat.includes('can')) return 'https://images.unsplash.com/photo-1622708782522-d19597a94c21?w=320';
+      if (cat.includes('main') || cat.includes('starter')) return 'https://images.unsplash.com/photo-1546833999-b9f581a1996d?w=320';
+      return `https://placehold.co/320x320/171921/F59E0B?text=${encodeURIComponent(item.name?.slice(0,1) || 'I')}`;
+    };
+
+    const drinkItems = inv
+      .filter(i => {
+        const cat = (i.category || '').toLowerCase();
+        const nam = (i.name || '').toLowerCase();
+        const keywords = ['soda','beer','alcohol','soft','bev','whiskey','vodka','wine','gin','rum','mixer','juice','liquor','energy','cold','drink','spirit','pint','bottle','can'];
+        const isDrink = keywords.some(k => cat.includes(k) || nam.includes(k));
+        // Only merge if not already in menu to avoid duplicates
+        return isDrink && !menu.some(m => m.name.toLowerCase() === (i.name || '').toLowerCase());
+      })
+      .map(i => ({ 
+        ...i, 
+        imageUrl: getImg(i),
+        available: i.stock > 0, 
+        isInventory: true 
+      }));
+    
+    const processedMenu = menu.map(m => ({
+      ...m,
+      imageUrl: getImg(m),
+      available: m.available !== false,
+      isInventory: false
+    }));
+
+    return [...processedMenu, ...drinkItems];
+  }, [menuItems, inventory]);
+
+  // ── Filtered menu ────────────────────────────────────────────────
+  const filteredMenu = useMemo(() => {
+    return allSellableItems.filter(item => {
+      const mc = categoryFilter === 'All' || item.category === categoryFilter;
+      const ms = item.name.toLowerCase().includes(menuSearch.toLowerCase());
+      return mc && ms;
+    });
+  }, [allSellableItems, categoryFilter, menuSearch]);
+
+  const categories = useMemo(() => {
+    const cats = allSellableItems.map(i => i.category);
+    return ['All', ...new Set(cats)];
+  }, [allSellableItems]);
+
   // ── Table helpers ────────────────────────────────────────────────
   const selectTable = useCallback((id) => setActiveTableId(id), []);
 
@@ -366,60 +421,6 @@ export function AppProvider({ children }) {
     return { subtotal, sgst, cgst, discountAmount, grandTotal, roundOff };
   }, [tableBills, activeTableId, settings]);
 
-  // ── All sellable items (Menu + Inventory drink items) ─────────────
-  const allSellableItems = useMemo(() => {
-    const menu = menuItems || [];
-    const inv  = inventory || [];
-
-    const getImg = (item) => {
-      if (item.imageUrl && item.imageUrl.startsWith('http')) return item.imageUrl;
-      const cat = item.category?.toLowerCase() || '';
-      if (cat.includes('beer')) return 'https://images.unsplash.com/photo-1608270586620-248524c67de9?w=320';
-      if (cat.includes('liquor')) return 'https://images.unsplash.com/photo-1527281400683-19dd761dc442?w=320';
-      if (cat.includes('soft') || cat.includes('can')) return 'https://images.unsplash.com/photo-1622708782522-d19597a94c21?w=320';
-      if (cat.includes('main') || cat.includes('starter')) return 'https://images.unsplash.com/photo-1546833999-b9f581a1996d?w=320';
-      return `https://placehold.co/320x320/171921/F59E0B?text=${encodeURIComponent(item.name?.slice(0,1) || 'I')}`;
-    };
-
-    const drinkItems = inv
-      .filter(i => {
-        const cat = (i.category || '').toLowerCase();
-        const nam = (i.name || '').toLowerCase();
-        const keywords = ['soda','beer','alcohol','soft','bev','whiskey','vodka','wine','gin','rum','mixer','juice','liquor','energy','cold','drink','spirit','pint','bottle','can'];
-        const isDrink = keywords.some(k => cat.includes(k) || nam.includes(k));
-        // Only merge if not already in menu to avoid duplicates
-        return isDrink && !menu.some(m => m.name.toLowerCase() === (i.name || '').toLowerCase());
-      })
-      .map(i => ({ 
-        ...i, 
-        imageUrl: getImg(i),
-        available: i.stock > 0, 
-        isInventory: true 
-      }));
-    
-    const processedMenu = menu.map(m => ({
-      ...m,
-      imageUrl: getImg(m),
-      available: m.available !== false,
-      isInventory: false
-    }));
-
-    return [...processedMenu, ...drinkItems];
-  }, [menuItems, inventory]);
-
-  // ── Filtered menu ────────────────────────────────────────────────
-  const filteredMenu = useMemo(() => {
-    return allSellableItems.filter(item => {
-      const mc = categoryFilter === 'All' || item.category === categoryFilter;
-      const ms = item.name.toLowerCase().includes(menuSearch.toLowerCase());
-      return mc && ms;
-    });
-  }, [allSellableItems, categoryFilter, menuSearch]);
-
-  const categories = useMemo(() => {
-    const cats = allSellableItems.map(i => i.category);
-    return ['All', ...new Set(cats)];
-  }, [allSellableItems]);
 
   const getTableStatus = useCallback((tableId) => {
     const t = tableBills[tableId];
