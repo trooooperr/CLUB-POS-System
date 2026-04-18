@@ -10,8 +10,8 @@ const INVENTORY_CACHE_KEY = 'inventory:all';
 // Get all menu items
 router.get('/', async (req, res) => {
   try {
-    const cached = await getCache(MENU_CACHE_KEY);
-    if (cached) return res.json(cached);
+    /* const cached = await getCache(MENU_CACHE_KEY);
+    if (cached) return res.json(cached); */
 
     const items = await MenuItem.find().sort({ category: 1, name: 1 });
     await setCache(MENU_CACHE_KEY, items, 300);
