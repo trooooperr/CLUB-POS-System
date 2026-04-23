@@ -57,8 +57,9 @@ router.post('/', async (req, res) => {
       return await client.incr(redisCounterKey);
     })();
     
-    // Format: HTB-001
-    orderData.billNo = `${count.toString().padStart(3, '0')}`;
+    // Format: 260423-001 (Unique across days)
+    const datePrefix = dateStr.replace(/-/g, '').slice(2); // YYMMDD
+    orderData.billNo = `${datePrefix}-${count.toString().padStart(3, '0')}`;
 
     const order = new Order(orderData);
     const saved = await order.save();
