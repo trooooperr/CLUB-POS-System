@@ -52,4 +52,20 @@ function requireRole(roles) {
   };
 }
 
-module.exports = { generateToken, requireAuth, requireRole, JWT_SECRET };
+/**
+ * Middleware: Allow either valid JWT OR a valid Cron Secret
+ */
+function allowCronSecret(req, res, next) {
+  const cronSecret = req.headers['x-cron-secret'];
+  const envSecret = process.env.CRON_SECRET || 'humtum_cron_secret_2026';
+  
+  if (cronSecret && cronSecret === envSecret) {
+    req.user = { role: 'admin', username: 'cron_job' }; // Grant admin-like access for cron
+    return next();
+  }
+  
+  // Fallback to standard auth
+  return requireAuth(req, res, next);
+}
+
+module.exports = { generateToken, requireAuth, requireRole, allowCronSecret, JWT_SECRET };

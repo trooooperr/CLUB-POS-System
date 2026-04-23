@@ -6,7 +6,7 @@ const fs = require('fs');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const { isRedisHealthy } = require('./src/lib/redis');
-const { requireAuth } = require('./src/middleware/auth');
+const { requireAuth, allowCronSecret } = require('./src/middleware/auth');
 
 const app = express();
 
@@ -56,7 +56,7 @@ const { router: reportsRouter } = require('./src/routes/reports');
 app.use('/api/menu',      requireAuth, require('./src/routes/menu'));
 app.use('/api/orders',    requireAuth, require('./src/routes/orders'));
 app.use('/api/workers',   requireAuth, require('./src/routes/workers'));
-app.use('/api/reports',   requireAuth, reportsRouter);
+app.use('/api/reports',   allowCronSecret, reportsRouter);
 app.use('/api/settings',  requireAuth, require('./src/routes/settings'));
 app.use('/api/inventory', requireAuth, require('./src/routes/inventory'));
 app.use('/api/admin',    requireAuth, require('./src/routes/admin'));
