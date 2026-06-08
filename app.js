@@ -36,16 +36,31 @@ app.use(helmet({
 const rawOrigins = process.env.ALLOWED_ORIGINS || 'http://localhost:5173,http://localhost:5176,http://localhost:3001';
 const allowedOrigins = rawOrigins.split(',').map(o => o.trim()).filter(Boolean);
 
-app.use(cors({
-  origin: (origin, callback) => {
-    // Allow requests with no origin (curl, mobile apps, Postman, same-origin)
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.includes(origin)) return callback(null, true);
-    // In development, be permissive
-    if (process.env.NODE_ENV !== 'production') return callback(null, true);
+app.use(cors((req, callback) => {
+  const origin = req.header('Origin');
+  let isAllowed = false;
+
+  if (!origin) {
+    isAllowed = true;
+  } else if (allowedOrigins.includes(origin)) {
+    isAllowed = true;
+  } else {
+    // Dynamically check if same-origin (requested origin matches current host header)
+    try {
+      const originUrl = new URL(origin);
+      if (originUrl.host === req.headers.host) {
+        isAllowed = true;
+      }
+    } catch (e) {
+      // Invalid URL in origin header
+    }
+  }
+
+  if (isAllowed || process.env.NODE_ENV !== 'production') {
+    callback(null, { origin: true, credentials: true });
+  } else {
     callback(new Error(`Origin ${origin} not allowed by CORS`));
-  },
-  credentials: true,
+  }
 }));
 
 // ── Body parsing ─────────────────────────────────────────────────
