@@ -1,9 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
-import { Volume2, VolumeX, Clock, ChefHat, AlertCircle, RefreshCw } from 'lucide-react';
+import { Volume2, VolumeX, Clock, ChefHat, AlertCircle, RefreshCw, Search } from 'lucide-react';
 import { apiUrl, authFetch } from '../lib/api';
-import './KitchenDisplay.css';
-
 // --- UI configuration ---
 const TOTAL_TABLES = 21;
 const SECTION_MAP = {
@@ -11,7 +9,7 @@ const SECTION_MAP = {
   lowerBarLounge: [8,9,10,11,12,13,14],
   restaurantArea: [15,16,17,18,19,20,21],
 };
-function KOTCard({ kot, onStatusChange }) {
+function KOTCard({ kot }) {
   const formatTime = (dateStr) => {
     return new Date(dateStr).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
   };
@@ -20,38 +18,38 @@ function KOTCard({ kot, onStatusChange }) {
     <div className="kot-card"
       style={{
         background: 'var(--s2)',
-        border: '1px solid var(--b2)',
+        border: '1px solid var(--b1)',
         borderRadius: 10,
-        padding: 14,
+        padding: 12,
         color: 'var(--t1)',
-        boxShadow: '0 2px 10px rgba(0,0,0,0.15)',
+        boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
         display: 'flex',
         flexDirection: 'column',
-        gap: 10,
+        gap: 8,
       }}
     >
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
-          <div style={{ fontSize: 17, fontWeight: 900, color: 'var(--t0)', letterSpacing: 0.5 }}>
-          {kot.kotNo}
+          <div style={{ fontSize: 16, fontWeight: 900, letterSpacing: 0.5 }} className="kot-table-number">
+            {kot.kotNo}
           </div>
-          <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: 6, marginTop: 4, flexWrap: 'wrap', alignItems: 'center' }}>
             {kot.orderType && (
-              <span style={{ fontSize: 10, fontWeight: 'bold', padding: '2px 8px', background: 'var(--a)', borderRadius: 20, color: 'var(--s0)', textTransform: 'uppercase' }}>
+              <span className="kot-order-type-badge">
                 {kot.orderType}
               </span>
             )}
             {kot.waiterName && (
-              <span style={{ fontSize: 11, color: 'var(--t2)' }}>
+              <span style={{ fontSize: 10, color: 'var(--t2)' }}>
                 👤 {kot.waiterName}
               </span>
             )}
           </div>
         </div>
         <div style={{ textAlign: 'right' }}>
-          <div style={{ fontSize: 14, color: 'var(--a)', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: 4 }}>
-            <Clock size={13} />
+          <div style={{ fontSize: 12, fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: 4 }} className="kot-time-text">
+            <Clock size={12} />
             {formatTime(kot.createdAt)}
           </div>
         </div>
@@ -66,19 +64,19 @@ function KOTCard({ kot, onStatusChange }) {
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'flex-start',
-              padding: '8px 12px',
+              padding: '6px 10px',
               borderBottom: idx < kot.items.length - 1 ? '1px solid var(--b2)' : 'none',
             }}
           >
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--t0)' }}>{item.name}</div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--t0)' }}>{item.name}</div>
               {item.notes && (
-                <div style={{ fontSize: 11, color: '#f5c518', fontStyle: 'italic', marginTop: 2 }}>
-                  ✎ Advice: {item.notes}
+                <div style={{ fontSize: 10, color: '#f5c518', fontStyle: 'italic', marginTop: 2 }}>
+                  ✎ {item.notes}
                 </div>
               )}
             </div>
-            <div style={{ fontSize: 14, fontWeight: 900, color: 'var(--t0)', minWidth: 30, textAlign: 'right' }}>
+            <div style={{ fontSize: 13, fontWeight: 900, color: 'var(--t0)', minWidth: 24, textAlign: 'right' }}>
               ×{item.quantity}
             </div>
           </div>
@@ -87,64 +85,23 @@ function KOTCard({ kot, onStatusChange }) {
 
       {/* Order-level notes */}
       {kot.notes && (
-        <div style={{ background: 'rgba(245,197,24,0.08)', border: '1px solid rgba(245,197,24,0.3)', borderRadius: 6, padding: '8px 10px', fontSize: 12, color: '#f5c518', display: 'flex', gap: 6, alignItems: 'flex-start' }}>
-          <AlertCircle size={13} style={{ marginTop: 1, flexShrink: 0 }} />
+        <div style={{ background: 'rgba(245,197,24,0.08)', border: '1px solid rgba(245,197,24,0.3)', borderRadius: 6, padding: '6px 8px', fontSize: 11, color: '#f5c518', display: 'flex', gap: 6, alignItems: 'flex-start' }}>
+          <AlertCircle size={12} style={{ marginTop: 1, flexShrink: 0 }} />
           <span>{kot.notes}</span>
         </div>
       )}
-
-      {/* KOT Status Action Buttons */}
-      <div style={{ display: 'flex', gap: 8, marginTop: 10, borderTop: '1px solid var(--b2)', paddingTop: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-        {kot.status === 'PENDING' && (
-          <button 
-            className="btn btn-blue btn-sm" 
-            style={{ flex: 1 }} 
-            onClick={() => onStatusChange(kot._id, 'PREPARING')}
-          >
-            Start Preparing
-          </button>
-        )}
-        {kot.status === 'PREPARING' && (
-          <button 
-            className="btn btn-primary btn-sm" 
-            style={{ flex: 1 }} 
-            onClick={() => onStatusChange(kot._id, 'READY')}
-          >
-            Mark Ready
-          </button>
-        )}
-        {kot.status === 'READY' && (
-          <button 
-            className="btn btn-success btn-sm" 
-            style={{ flex: 1 }} 
-            onClick={() => onStatusChange(kot._id, 'SERVED')}
-          >
-            Mark Served
-          </button>
-        )}
-        <span 
-          className={`badge ${
-            kot.status === 'PENDING' ? 'b-red' : 
-            kot.status === 'PREPARING' ? 'b-amber' : 
-            'b-green'
-          }`} 
-          style={{ fontSize: 10, marginLeft: 'auto', alignSelf: 'center' }}
-        >
-          {kot.status}
-        </span>
-      </div>
     </div>
   );
 }
 
-export default function KitchenDisplay() {
+export default function KitchenDisplay({ department = 'kitchen' }) {
   const { socket, role, can, updateKOTStatus } = useApp();
   const [kots, setKots] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [selectedTable, setSelectedTable] = useState(null);
-
+  const [tableSearch, setTableSearch] = useState('');
   const loadKOTs = async () => {
     try {
       const res = await authFetch(apiUrl('/api/kots/kitchen/display'));
@@ -226,11 +183,23 @@ export default function KitchenDisplay() {
     }
   }, [socket, soundEnabled]);
 
-  // Group KOTs by table number
+  // Group KOTs by table number, filtering items by the specified department
   const kotsByTable = kots.reduce((acc, kot) => {
-    const key = kot.tableNo;
+    const deptItems = kot.items.filter(item => {
+      // Default to kitchen if department is missing
+      const itemDept = item.department || 'kitchen';
+      return itemDept === department;
+    });
+
+    // If this KOT has no items for this display's department, skip it
+    if (deptItems.length === 0) return acc;
+
+    // Create a copy of the KOT with only the relevant items
+    const displayKot = { ...kot, items: deptItems };
+
+    const key = displayKot.tableNo;
     if (!acc[key]) acc[key] = [];
-    acc[key].push(kot);
+    acc[key].push(displayKot);
     return acc;
   }, {});
 
@@ -244,98 +213,84 @@ export default function KitchenDisplay() {
   const tableNos = Object.keys(kotsByTable).sort((a, b) => parseInt(a) - parseInt(b));
 
   if (!can('kitchen')) {
-    return <div style={{ padding: 20, color: '#ef4444' }}>Access denied. Kitchen display is for staff only.</div>;
+    return <div style={{ padding: 20, color: '#ef4444' }}>Access denied. This display is for staff only.</div>;
   }
+
+  const filteredKots = tableSearch.trim()
+    ? kots.filter(k => 
+        String(k.tableNo).includes(tableSearch.trim()) || 
+        String(k.kotNo || '').toLowerCase().includes(tableSearch.trim().toLowerCase())
+      )
+    : kots;
 
   return (
     <div className="kitchen-display">
-      {/* Top Stats Bar */}
-      <div className="top-stats-bar">
-        <div className="stat-item">Total Tables: {TOTAL_TABLES}</div>
-        <div className="stat-item">Active: {activeTables}</div>
-        <div className="stat-item">Empty: {emptyTables}</div>
-      </div>
-      {/* Page Header */}
-      <div className="kitchen-header">
-        <div className="kitchen-header-left">
-          <ChefHat size={30} style={{ color: 'var(--a)' }} />
-          <div>
-            <h1 className="kitchen-title">Kitchen Display</h1>
-            <p className="kitchen-subtitle">
-              Today's KOT History — {kots.length} KOT{kots.length !== 1 ? 's' : ''} printed
-            </p>
-          </div>
+      {/* Page Header: Search + Refresh */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, gap: 12 }}>
+        <div className="kot-search-wrapper">
+          <Search size={15} className="kot-search-icon" />
+          <input
+            type="text"
+            placeholder="Search KOT..."
+            value={tableSearch}
+            onChange={e => setTableSearch(e.target.value)}
+            className="kot-search-input"
+          />
         </div>
-
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-          {/* Refresh button */}
-          <button
-            onClick={() => { setRefreshing(true); loadKOTs().finally(() => setRefreshing(false)); }}
-            className="refresh-button"
-            aria-label="Refresh KOTs"
-          >
-            <RefreshCw size={14} className={refreshing ? 'rotating' : ''} /> Refresh
-          </button>
-
-          {/* Sound toggle */}
-          {/* <button
-            onClick={() => setSoundEnabled(!soundEnabled)}
-            style={{ padding: '8px 14px', background: soundEnabled ? 'var(--a)' : 'var(--s2)', color: soundEnabled ? 'var(--s0)' : 'var(--t1)', border: '1px solid var(--b2)', borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600 }}
-          >
-            {soundEnabled ? <Volume2 size={14} /> : <VolumeX size={14} />}
-            Sound {soundEnabled ? 'On' : 'Off'}
-          </button> */}
-        </div>
+        <button
+          onClick={() => { setRefreshing(true); loadKOTs().finally(() => setRefreshing(false)); }}
+          className="refresh-button"
+          aria-label="Refresh KOTs"
+        >
+          <RefreshCw size={14} className={refreshing ? 'rotating' : ''} /> Refresh
+        </button>
       </div>
 
-      {/* Table selection and KOT display */}
       {loading ? (
-        <div style={{ textAlign: 'center', padding: 60, color: 'var(--t2)' }}>Loading KOT history...</div>
-      ) : tableNos.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: 60, color: 'var(--t2)' }}>
-          <ChefHat size={56} style={{ margin: '0 auto 16px', opacity: 0.3 }} />
-          <p style={{ fontSize: 16 }}>No KOTs generated today</p>
-        </div>
-      ) : selectedTable ? (
-        // --- Selected table view ---
-        <div className="selected-table-view">
-          <button className="back-button" onClick={() => setSelectedTable(null)}>
-            ← Back to tables
-          </button>
-          <h2 className="selected-table-title">TABLE {selectedTable} – {kotsByTable[selectedTable].length} KOT{kotsByTable[selectedTable].length !== 1 ? 's' : ''}</h2>
-          <div className="kitchen-kot-list custom-scroll" style={{ padding: 12, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10, flex: 1, paddingBottom: 20 }}>
-            {kotsByTable[selectedTable]
-              .slice()
-              .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
-              .map(kot => (
-                <KOTCard key={kot._id} kot={kot} onStatusChange={handleStatusChange} />
-              ))}
+        <div style={{ textAlign: 'center', padding: 60, color: 'var(--t2)' }}>Loading KOTs...</div>
+        ) : Object.keys(kotsByTable).length === 0 ? (
+          <div style={{ textAlign: 'center', padding: 60, color: 'var(--t2)' }}>
+            <ChefHat size={56} style={{ margin: '0 auto 16px', opacity: 0.3 }} />
+            <p style={{ fontSize: 16 }}>{tableSearch ? `No KOTs for table "${tableSearch}"` : 'No active KOTs'}</p>
           </div>
-        </div>
-      ) : (
-        // --- Sectioned Table view ---
+        ) : (
         <>
-          {['topBarLounge', 'lowerBarLounge', 'restaurantArea'].map(sectionKey => (
-            <section key={sectionKey} className="tables-section">
-              <h2 className="section-title">
-                {sectionKey === 'topBarLounge' ? 'Top Bar Lounge' : sectionKey === 'lowerBarLounge' ? 'Lower Bar Lounge' : 'Restaurant Area'}
-              </h2>
-              <div className="tables-grid">
-                {SECTION_MAP[sectionKey].map(tableNo => (
-                  <div key={tableNo} className="kitchen-table-card" onClick={() => setSelectedTable(tableNo)}>
-                    <div className="kitchen-table-header">
-                      <span>TABLE {tableNo}</span>
-                      <span className="count-badge">
-                        {(kotsByTable[tableNo] || []).length} KOT{((kotsByTable[tableNo] || []).length) !== 1 ? 's' : ''}
-                      </span>
-                    </div>
-                  </div>
-                ))}
+            {selectedTable ? (
+              <div className="selected-table-view">
+                <button className="back-button" onClick={() => setSelectedTable(null)}>
+                  &larr; Back to Tables
+                </button>
+                <div className="selected-table-title">TABLE {selectedTable}</div>
+                <div className="kitchen-kot-list custom-scroll">
+                  {(kotsByTable[selectedTable] || [])
+                    .slice()
+                    .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
+                    .map(kot => (
+                      <KOTCard key={kot._id} kot={kot} />
+                    ))}
+                </div>
               </div>
-            </section>
-          ))}
+            ) : (
+              <div className="tables-grid">
+                {Object.entries(kotsByTable)
+                  .filter(([tn, kotList]) => {
+                    if (!tableSearch) return true;
+                    const search = tableSearch.trim().toLowerCase();
+                    return tn.toLowerCase().includes(search) || kotList.some(k => String(k.kotNo || '').toLowerCase().includes(search));
+                  })
+                  .sort((a, b) => parseInt(a[0]) - parseInt(b[0]))
+                  .map(([tn, kotList]) => (
+                    <div key={tn} className="kitchen-table-card" onClick={() => setSelectedTable(tn)}>
+                      <div className="kitchen-table-header">
+                        <span>TABLE {tn}</span>
+                        <span className="count-badge">{kotList.length} KOTs</span>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            )}
         </>
       )}
-</div>
+    </div>
   );
 }

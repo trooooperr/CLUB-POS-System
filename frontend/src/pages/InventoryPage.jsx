@@ -267,13 +267,19 @@ export default function InventoryPage() {
       <div className="orders-filters-row">
         <div style={{ display: 'flex', flex: 1, gap: 8 }}>
           <div className="search-wrapper-unified" style={{ flex: 1 }}>
-            <input
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="🔍 Search items..."
-              className="search-input-unified"
-            />
-          </div>
+  <Search size={16} className="search-icon" />
+  <input
+    value={search}
+    onChange={e => setSearch(e.target.value)}
+    placeholder="Search items..."
+    className="search-input-unified"
+  />
+  {search && (
+    <button className="search-clear-btn" onClick={() => setSearch('')} title="Clear search">
+      <X size={14} />
+    </button>
+  )}
+</div>
           <div className="select-wrapper-unified hide-on-desktop" style={{ width: '110px', flexShrink: 0 }}>
             <select value={cat} onChange={e => setCat(e.target.value)} style={{ paddingLeft: '14px' }}>
               <option value="All">All</option>

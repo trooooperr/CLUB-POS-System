@@ -64,9 +64,10 @@ export default function LoginPage() {
       <div className="lpage">
         <div className="lcard fi">
           <div className="llogo">
-            <div className="ltitle">{settings.restaurantName?.split(' ').slice(0,2).join(' ') || 'HumTum'}</div>
+            <img src="/favicon.ico" alt="Logo" className="llogo-img" />
+            <div className="ltitle">{settings.restaurantName || 'HumTum'}</div>
             <div className="lsub">
-              {fpMode === 'done' ? 'Password Reset!' : fpMode === 'otp' ? 'Enter OTP' : 'Forgot Password'}
+              {fpMode === 'done' ? '✓ Password Reset!' : fpMode === 'otp' ? 'Enter Verification Code' : 'Account Recovery'}
             </div>
           </div>
 
@@ -77,7 +78,7 @@ export default function LoginPage() {
                   background: 'rgba(245,158,11,0.05)', 
                   border: '1px solid rgba(245,158,11,0.2)', 
                   borderRadius: 12, 
-                  padding: '16px', 
+                  padding: '26px', 
                   marginBottom: 20, 
                   textAlign: 'center' 
                 }}>
@@ -181,15 +182,15 @@ export default function LoginPage() {
               <div className="fgroup">
                 <label className="lbl">OTP Code</label>
                 <div style={{ position:'relative' }}>
-                  <KeyRound size={13} style={{ position:'absolute', left:10, top:'50%', transform:'translateY(-50%)', color:'var(--t2)' }}/>
-                  <input value={fpOtp} onChange={e=>setFpOtp(e.target.value)} placeholder="6-digit OTP" maxLength={6} style={{ paddingLeft:30, letterSpacing:4, fontSize:18, textAlign:'center' }}/>
+                  <KeyRound size={16} style={{ position:'absolute', left:14, top:'50%', transform:'translateY(-50%)', color:'var(--t2)' }}/>
+                  <input value={fpOtp} onChange={e=>setFpOtp(e.target.value)} placeholder="6-digit OTP" maxLength={6} style={{ paddingLeft:42, letterSpacing:4, fontSize:18, textAlign:'center' }}/>
                 </div>
               </div>
               <div className="fgroup">
                 <label className="lbl">New Password</label>
                 <div style={{ position:'relative' }}>
-                  <Lock size={13} style={{ position:'absolute', left:10, top:'50%', transform:'translateY(-50%)', color:'var(--t2)' }}/>
-                  <input type="password" value={fpNewPwd} onChange={e=>setFpNewPwd(e.target.value)} placeholder="Min 6 characters" style={{ paddingLeft:30 }}/>
+                  <Lock size={16} style={{ position:'absolute', left:14, top:'50%', transform:'translateY(-50%)', color:'var(--t2)' }}/>
+                  <input type="password" value={fpNewPwd} onChange={e=>setFpNewPwd(e.target.value)} placeholder="Min 6 characters" style={{ paddingLeft:42 }}/>
                 </div>
               </div>
               {fpError && (
@@ -228,8 +229,9 @@ export default function LoginPage() {
       <div className="lcard fi">
         {/* Brand */}
         <div className="llogo">
-          <div className="ltitle">{settings.restaurantName?.split(' ').slice(0,2).join(' ') || 'HumTum'}</div>
-          <div className="lsub">Secure Login</div>
+          <img src="/favicon.ico" alt="Logo" className="llogo-img" />
+          <div className="ltitle">{settings.restaurantName || 'HumTum'}</div>
+          <div className="lsub">THE BAR &amp; RESTAURANT · POS</div>
         </div>
 
         {/* Form */}
@@ -237,16 +239,36 @@ export default function LoginPage() {
           <div className="fgroup">
             <label className="lbl">Username</label>
             <div style={{ position:'relative' }}>
-              <User size={13} style={{ position:'absolute', left:10, top:'50%', transform:'translateY(-50%)', color:'var(--t2)' }}/>
-              <input value={username} onChange={e=>setUsername(e.target.value)} placeholder="Enter username" autoComplete="username" required style={{ paddingLeft:30 }}/>
+              <User size={16} style={{ position:'absolute', left:14, top:'50%', transform:'translateY(-50%)', color:'var(--t2)' }}/>
+              <input value={username} onChange={e=>setUsername(e.target.value)} placeholder="Enter username" autoComplete="username" required style={{ paddingLeft:42 }}/>
             </div>
           </div>
 
           <div className="fgroup">
             <label className="lbl">Password</label>
             <div style={{ position:'relative' }}>
-              <Lock size={13} style={{ position:'absolute', left:10, top:'50%', transform:'translateY(-50%)', color:'var(--t2)' }}/>
-              <input type={show?'text':'password'} value={password} onChange={e=>setPassword(e.target.value)} placeholder="Enter password" required style={{ paddingLeft:30, paddingRight:34 }}/>
+              <Lock size={16} style={{ position:'absolute', left:14, top:'50%', transform:'translateY(-50%)', color:'var(--t2)' }}/>
+              <input type={show?'text':'password'} value={password} onChange={e=>setPassword(e.target.value)} placeholder="Enter password" required style={{ paddingLeft:42, paddingRight:48 }}/>
+              <button
+                type="button"
+                onClick={() => setShow(!show)}
+                style={{
+                  position: 'absolute',
+                  right: 14,
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--t2)',
+                  cursor: 'pointer',
+                  padding: 0,
+                  fontSize: 10,
+                  fontWeight: 800,
+                  letterSpacing: '0.5px'
+                }}
+              >
+                {show ? 'HIDE' : 'SHOW'}
+              </button>
             </div>
           </div>
 

@@ -3,13 +3,13 @@ const jwt = require('jsonwebtoken');
 const JWT_SECRET = process.env.JWT_SECRET || 'humtum-pos-secret-key-change-in-production';
 
 /**
- * Generate JWT token for a user
+ * Generate JWT access token for a user (1 day expiry)
  */
 function generateToken(user) {
   return jwt.sign(
     { id: user._id, username: user.username, role: user.role },
     JWT_SECRET,
-    { expiresIn: '7d' }
+    { expiresIn: '1d' }
   );
 }
 
@@ -57,14 +57,13 @@ function requireRole(roles) {
  */
 function allowCronSecret(req, res, next) {
   const cronSecret = req.headers['x-cron-secret'];
-  const envSecret = process.env.CRON_SECRET || 'humtum_cron_secret_2026';
-  
+  const envSecret  = process.env.CRON_SECRET || 'humtum_cron_secret_2026';
+
   if (cronSecret && cronSecret === envSecret) {
-    req.user = { role: 'admin', username: 'cron_job' }; // Grant admin-like access for cron
+    req.user = { role: 'admin', username: 'cron_job' };
     return next();
   }
-  
-  // Fallback to standard auth
+
   return requireAuth(req, res, next);
 }
 

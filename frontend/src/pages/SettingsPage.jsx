@@ -2,8 +2,6 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import { Save, Check, Send, KeyRound, ShieldAlert, Users, Trash2, RefreshCw } from 'lucide-react';
 import { apiUrl, authFetch } from '../lib/api';
-import './SettingsPage.css';
-
 export default function SettingsPage() {
   const { settings, setSettings, saveSettings, currentUser, orderHistory, workers, loadData } = useApp();
   const [form, setForm] = useState({ ...settings });

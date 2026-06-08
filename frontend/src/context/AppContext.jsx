@@ -35,7 +35,7 @@ const SETTINGS_CACHE = 'ht_settings_cache';
 const WORKERS_CACHE = 'ht_workers_cache';
 const INVENTORY_CACHE = 'ht_inventory_cache';
 
-const NUM_TABLES = 21;
+const NUM_TABLES = 20;
 
 const DEFAULT_SETTINGS = {
   restaurantName:  'HumTum Bar & Restaurant',
@@ -132,6 +132,10 @@ export function AppProvider({ children }) {
       }
     });
 
+    newSocket.on('TABLE_SESSION_UPDATED', () => {
+      safeFetch(apiUrl('/api/orders/sessions/active')).then(setActiveSessions);
+    });
+
     setSocket(newSocket);
 
     return () => {
@@ -221,6 +225,7 @@ export function AppProvider({ children }) {
   // ── Data ────────────────────────────────────────────────────────
   const [menuItems,    setMenuItems]    = useState([]);
   const [orderHistory, setOrderHistory] = useState([]);
+  const [activeSessions, setActiveSessions] = useState([]);
   const [workers,      setWorkers]      = useState([]);
   const [inventory,    setInventory]    = useState([]);
   const [loading,      setLoading]      = useState(true);
@@ -332,6 +337,7 @@ export function AppProvider({ children }) {
         safeFetch(apiUrl('/api/workers')),
         safeFetch(apiUrl('/api/inventory')),
         safeFetch(apiUrl('/api/settings')),
+        safeFetch(apiUrl('/api/orders/sessions/active')),
       ]);
 
       if (results[0].status === 'fulfilled') {
@@ -346,6 +352,9 @@ export function AppProvider({ children }) {
       }
       if (results[4].status === 'fulfilled' && results[4].value && !Array.isArray(results[4].value)) {
         setSettings(results[4].value);
+      }
+      if (results[5].status === 'fulfilled') {
+        setActiveSessions(results[5].value);
       }
 
     } catch (err) {
@@ -384,15 +393,12 @@ export function AppProvider({ children }) {
 
     const drinkItems = inv
       .filter(i => {
-        const isDrink = ['Soda','Beer','Alcohol','Soft Drink','Beverage','Whiskey','Vodka','Wine','Gin','Rum','Mixer','Juice'].some(c => 
-          i.category?.toLowerCase().includes(c.toLowerCase()) || 
-          i.name?.toLowerCase().includes(c.toLowerCase())
-        );
         // Only merge if not already in menu to avoid duplicates
-        return isDrink && !menu.some(m => m.name.toLowerCase() === i.name.toLowerCase());
+        return !menu.some(m => m.name.toLowerCase() === i.name.toLowerCase());
       })
       .map(i => ({ 
         ...i, 
+        department: 'bar',
         imageUrl: getImg(i),
         available: i.stock > 0, 
         isInventory: true 
@@ -400,6 +406,7 @@ export function AppProvider({ children }) {
     
     const processedMenu = menu.map(m => ({
       ...m,
+      department: m.department || 'kitchen',
       imageUrl: getImg(m),
       available: m.available !== false,
       isInventory: false
@@ -419,7 +426,7 @@ export function AppProvider({ children }) {
   }, [allSellableItems, categoryFilter, menuSearch]);
 
   const categories = useMemo(() => {
-    const cats = allSellableItems.map(i => i.category);
+    const cats = allSellableItems.map(i => i.category).filter(Boolean);
     return ['All', ...new Set(cats)];
   }, [allSellableItems]);
 
@@ -498,11 +505,74 @@ export function AppProvider({ children }) {
 
 
   const getTableStatus = useCallback((tableId) => {
+    const tableNo = parseInt(tableId.substring(1));
+    const session = activeSessions.find(s => s.tableNo === tableNo);
     const t = tableBills[tableId];
-    if (!t || t.items.length === 0) return 'free';
-    if (t.dueAmount > 0) return 'due';
-    return 'occupied';
-  }, [tableBills]);
+    
+    let kotItemsCount = 0;
+    if (session && Array.isArray(session.kotIds)) {
+      session.kotIds.forEach(kot => {
+        if (Array.isArray(kot.items)) {
+          kot.items.forEach(item => {
+            kotItemsCount += item.quantity;
+          });
+        }
+      });
+    }
+    
+    let pendingItemsCount = 0;
+    if (t && t.items && t.items.length > 0) {
+      pendingItemsCount = t.items.length;
+    } else if (session && Array.isArray(session.pendingItems)) {
+      pendingItemsCount = session.pendingItems.length;
+    }
+    
+    const hasItems = (kotItemsCount + pendingItemsCount) > 0;
+    const isDue = (session?.activeOrderId?.dueAmount > 0) || (t && t.dueAmount > 0);
+    
+    if (isDue) return 'due';
+    if (hasItems) return 'occupied';
+    
+    return 'free';
+  }, [tableBills, activeSessions]);
+
+  const getTableInfo = useCallback((tableId) => {
+    const tableNo = parseInt(tableId.substring(1));
+    const session = activeSessions.find(s => s.tableNo === tableNo);
+    const localBill = tableBills[tableId] || { items: [] };
+
+    let kotItemsCount = 0;
+    let kotTotal = 0;
+    if (session && Array.isArray(session.kotIds)) {
+      session.kotIds.forEach(kot => {
+        if (Array.isArray(kot.items)) {
+          kot.items.forEach(item => {
+            kotItemsCount += item.quantity;
+            kotTotal += (item.price || 0) * item.quantity;
+          });
+        }
+      });
+    }
+
+    let pendingItemsCount = 0;
+    let pendingTotal = 0;
+    if (localBill.items && localBill.items.length > 0) {
+      localBill.items.forEach(item => {
+        pendingItemsCount += item.quantity;
+        pendingTotal += (item.price || 0) * item.quantity;
+      });
+    } else if (session && Array.isArray(session.pendingItems)) {
+      session.pendingItems.forEach(item => {
+        pendingItemsCount += item.quantity;
+        pendingTotal += (item.price || 0) * item.quantity;
+      });
+    }
+
+    return {
+      itemsCount: kotItemsCount + pendingItemsCount,
+      totalAmount: kotTotal + pendingTotal
+    };
+  }, [tableBills, activeSessions]);
 
   // ── Generate bill (with proper error handling) ──────────────────
   const generateBill = useCallback(async (paymentMode, paidAmount) => {
@@ -643,7 +713,14 @@ export function AppProvider({ children }) {
       }
       const session = await res.json();
       setCurrentSession(session);
-      if (socket) socket.emit('join-table', tableNo);
+      setActiveSessions(prev => {
+        const filtered = prev.filter(s => s.tableNo !== session.tableNo);
+        return [...filtered, session];
+      });
+      if (socket) {
+        socket.emit('join-table', tableNo);
+        socket.emit('table-updated', { tableNo });
+      }
       return session;
     } catch (err) {
       console.error('Open table error:', err);
@@ -661,11 +738,18 @@ export function AppProvider({ children }) {
       if (!res.ok) throw new Error('Failed to sync session');
       const session = await res.json();
       setCurrentSession(session);
+      setActiveSessions(prev => {
+        const filtered = prev.filter(s => s.tableNo !== session.tableNo);
+        return [...filtered, session];
+      });
+      if (socket) {
+        socket.emit('table-updated', { tableNo });
+      }
       return session;
     } catch (err) {
       console.error('Sync session error:', err);
     }
-  }, []);
+  }, [socket]);
 
   const createKOT = useCallback(async (orderId, tableNo, items, notes = '', waiterName = '', orderType = 'dine-in') => {
     try {
@@ -674,7 +758,10 @@ export function AppProvider({ children }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ orderId, tableNo, items, notes, waiterName, orderType })
       });
-      if (!res.ok) throw new Error('Failed to create KOT');
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || 'Failed to create KOT');
+      }
       const kotResponse = await res.json();
       const { inventory: nextInventory, ...kot } = kotResponse;
       if (nextInventory) applyInventoryUpdate(nextInventory);
@@ -716,7 +803,15 @@ export function AppProvider({ children }) {
       const orderResponse = await res.json();
       const { inventory: nextInventory, ...order } = orderResponse;
       if (nextInventory) applyInventoryUpdate(nextInventory);
-      setOrderHistory(prev => prev.map(o => o._id === orderId ? order : o));
+      setOrderHistory(prev => {
+        const historyArray = Array.isArray(prev) ? prev : [];
+        const exists = historyArray.some(o => o._id === orderId);
+        if (exists) {
+          return historyArray.map(o => o._id === orderId ? order : o);
+        } else {
+          return [order, ...historyArray];
+        }
+      });
       return order;
     } catch (err) {
       console.error('Finalize bill error:', err);
@@ -732,7 +827,15 @@ export function AppProvider({ children }) {
       });
       if (!res.ok) throw new Error('Failed to complete order');
       const order = await res.json();
-      setOrderHistory(prev => prev.map(o => o._id === orderId ? order : o));
+      setOrderHistory(prev => {
+        const historyArray = Array.isArray(prev) ? prev : [];
+        const exists = historyArray.some(o => o._id === orderId);
+        if (exists) {
+          return historyArray.map(o => o._id === orderId ? order : o);
+        } else {
+          return [order, ...historyArray];
+        }
+      });
       if (socket && order.tableNo) socket.emit('order-completed', { tableNo: order.tableNo, orderId });
       return order;
     } catch (err) {
@@ -759,6 +862,7 @@ export function AppProvider({ children }) {
       categoryFilter, setCategoryFilter,
       menuSearch, setMenuSearch,
       getTableStatus, generateBill,
+      activeSessions, getTableInfo,
       invoiceOrder, setInvoiceOrder,
       saveMenuItem, deleteMenuItem,
       saveWorker, deleteWorker, updateWorkerStatus,

@@ -11,6 +11,7 @@ const NAV = [
   { id:'inventory', label:'Inventory',       icon:Package,         perm:'inventory' },
   { id:'settings',  label:'Settings',        icon:Settings,        perm:'settings'  },
   { id:'kitchen',   label:'Kitchen Display', icon:UtensilsCrossed, perm:'kitchen'   },
+  { id:'bar',       label:'Bar Display',     icon:UtensilsCrossed, perm:'kitchen'   },
 ];
 
 const RC = { admin:'#0D9488', manager:'#B8860B', staff:'#10B981' };
@@ -34,7 +35,9 @@ export default function Sidebar() {
       <aside className={`sbar${sidebarOpen ? ' open' : ''}`}>
         {/* Logo */}
         <div className="logo-wrap">
-          <div className="logo-box">H</div>
+          <div className="logo-box" style={{ background: 'none', boxShadow: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <img src="/favicon.ico" alt="Logo" style={{ width: '32px', height: '32px', objectFit: 'contain' }} />
+          </div>
           <div style={{ flex:1 }}>
             <div className="logo-name" style={{ fontWeight: 900, letterSpacing: '-0.08em', color: 'var(--a)', fontSize: 18, textTransform: 'uppercase', textShadow: '0 1px 2px rgba(0,0,0,0.18)' }}>
               {settings.restaurantName?.toUpperCase() || 'HUMTUM'}

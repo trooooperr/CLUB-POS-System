@@ -17,14 +17,14 @@ import './index.css';
 import Toast from './components/Toast';
 
 function Shell() {
-  const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth <= 700 : false);
+  const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth <= 750 : false);
   useEffect(() => {
-    const onResize = () => setIsMobile(window.innerWidth <= 700);
+    const onResize = () => setIsMobile(window.innerWidth <= 750);
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
-  const { currentUser, activeSection, settings, loading, error, loadData, sidebarOpen, setSidebarOpen, invoiceOrder, activeTableId, showToast, tableBills, getTableStatus, NUM_TABLES } = useApp();
+  const { currentUser, activeSection, setActiveSection, selectTable, settings, loading, error, loadData, sidebarOpen, setSidebarOpen, invoiceOrder, activeTableId, showToast, tableBills, getTableStatus, NUM_TABLES } = useApp();
 
   const pageTitles = {
     billing: 'Billing',
@@ -35,6 +35,7 @@ function Shell() {
     workers: 'Workers',
     settings: 'Settings',
     kitchen: 'Kitchen Display',
+    bar: 'Bar Display',
   };
   const currentPageTitle = pageTitles[activeSection] || 'Dashboard';
   const activeTableCount = Object.keys(tableBills || {}).filter(tableId => getTableStatus(tableId) !== 'free').length;
@@ -68,17 +69,32 @@ function Shell() {
     };
   }, [currentUser, showToast]);
 
+  // Global ESC → go to table picker
+  useEffect(() => {
+    if (!currentUser) return;
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        // Don't intercept if a modal/overlay is open (has its own ESC handling)
+        const hasModal = document.querySelector('.moverlay, [role="dialog"], .overlay');
+        if (hasModal) return;
+        setActiveSection('billing');
+        selectTable(null);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [currentUser, setActiveSection, selectTable]);
+
   if (!currentUser) return <LoginPage />;
 
-  const pages = { billing:<BillingPage/>, menu:<MenuPage/>, orders:<OrdersPage/>, sales:<SalesPage/>, workers:<WorkersPage/>, inventory:<InventoryPage/>, settings:<SettingsPage/>, kitchen:<KitchenDisplay/> };
+  const pages = { billing:<BillingPage/>, menu:<MenuPage/>, orders:<OrdersPage/>, sales:<SalesPage/>, workers:<WorkersPage/>, inventory:<InventoryPage/>, settings:<SettingsPage/>, kitchen:<KitchenDisplay department="kitchen" />, bar:<KitchenDisplay department="bar" /> };
 
-  const hideSidebar = activeSection === 'billing' && activeTableId && isMobile;
-  const showTopBar = activeSection !== 'billing' || !activeTableId;
+  const showTopBar = activeSection !== 'billing'; // Hide HumTumBar entirely on billing page
   const navHint = activeSection === 'billing' ? 'BILL = Ctrl+B   ·   KOT = Ctrl+K' : '';
 
   return (
     <div className="shell">
-      {!hideSidebar && <Sidebar/>}
+      <Sidebar/>
       <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
         {showTopBar && (
           <HumTumBar
@@ -102,7 +118,7 @@ function Shell() {
           </div>
         )}
 
-        <main className={`main${(activeSection === 'billing' || activeSection === 'kitchen' || hideSidebar) ? ' full-page-section' : ''}`}>
+        <main className={`main${(activeSection === 'billing' || activeSection === 'kitchen') ? ' full-page-section' : ''}`}>
           <div className="page-inner">{pages[activeSection]||<BillingPage/>}</div>
         </main>
       </div>

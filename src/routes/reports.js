@@ -6,16 +6,9 @@ const Settings = require('../models/Settings');
 const nodemailer = require('nodemailer');
 const { getCache, setCache } = require('../lib/redis');
 const { requireRole } = require('../middleware/auth');
+const { getBusinessDayBounds } = require('../lib/businessDay');
 
 const REPORT_SUMMARY_CACHE_KEY = 'reports:daily-summary';
-
-function getTodayBounds() {
-  const start = new Date();
-  start.setHours(0, 0, 0, 0);
-  const end = new Date(start);
-  end.setDate(end.getDate() + 1);
-  return { start, end };
-}
 
 async function getPersistedSettings() {
   const existing = await Settings.findOne();
@@ -177,7 +170,7 @@ async function sendDailyReportInternal(options = {}) {
     currency: options.settings?.currency || persistedSettings.currency || '₹',
   };
 
-  const { start, end } = getTodayBounds();
+  const { start, end } = getBusinessDayBounds();
   const orders = await Order.find({ date: { $gte: start, $lt: end } });
   const inventory = await Inventory.find().sort({ category: 1, name: 1 });
 
@@ -221,7 +214,7 @@ router.get('/daily-summary', requireRole(['admin', 'manager']), async (req, res)
     const cached = await getCache(REPORT_SUMMARY_CACHE_KEY);
     if (cached) return res.json(cached);
 
-    const { start, end } = getTodayBounds();
+    const { start, end } = getBusinessDayBounds();
     const orders = await Order.find({ date: { $gte: start, $lt: end } });
     const total    = orders.reduce((s,o)=>s+o.grandTotal,0);
     const due      = orders.reduce((s,o)=>s+(o.dueAmount||0),0);

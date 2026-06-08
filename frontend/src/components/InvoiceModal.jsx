@@ -3,7 +3,7 @@ import { useApp } from '../context/AppContext';
 import { X, Printer, Phone, Send, Check, Download, Share2 } from 'lucide-react';
 
 export default function InvoiceModal() {
-  const { invoiceOrder, setInvoiceOrder, settings } = useApp();
+  const { invoiceOrder, setInvoiceOrder, settings, showToast } = useApp();
   const [phone, setPhone] = useState(invoiceOrder?.customerPhone || '');
   const [sent, setSent] = useState(false);
   const [tab, setTab] = useState('whatsapp');
@@ -12,15 +12,9 @@ export default function InvoiceModal() {
   const o = invoiceOrder;
   const s = settings;
 
-const handlePrint = () => {
+  const handlePrint = async () => {
     const roundedGrandTotal = Math.round(o.grandTotal);
-    const iframe = document.createElement('iframe');
-    iframe.style.display = 'none';
-    document.body.appendChild(iframe);
-    
-    const pri = iframe.contentWindow;
-    pri.document.open();
-    pri.document.write(`
+    const html = `
       <html>
         <head>
           <style>
@@ -75,6 +69,7 @@ const handlePrint = () => {
 
           <div class="row"><span>BILL: HTB-${(o.billNo || '').split('-').pop()}</span><span>TABLE: ${o.tableNo}</span></div>
           <div class="row" style="font-size: 10px;">DATE: ${new Date(o.date).toLocaleString('en-IN')}</div>
+          ${o.waiterName ? `<div class="row" style="font-size: 10px;">WAITER: ${o.waiterName.toUpperCase()}</div>` : ''}
 
           <div class="dash-line"></div>
 
@@ -115,8 +110,28 @@ const handlePrint = () => {
           </div>
         </body>
       </html>
-    `);
-    pri.document.close();
+    `;
+
+    try {
+      const response = await fetch('/api/print', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('humtum_token_v2')}`
+        },
+        body: JSON.stringify({ html, documentType: 'bill' })
+      });
+      if (response.ok) {
+        console.log('Direct print job sent successfully to backend printer.');
+        showToast('Print job sent to printer', 'success');
+        return;
+      }
+      const errData = await response.json().catch(() => ({}));
+      throw new Error(errData.error || 'Server print failure');
+    } catch (err) {
+      console.warn('Direct backend print failed:', err);
+      showToast(`Print failed: ${err.message || 'Direct printing error'}`, 'error');
+    }
   };
 
 const sendBill = () => {
@@ -178,7 +193,7 @@ ${s.thankYouMsg}
         <div className="inv-m-header">
           <div className="header-left">
             <div className="live-dot"></div>
-            <span className="header-status">ORDER HTB-${(o.billNo || '').split('-').pop()}</span>
+            <span className="header-status">ORDER HTB-{(o.billNo || '').split('-').pop()}</span>
           </div>
           <button className="close-btn-minimal" onClick={() => setInvoiceOrder(null)}><X size={20}/></button>
         </div>
@@ -196,9 +211,10 @@ ${s.thankYouMsg}
               <div className="bill-zig-zag-sep"></div>
 
               <div className="bill-meta-grid">
-                <div className="meta-item"><span>BILL NO</span><strong>HTB-${(o.billNo || '').split('-').pop()}</strong></div>
+                <div className="meta-item"><span>BILL NO</span><strong>HTB-{(o.billNo || '').split('-').pop()}</strong></div>
                 <div className="meta-item" style={{textAlign:'right'}}><span>TABLE</span><strong>{o.tableNo}</strong></div>
                 <div className="meta-item full-row"><span>DATE</span><strong>{new Date(o.date).toLocaleString()}</strong></div>
+                {o.waiterName && <div className="meta-item full-row"><span>WAITER</span><strong>{o.waiterName.toUpperCase()}</strong></div>}
               </div>
 
               <div className="bill-zig-zag-sep"></div>
@@ -254,10 +270,7 @@ ${s.thankYouMsg}
             </div>
             
             <div className="share-input-row">
-       
-            
                 <input maxLength={10} value={phone} onChange={e => setPhone(e.target.value)} placeholder="Phone Number" />
-              
               <button className="send-circle-btn" onClick={sendBill} disabled={!phone || phone.length < 10}>
                 {sent ? <Check size={12} /> : <Send size={18} />}
               </button>
@@ -277,81 +290,91 @@ ${s.thankYouMsg}
 
       <style>{`
         .invoice-premium-modal {
-          width: 95%; max-width: 350px; height: auto; max-height: 94vh; 
-          display: flex; flex-direction: column; background: #08090a; 
-          border: 1px solid #1c1e21; border-radius: 28px; padding: 0 !important; overflow: hidden;
+          width: 95%; max-width: 340px; height: auto; max-height: 94vh; 
+          display: flex; flex-direction: column; background: #0c0e12; 
+          border: 1px solid #232830; border-radius: 20px; padding: 0 !important; overflow: hidden;
+          box-shadow: 0 20px 50px rgba(0,0,0,0.6);
         }
 
-        .inv-m-header { display: flex; justify-content: space-between; align-items: center; padding: 18px 20px; border-bottom: 1px solid #1c1e21; }
+        .inv-m-header { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid #1c2026; }
         .header-left { display: flex; align-items: center; gap: 8px; }
         .live-dot { width: 6px; height: 6px; background: #22c55e; border-radius: 50%; box-shadow: 0 0 8px #22c55e; }
-        .header-status { color: #888; font-size: 10px; font-weight: 800; letter-spacing: 1px; }
-        .close-btn-minimal { background: none; border: none; color: #555; cursor: pointer; }
+        .header-status { color: #8a94a6; font-size: 10px; font-weight: 800; letter-spacing: 1.5px; }
+        .close-btn-minimal { background: none; border: none; color: #64748b; cursor: pointer; transition: color 0.15s; }
+        .close-btn-minimal:hover { color: #f43f5e; }
 
-        .inv-m-body { flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 20px; }
+        .inv-m-body { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 12px; }
 
-        /* Modern Receipt Look */
+        /* Modern Receipt Look - Smaller & Polished */
         .bill-paper-wrap { 
-          background: #fff; border-radius: 12px; padding: 4px;
-          box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+          background: #ffffff; border-radius: 8px; padding: 2px;
+          box-shadow: 0 4px 20px rgba(0,0,0,0.25);
         }
-        .bill-inner { border: 1px solid #eee; border-radius: 8px; padding: 18px; color: #000; font-family: 'Courier New', Courier, monospace; }
-        .bill-name-heavy { font-size: 26px; font-weight: 900; text-align: center; color: #000; }
-        .bill-sub-info { font-size: 13px; text-align: center; color: #666; text-transform: uppercase; margin-bottom: 2px; }
-        .bill-zig-zag-sep { border-top: 1px dashed #ddd; margin: 15px 0; }
+        .bill-inner { border: 1px dashed #e2e8f0; border-radius: 6px; padding: 12px; color: #1e293b; font-family: 'Courier New', Courier, monospace; }
+        .bill-name-heavy { font-size: 16px; font-weight: 900; text-align: center; color: #0f172a; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 1px; }
+        .bill-sub-info { font-size: 10px; text-align: center; color: #64748b; text-transform: uppercase; margin-bottom: 1px; line-height: 1.3; }
+        .bill-zig-zag-sep { border-top: 1px dashed #cbd5e1; margin: 8px 0; }
         
-        .bill-meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 14px; }
-        .meta-item span { display: block; color: #999; font-size: 11px; font-weight: bold; margin-bottom: 2px; }
+        .bill-meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; font-size: 11px; }
+        .meta-item span { display: block; color: #94a3b8; font-size: 9px; font-weight: bold; margin-bottom: 1px; }
+        .meta-item strong { color: #334155; }
         .full-row { grid-column: span 2; }
 
-        .bill-items-table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 15px; }
-        .bill-items-table th { border-bottom: 1px solid #000; padding-bottom: 5px; font-size: 13px; color: #888; }
-        .item-name-bold { font-weight: bold; padding: 5px 0; }
+        .bill-items-table { width: 100%; border-collapse: collapse; margin: 6px 0; font-size: 11px; }
+        .bill-items-table th { border-bottom: 1px solid #475569; padding-bottom: 3px; font-size: 10px; color: #64748b; font-weight: 900; }
+        .bill-items-table td { padding: 4px 0; color: #334155; }
+        .item-name-bold { font-weight: 700; text-transform: uppercase; }
 
-        .bill-summary-stack { display: flex; flex-direction: column; gap: 4px; }
-        .sum-row { display: flex; justify-content: space-between; font-size: 14px; color: #444; margin-bottom: 2px; }
-        .discount { color: #d32f2f; font-weight: bold; }
+        .bill-summary-stack { display: flex; flex-direction: column; gap: 3px; }
+        .sum-row { display: flex; justify-content: space-between; font-size: 11px; color: #475569; margin-bottom: 1px; }
+        .discount { color: #dc2626; font-weight: bold; }
         
         .grand-total-box { 
-          margin: 10px 0; padding: 12px; background: #f8f9fa; border-radius: 8px; text-align: center;
-          border: 1px solid #eee;
+          margin: 6px 0; padding: 6px 10px; background: #f8fafc; border-radius: 6px; text-align: center;
+          border: 1px solid #e2e8f0;
         }
-        .grand-label { font-size: 13px; font-weight: 800; color: #888; }
-        .grand-value { font-size: 28px; font-weight: 900; color: #000; }
+        .grand-label { font-size: 9px; font-weight: 800; color: #64748b; letter-spacing: 0.5px; }
+        .grand-value { font-size: 18px; font-weight: 900; color: #0f172a; }
         
-        .due-row { color: #d32f2f; font-weight: 900; font-size: 16px; margin-top: 4px; }
-        .paid-row { border-top: 1px solid #eee; padding-top: 5px; margin-top: 5px; }
-        .bill-footer-note { text-align: center; font-size: 12px; margin-top: 15px; color: #999; font-weight: bold; }
+        .due-row { color: #dc2626; font-weight: 900; font-size: 12px; margin-top: 2px; }
+        .paid-row { border-top: 1px dashed #e2e8f0; padding-top: 4px; margin-top: 2px; }
+        .bill-footer-note { text-align: center; font-size: 10px; margin-top: 8px; color: #94a3b8; font-weight: bold; text-transform: uppercase; }
 
         /* Share Control Styling */
-        .share-section-card { background: #12141a; border-radius: 20px; padding: 15px; border: 1px solid #1c1e21; }
-        .share-header { font-size: 9px; font-weight: 900; color: #444; margin-bottom: 12px; letter-spacing: 1px; display: flex; align-items: center; gap: 6px; }
+        .share-section-card { background: #161b22; border-radius: 14px; padding: 10px; border: 1px solid #232830; }
+        .share-header { font-size: 9px; font-weight: 900; color: #4b5563; margin-bottom: 8px; letter-spacing: 0.5px; display: flex; align-items: center; gap: 6px; }
         
-        .tab-segment-control { display: flex; background: #08090a; padding: 4px; border-radius: 12px; margin-bottom: 12px; }
-        .segment { flex: 1; border: none; background: none; color: #555; padding: 8px; font-size: 11px; font-weight: 800; border-radius: 10px; cursor: pointer; }
-        .segment.active { background: #f59e0b; color: #000; box-shadow: 0 4px 12px rgba(245, 158, 11, 0.2); }
+        .tab-segment-control { display: flex; background: #0d1117; padding: 3px; border-radius: 8px; margin-bottom: 8px; }
+        .segment { flex: 1; border: none; background: none; color: #8b949e; padding: 6px; font-size: 10px; font-weight: 800; border-radius: 6px; cursor: pointer; transition: all 0.2s; }
+        .segment.active { background: #f59e0b; color: #000; font-weight: 900; }
 
-        .share-input-row { display: flex; gap: 10px; }
-        .phone-input-luxury { flex: 1; background: #08090a; border-radius: 14px; display: flex; align-items: center; padding: 0 14px; gap: 10px; border: 1px solid #1c1e21; }
-        .phone-input-luxury input { background: none; border: none; color: #fff; font-size: 14px; outline: none; width: 100%; }
-        .send-circle-btn { background: #22c55e; color: #000; width: 40px; height: 32px; border-radius: 22px; border: none; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+        .share-input-row { display: flex; gap: 8px; }
+        .share-input-row input { flex: 1; background: #0d1117; border: 1px solid #21262d; border-radius: 8px; color: #c9d1d9; font-size: 12px; outline: none; padding: 0 10px; height: 32px; }
+        .share-input-row input::placeholder { color: #484f58; }
+        .send-circle-btn { background: #238636; color: #fff; width: 40px; height: 32px; border-radius: 8px; border: none; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background 0.15s; }
+        .send-circle-btn:hover { background: #2ea043; }
 
         /* BOTTOM FLOATING ACTION BAR */
         .inv-m-actions { 
-          display: grid; grid-template-columns: 0.8fr 0.7fr 1.5fr; gap: 10px; 
-          padding: 15px 15px 25px; background: #08090a; border-top: 1px solid #1c1e21;
+          display: grid; grid-template-columns: 0.8fr 0.8fr 1.4fr; gap: 8px; 
+          padding: 10px 12px 18px; background: #0c0e12; border-top: 1px solid #1c2026;
         }
         .btn-pill { 
-          height: 48px; border-radius: 16px; font-weight: 900; font-size: 11px; 
-          display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer; border: none;
+          height: 38px; border-radius: 10px; font-weight: 900; font-size: 10px; 
+          display: flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; border: none;
+          transition: transform 0.1s, opacity 0.15s;
         }
-        .btn-minimal { background: #1c1e21; color: #fff; }
-        .btn-outline-luxury { background: transparent; border: 1px solid #1c1e21; color: #fff; }
-        .btn-primary-luxury { background: #f59e0b; color: #000; box-shadow: 0 8px 20px rgba(245, 158, 11, 0.2); }
+        .btn-pill:active { transform: scale(0.97); }
+        .btn-minimal { background: #21262d; color: #c9d1d9; }
+        .btn-minimal:hover { background: #30363d; }
+        .btn-outline-luxury { background: transparent; border: 1px solid #30363d; color: #c9d1d9; }
+        .btn-outline-luxury:hover { background: #161b22; }
+        .btn-primary-luxury { background: #f59e0b; color: #000; }
+        .btn-primary-luxury:hover { opacity: 0.95; }
 
         @media (max-width: 320px) {
-          .btn-pill { font-size: 10px; padding: 0 5px; }
-          .grand-value { font-size: 20px; }
+          .btn-pill { font-size: 9px; padding: 0 4px; }
+          .grand-value { font-size: 15px; }
         }
       `}</style>
     </div>

@@ -101,7 +101,7 @@ function WorkerModal({ worker, onClose, onSave }) {
 
         <div className="frow2">
           <div className="fgroup"><label className="lbl">Role</label><select value={form.role} onChange={e => setForm({ ...form, role: e.target.value })}><option>Waiter</option><option>Cashier</option><option>Chef</option><option>Manager</option><option>Bartender</option></select></div>
-          <div className="fgroup"><label className="lbl">Joining Date</label><input type="date" value={form.joiningDate} onChange={e => setForm({ ...form, joiningDate: e.target.value })} /></div>
+          <div className="fgroup"><label className="lbl">Joining Date</label><input type="date" className="joining-date-input" value={form.joiningDate} onChange={e => setForm({ ...form, joiningDate: e.target.value })} /></div>
         </div>
 
         <div className="frow2">

@@ -71,12 +71,18 @@ export default function OrdersPage() {
       {/* FILTER BAR - FIXED ALIGNMENT */}
       <div className="orders-filters-row">
         <div className="search-wrapper-unified">
+          <Search size={16} className="search-icon" />
           <input
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="🔍 Search bill no. or customer..."
+            placeholder="Search bill no. or customer..."
             className="search-input-unified"
           />
+          {search && (
+            <button className="search-clear-btn" onClick={() => { setSearch(''); }} title="Clear search">
+              <X size={14} />
+            </button>
+          )}
         </div>
 
         <div
@@ -142,7 +148,7 @@ export default function OrdersPage() {
             <div key={o._id} className="order-mobile-card" onClick={() => setInvoiceOrder(o)}>
               <div className="order-card-row">
                 <div>
-                  <div className="bill-no-tag">HTB-${(o.billNo || '').split('-').pop()}</div>
+                  <div className="bill-no-tag">HTB-{(o.billNo || '').split('-').pop()}</div>
                   <div className="card-meta">{new Date(o.date).toLocaleDateString()} · Table {o.tableNo}</div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
@@ -181,7 +187,7 @@ export default function OrdersPage() {
               {filtered.map(o => (
                 <tr key={o._id}>
                   <td className="td-date">{new Date(o.date).toLocaleDateString()}</td>
-                  <td style={{ fontWeight: 700 }}>HTB-${(o.billNo || '').split('-').pop()}</td>
+                  <td style={{ fontWeight: 700 }}>HTB-{(o.billNo || '').split('-').pop()}</td>
                   <td style={{ textAlign: 'center' }}>T{o.tableNo}</td>
                   <td className="td-date">{o.customerName || 'Walk-in Customer'}</td>
                   <td style={{ textAlign: 'right', fontWeight: 800, color: 'var(--a)' }}>{c}{o.grandTotal.toFixed(2)}</td>

@@ -1,32 +1,49 @@
 require('dotenv').config();
 
-const mongoose = require('mongoose'); // Fresh start
-const cron = require('node-cron');
-const http = require('http');
+// ── Validate critical env vars before anything else ──────────────
+const JWT_SECRET = process.env.JWT_SECRET;
+const INSECURE_DEFAULTS = [
+  'humtum-pos-secret-key-change-in-production',
+  'humtum_pos_production_secret_2026_safe_key',
+  'change_me',
+  'secret',
+];
+if (!JWT_SECRET || JWT_SECRET.length < 32 || INSECURE_DEFAULTS.includes(JWT_SECRET)) {
+  console.warn(
+    '⚠️  JWT_SECRET is missing or appears to be a weak/default value.\n' +
+    '   Generate a strong secret: node -e "console.log(require(\'crypto\').randomBytes(48).toString(\'hex\'))"\n' +
+    '   Then set JWT_SECRET in your .env file.\n' +
+    '   Continuing anyway — CHANGE THIS BEFORE DEPLOYING TO PRODUCTION.'
+  );
+}
+
+const mongoose = require('mongoose');
+const cron     = require('node-cron');
+const http     = require('http');
 const socketIO = require('socket.io');
 
-const app = require('./app');
+const app    = require('./app');
 const { connectRedis, setCache } = require('./src/lib/redis');
 const Settings = require('./src/models/Settings');
-const { seedDefaultUsers } = require('./src/routes/auth');
+const { seedDefaultUsers }       = require('./src/routes/auth');
 const { sendDailyReportInternal } = require('./src/routes/reports');
 
-const PORT = Number(process.env.PORT || 3000);
+const PORT        = Number(process.env.PORT || 3000);
 const REPORT_TIME = process.env.REPORT_CRON || '55 23 * * *';
 
-// Create HTTP server with Socket.IO
+// ── HTTP Server + Socket.IO ──────────────────────────────────────
 const server = http.createServer(app);
 const io = socketIO(server, {
-  cors: { origin: true, credentials: true }
+  cors: { origin: true, credentials: true },
+  pingTimeout:  60000,
+  pingInterval: 25000,
 });
 
-let mongoUri =
-  process.env.USE_LOCAL_DB === 'true'
-    ? (process.env.LOCAL_MONGO_URI || 'mongodb://localhost:27017/humtum-bar-pos')
-    : process.env.CLOUD_MONGO_URI;
-
+// ── MongoDB URI resolution ───────────────────────────────────────
+let mongoUri;
 let memoryServer = null;
 
+// ── Cron: Daily report ───────────────────────────────────────────
 function scheduleDailyReport() {
   cron.schedule(REPORT_TIME, async () => {
     console.log('⏰ Running scheduled daily report...');
@@ -36,36 +53,17 @@ function scheduleDailyReport() {
     } catch (err) {
       console.error('❌ Failed to send scheduled report:', err.message);
     }
-  }, { timezone: "Asia/Kolkata" });
-
-  console.log(`Cron scheduled: ${REPORT_TIME}`);
+  }, { timezone: 'Asia/Kolkata' });
+  console.log(`📅 Daily report cron scheduled: ${REPORT_TIME} IST`);
 }
 
-async function shutdownResources() {
-  try {
-    if (mongoose.connection.readyState !== 0) {
-      await mongoose.connection.close();
-    }
-  } catch (err) {
-    console.error('Mongo shutdown error:', err.message);
-  }
-
-  try {
-    if (memoryServer) {
-      await memoryServer.stop();
-    }
-  } catch (err) {
-    console.error('Memory Mongo shutdown error:', err.message);
-  }
-}
-
-// ── Cache warmup on startup ─────────────────────────────────────
+// ── Cache warmup ─────────────────────────────────────────────────
 async function warmupCache() {
   try {
     const MenuItem = require('./src/models/MenuItem');
     const Inventory = require('./src/models/Inventory');
-    const Worker = require('./src/models/Worker');
-    
+    const Worker    = require('./src/models/Worker');
+
     const [menuItems, settings, inventory, workers] = await Promise.all([
       MenuItem.find().sort({ category: 1, name: 1 }),
       (async () => {
@@ -73,276 +71,214 @@ async function warmupCache() {
         return existing || Settings.create({});
       })(),
       Inventory.find().sort({ category: 1, name: 1 }),
-      Worker.find().sort({ name: 1 })
+      Worker.find().sort({ name: 1 }),
     ]);
 
     await Promise.all([
-      setCache('menu:all', menuItems, 300),
-      setCache('settings:current', settings, 300),
-      setCache('inventory:all', inventory, 300),
-      setCache('workers:all', workers, 300)
+      setCache('menu:all',          menuItems, 300),
+      setCache('settings:current',  settings,  300),
+      setCache('inventory:all',     inventory, 300),
+      setCache('workers:all',       workers,   300),
     ]);
     console.log('🔥 Cache warmed up');
   } catch (err) {
-    console.log('Cache warmup failed:', err.message);
+    console.warn('⚠️  Cache warmup failed (non-fatal):', err.message);
   }
 }
 
-async function seedDemoData() {
-  try {
-    const MenuItem = require('./src/models/MenuItem');
-    const Inventory = require('./src/models/Inventory');
-    const Worker = require('./src/models/Worker');
-    const Settings = require('./src/models/Settings');
+// ── Graceful shutdown ────────────────────────────────────────────
+let isShuttingDown = false;
 
-    // 1. Settings
-    let settings = await Settings.findOne();
-    if (!settings) {
-      settings = await Settings.create({
-        restaurantName: 'HumTum Bar & Club',
-        address: '123 Main Street, Sector 1, City',
-        gstin: '07AAAAA1111A1Z1',
-        phone: '9999999999',
-        sgstRate: 2.5,
-        cgstRate: 2.5,
-        currency: '₹',
-        thankYouMsg: 'Thank you for visiting HumTum!',
-        darkMode: true,
-        menuCategories: ['Spirits','Beer','Wine','Food','Mixers'],
-        inventoryCategories: ['Spirits','Beer','Wine','Food','Mixers']
-      });
-      console.log('✅ Default settings created');
+async function gracefulShutdown(signal) {
+  if (isShuttingDown) return;
+  isShuttingDown = true;
+  console.log(`\n🛑 Received ${signal}. Gracefully shutting down...`);
+
+  // Stop accepting new connections
+  server.close(async () => {
+    console.log('✅ HTTP server closed');
+    try {
+      if (mongoose.connection.readyState !== 0) {
+        await mongoose.connection.close();
+        console.log('✅ MongoDB connection closed');
+      }
+      if (memoryServer) {
+        await memoryServer.stop();
+        console.log('✅ In-memory MongoDB stopped');
+      }
+    } catch (err) {
+      console.error('❌ Shutdown error:', err.message);
     }
+    process.exit(0);
+  });
 
-    // 2. Menu Items
-    const menuCount = await MenuItem.countDocuments();
-    if (menuCount === 0) {
-      const demoMenu = [
-
-
-        { name: "Chicken Lollipop", category: "Food", price: 340, department: "kitchen", shortcut: "cl" },
-
-
-      ];
-      await MenuItem.insertMany(demoMenu);
-      console.log('✅ Demo menu items seeded');
-    }
-
-    // 3. Inventory Items
-    const invCount = await Inventory.countDocuments();
-    if (invCount === 0) {
-      const demoInv = [
-        { name: "Jack Daniel's", category: "Spirits", unit: "Bottles", stock: 15, minStock: 3, price: 2800, shortcut: "jd" },
-        { name: "Kingfisher Ultra", category: "Beer", unit: "Bottles", stock: 100, minStock: 20, price: 120, shortcut: "ku" },
-        { name: "Corona Extra", category: "Beer", unit: "Bottles", stock: 60, minStock: 15, price: 180, shortcut: "ce" },
-        { name: "Coca Cola", category: "Mixers", unit: "Cans", stock: 200, minStock: 30, price: 20, shortcut: "cc" },
-        { name: "Tonic Water", category: "Mixers", unit: "Bottles", stock: 120, minStock: 20, price: 35, shortcut: "tw" },
-        { name: "Fresh Lime Soda", category: "Mixers", unit: "Bottles", stock: 80, minStock: 15, price: 30, shortcut: "fls" }
-      ];
-      await Inventory.insertMany(demoInv);
-      console.log('✅ Demo inventory items seeded');
-    }
-
-    const menuTopUps = [
-      { name: "Chicken Lollipop", category: "Food", price: 340, department: "kitchen", shortcut: "cl" },
-      { name: "Fresh Lime Soda", category: "Mixers", price: 90, department: "bar", shortcut: "fls" },
-      { name: "Peanut Masala", category: "Food", price: 120, department: "kitchen", shortcut: "pm" },
-      { name: "Crispy Corn", category: "Food", price: 210, department: "kitchen", shortcut: "crc" }
-    ];
-
-    for (const item of menuTopUps) {
-      const exists = await MenuItem.findOne({ name: item.name });
-      if (exists) continue;
-
-      const shortcutTaken = item.shortcut ? await MenuItem.findOne({ shortcut: item.shortcut }) : null;
-      await MenuItem.create(shortcutTaken ? { ...item, shortcut: '' } : item);
-    }
-
-    const inventoryTopUps = [
-      { name: "Tonic Water", category: "Mixers", unit: "Bottles", stock: 120, minStock: 20, price: 35, shortcut: "tw" },
-      { name: "Fresh Lime Soda", category: "Mixers", unit: "Bottles", stock: 80, minStock: 15, price: 30, shortcut: "fls" }
-    ];
-
-    for (const item of inventoryTopUps) {
-      const exists = await Inventory.findOne({ name: item.name });
-      if (!exists) await Inventory.create(item);
-    }
-
-    // 4. Workers
-    const workerCount = await Worker.countDocuments();
-    if (workerCount === 0) {
-      const demoWorkers = [
-        { name: 'Rohan Sharma', role: 'Staff', salary: 15000, contact: '9876543210', email: 'rohan@example.com' },
-        { name: 'Amit Verma', role: 'Staff', salary: 16000, contact: '9876543211', email: 'amit@example.com' },
-        { name: 'Sanjay Kumar', role: 'Staff', salary: 18000, contact: '9876543212', email: 'sanjay@example.com' }
-      ];
-      await Worker.insertMany(demoWorkers);
-      console.log('✅ Demo staff workers seeded');
-    }
-
-  } catch (err) {
-    console.error('❌ Demo data seeding failed:', err.message);
-  }
+  // Force exit after 10 seconds
+  setTimeout(() => {
+    console.error('⚠️  Forced exit after timeout');
+    process.exit(1);
+  }, 10_000).unref();
 }
 
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT',  () => gracefulShutdown('SIGINT'));
+
+// ── Unhandled errors ─────────────────────────────────────────────
+process.on('uncaughtException', (err) => {
+  console.error('💥 Uncaught Exception:', err.message, err.stack);
+  gracefulShutdown('uncaughtException');
+});
+
+process.on('unhandledRejection', (reason) => {
+  console.error('💥 Unhandled Promise Rejection:', reason);
+  // Don't crash on unhandled rejection — log and continue
+});
+
+// ── Socket.IO event handlers ─────────────────────────────────────
+function setupSocketIO() {
+  app.locals.io = io;
+
+  io.on('connection', (socket) => {
+    console.log('👤 Client connected:', socket.id);
+
+    socket.on('join-kitchen', () => {
+      socket.join('kitchen');
+      console.log('👨‍🍳 Kitchen staff joined:', socket.id);
+    });
+
+    socket.on('join-table', (tableNo) => {
+      socket.join(`table:${tableNo}`);
+    });
+
+    socket.on('kot-created', (data) => {
+      io.to('kitchen').emit('NEW_KOT', data);
+      io.emit('TABLE_SESSION_UPDATED', { tableNo: data.tableNo });
+      console.log('🎫 New KOT broadcast:', data.kotNo);
+    });
+
+    socket.on('kot-status-updated', (data) => {
+      io.to('kitchen').emit('KOT_UPDATED', data);
+      io.to(`table:${data.tableNo}`).emit('KOT_UPDATED', data);
+      io.emit('TABLE_SESSION_UPDATED', { tableNo: data.tableNo });
+    });
+
+    socket.on('kot-ready', (data) => {
+      io.to('kitchen').emit('KOT_READY', data);
+      io.to(`table:${data.tableNo}`).emit('KOT_READY', data);
+      io.emit('TABLE_SESSION_UPDATED', { tableNo: data.tableNo });
+    });
+
+    socket.on('table-updated', (data) => {
+      io.to(`table:${data.tableNo}`).emit('TABLE_UPDATED', data);
+      io.emit('TABLE_SESSION_UPDATED', { tableNo: data.tableNo });
+    });
+
+    socket.on('payment-completed', (data) => {
+      io.to(`table:${data.tableNo}`).emit('PAYMENT_COMPLETED', data);
+      io.to('kitchen').emit('PAYMENT_COMPLETED', data);
+      io.emit('TABLE_SESSION_UPDATED', { tableNo: data.tableNo });
+    });
+
+    socket.on('order-completed', (data) => {
+      io.to('kitchen').emit('ORDER_COMPLETED', data);
+      io.to(`table:${data.tableNo}`).emit('ORDER_COMPLETED', data);
+      io.emit('TABLE_SESSION_UPDATED', { tableNo: data.tableNo });
+    });
+
+    socket.on('disconnect', () => {
+      console.log('❌ Client disconnected:', socket.id);
+    });
+  });
+}
+
+// ── Main startup ─────────────────────────────────────────────────
 async function startServer() {
   try {
     console.log('🚀 Starting HumTum POS Backend...');
+    console.log(`   NODE_ENV: ${process.env.NODE_ENV || 'development'}`);
 
-    // Determine MongoDB connection URI
-    // Prefer cloud URI if provided; fall back to in-memory only when explicitly requested
+    // Determine MongoDB URI
     if (process.env.USE_MEMORY_DB === 'true') {
-      console.log('📦 Starting in-memory MongoDB database server...');
+      console.log('📦 Starting in-memory MongoDB...');
       const { MongoMemoryServer } = require('mongodb-memory-server');
       memoryServer = await MongoMemoryServer.create();
       mongoUri = memoryServer.getUri();
-      console.log('✅ In-memory MongoDB URI:', mongoUri);
+      console.log('✅ In-memory MongoDB ready');
     } else if (process.env.CLOUD_MONGO_URI) {
       mongoUri = process.env.CLOUD_MONGO_URI;
-      console.log('🔗 Connecting to cloud MongoDB URI');
+      console.log('🔗 Using cloud MongoDB URI');
     } else {
-      console.error('❌ No MongoDB URI configured. Set CLOUD_MONGO_URI or enable USE_MEMORY_DB.');
+      console.error('❌ No MongoDB URI configured. Set CLOUD_MONGO_URI in .env or enable USE_MEMORY_DB=true.');
       process.exit(1);
     }
 
-
-    if (!mongoUri) {
-      console.error('No MongoDB URI found');
+    // Validate URI is not a placeholder
+    if (mongoUri.includes('<') || mongoUri.includes('example.com')) {
+      console.error('❌ CLOUD_MONGO_URI appears to be a placeholder. Please set a real connection string.');
       process.exit(1);
     }
 
-    // Basic sanity checks for placeholder URIs
-    if (mongoUri.includes('<') || mongoUri.includes('cluster>') || mongoUri.includes('example.com')) {
-      console.error('❌ CLOUD_MONGO_URI appears to be a placeholder. Please set a valid connection string in your .env file.');
-      console.error('   Example (SRV): mongodb+srv://<user>:<password>@cluster0.abcd123.mongodb.net/myDB');
-      console.error('   If DNS SRV lookups fail in your environment, you can use the standard connection format:');
-      console.error('   mongodb://host1:27017,host2:27017/?replicaSet=rs0');
-      process.exit(1);
-    }
-
+    // Connect to MongoDB with production-grade options
     try {
       await mongoose.connect(mongoUri, {
-        serverSelectionTimeoutMS: 30000,
-        family: 4,
+        serverSelectionTimeoutMS: 30_000,
+        socketTimeoutMS:          45_000,
+        maxPoolSize:              10,
+        minPoolSize:              2,
+        family:                   4,    // Force IPv4
+        retryWrites:              true,
+        w:                        'majority',
       });
     } catch (connErr) {
-      console.error('❌ MongoDB connection error:', connErr.message);
-      if (connErr.message && connErr.message.includes('querySrv')) {
-        console.error('   The driver failed to perform a DNS SRV lookup for your mongodb+srv URI.');
-        console.error('   Possible causes: network/DNS blocking, invalid cluster name, or using a placeholder URI.');
-        console.error('   Quick fixes:');
-        console.error('     - Ensure CLOUD_MONGO_URI in your .env is a valid, credentialed connection string.');
-        console.error('     - If DNS SRV is not available in your environment, use the non-SRV mongodb:// host list form.');
-        console.error('     - As a temporary workaround, start with a local DB by setting USE_LOCAL_DB=true in .env');
+      console.error('❌ MongoDB connection failed:', connErr.message);
+      if (connErr.message?.includes('querySrv')) {
+        console.error('   DNS SRV lookup failed. Check your CLOUD_MONGO_URI and network.');
+        console.error('   Tip: Ensure MongoDB Atlas IP whitelist includes your server IP (or 0.0.0.0/0 for dev).');
       }
-      await shutdownResources();
       process.exit(1);
     }
+
     console.log('✅ MongoDB connected');
-    // ----- Index sanity for TableSession -----
+
+    // Fix TableSession indexes
     (async () => {
       try {
         const coll = mongoose.connection.db.collection('tablesessions');
-        // Remove old unique index on `tableId` if it exists
         await coll.dropIndex('tableId_1').catch(() => {});
-        // Ensure a non‑unique compound index on tableNo + status (already defined in schema, but reconfirm)
         await coll.createIndex({ tableNo: 1, status: 1 });
         console.log('✅ TableSession indexes verified');
       } catch (idxErr) {
-        console.error('⚠️ Index setup error:', idxErr.message);
+        console.warn('⚠️  Index setup warning:', idxErr.message);
       }
     })();
 
     await seedDefaultUsers();
-    // Demo data disabled - using cloud database in production
-    // await seedDemoData();
     await connectRedis();
     await warmupCache();
 
-    // ── Store io in app.locals for access in routes ────────────────
-    app.locals.io = io;
-
-    // ── Socket.IO setup ────────────────────────────────────────
-    io.on('connection', (socket) => {
-      console.log('👤 Client connected:', socket.id);
-
-      // Join kitchen namespace for KDS
-      socket.on('join-kitchen', () => {
-        socket.join('kitchen');
-        console.log('👨‍🍳 Kitchen staff joined:', socket.id);
-      });
-
-      // Join table namespace for updates
-      socket.on('join-table', (tableNo) => {
-        socket.join(`table:${tableNo}`);
-        console.log(`🪑 Joined table ${tableNo}:`, socket.id);
-      });
-
-      // Broadcast new KOT to kitchen
-      socket.on('kot-created', (data) => {
-        io.to('kitchen').emit('NEW_KOT', data);
-        console.log('🎫 New KOT broadcast to kitchen:', data.kotNo);
-      });
-
-      // Broadcast KOT status update
-      socket.on('kot-status-updated', (data) => {
-        io.to('kitchen').emit('KOT_UPDATED', data);
-        io.to(`table:${data.tableNo}`).emit('KOT_UPDATED', data);
-      });
-
-      // Broadcast KOT ready notification
-      socket.on('kot-ready', (data) => {
-        io.to('kitchen').emit('KOT_READY', data);
-        io.to(`table:${data.tableNo}`).emit('KOT_READY', data);
-      });
-
-      // Broadcast table session updates
-      socket.on('table-updated', (data) => {
-        io.to(`table:${data.tableNo}`).emit('TABLE_UPDATED', data);
-      });
-
-      // Broadcast payment completion
-      socket.on('payment-completed', (data) => {
-        io.to(`table:${data.tableNo}`).emit('PAYMENT_COMPLETED', data);
-        io.to('kitchen').emit('PAYMENT_COMPLETED', data);
-      });
-
-      // Broadcast order completion
-      socket.on('order-completed', (data) => {
-        io.to('kitchen').emit('ORDER_COMPLETED', data);
-        io.to(`table:${data.tableNo}`).emit('ORDER_COMPLETED', data);
-      });
-
-      socket.on('disconnect', () => {
-        console.log('❌ Client disconnected:', socket.id);
-      });
-    });
+    setupSocketIO();
 
     server.once('error', async (err) => {
       if (err.code === 'EADDRINUSE') {
         console.error(`❌ Port ${PORT} is already in use.`);
-        console.error(`   Stop the existing process with: lsof -ti :${PORT} | xargs kill`);
-        console.error('   Or change PORT in .env, for example: PORT=3001');
+        console.error(`   Stop the existing process: lsof -ti :${PORT} | xargs kill`);
       } else {
-        console.error('❌ Server listen error:', err.message);
+        console.error('❌ Server error:', err.message);
       }
-      await shutdownResources();
-      process.exit(1);
+      await gracefulShutdown('EADDRINUSE');
     });
 
     server.listen(PORT, () => {
       console.log(`📡 Server running on port ${PORT}`);
-      console.log(`🔗 Socket.IO ready for real-time updates`);
+      console.log(`🔗 Socket.IO ready`);
       scheduleDailyReport();
     });
+
   } catch (err) {
     console.error('❌ Server startup failed:', err.message);
-    await shutdownResources();
-    process.exit(1);
+    await gracefulShutdown('STARTUP_FAILURE');
   }
 }
 
 startServer();
 
-// Export io and server for use in routes/other modules
 module.exports = { app, server, io };

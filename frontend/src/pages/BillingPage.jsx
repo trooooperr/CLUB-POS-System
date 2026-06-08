@@ -1,8 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useApp } from '../context/AppContext';
-import { ArrowLeft, Search, Trash2, Printer, UtensilsCrossed } from 'lucide-react';
-import './BillingPage.css';
-
+import { ArrowLeft, Search, Trash2, Printer, UtensilsCrossed, X, Menu } from 'lucide-react';
 const PM = ['cash', 'card', 'upi'];
 
 /* COMPACT TABLE PILL */
@@ -15,18 +13,37 @@ function TableCard({ id, isActive, status, num, onClick }) {
   );
 }
 
-function TableTile({ id, status, num, total, items, currency, onClick }) {
-  const statusLabel = status === 'occupied' ? 'Running' : status === 'due' ? 'Due' : 'Free';
+function TableTile({ id, status, num, total, items, currency, onClick, isVip }) {
+  const isOccupied = status === 'occupied';
+  const isDue = status === 'due';
+  const isFree = !isOccupied && !isDue;
+  const statusLabel = isOccupied ? 'Active' : isDue ? 'Due' : 'Free';
 
   return (
-    <button className={`table-tile ${status}`} onClick={onClick}>
-      <div className="table-tile-top">
-        <span className="table-tile-number">T{num}</span>
-        <span className={`table-tile-status ${status}`}>{statusLabel}</span>
-      </div>
-      <div className="table-tile-meta">
-        <span>{items} item{items === 1 ? '' : 's'}</span>
-        <strong>{currency}{total.toFixed(0)}</strong>
+    <button
+      className={`table-tile ${status}${isVip ? ' vip-tile' : ''}`}
+      onClick={onClick}
+    >
+      {isVip && <div className="vip-shimmer" />}
+      <div className="table-tile-inner">
+        <div className="table-tile-header">
+          <div className="table-tile-icon">
+            {isVip && <span className="vip-crown">♛</span>}
+            <span className="table-tile-number">T{num}</span>
+          </div>
+          <span className={`table-tile-status ${status}`}>{statusLabel}</span>
+        </div>
+        {isVip && <span className="vip-label">VIP</span>}
+        <div className="table-tile-footer">
+          {isFree ? (
+            <span className="table-tile-free-hint">Tap to open</span>
+          ) : (
+            <>
+              <span className="table-tile-items">{items} item{items !== 1 ? 's' : ''}</span>
+              <strong className="table-tile-amount">{currency}{total.toFixed(0)}</strong>
+            </>
+          )}
+        </div>
       </div>
     </button>
   );
@@ -106,11 +123,11 @@ function BillingNavBar({
             className="bnav-shortcut-btn bill"
             onClick={onPrintBill}
             disabled={allCount === 0 || busy}
-            title="Print Bill (Ctrl+B)"
+            title="Print Bill (Ctrl+Enter)"
           >
             <Printer size={13} />
             <span>Bill</span>
-            <kbd>Ctrl B</kbd>
+            <kbd>Ctrl ↵</kbd>
           </button>
           <div className="bnav-shortcut-btn esc" title="Back to Tables (Esc)" onClick={onBack}>
             <span>Esc</span>
@@ -143,20 +160,22 @@ function BillingNavBar({
 export default function BillingPage() {
   const {
     tableBills, setTableBills, activeTableId, selectTable, updateTableItem, clearTable, setTableField,
-    setItemNote,
+    setItemNote, allSellableItems,
     billTotals, filteredMenu, categories, categoryFilter, setCategoryFilter,
-    menuSearch, setMenuSearch, inventory, workers, getTableStatus, settings, NUM_TABLES,
-    openTableSession, createKOT, finalizeBill, completeOrder, socket, syncTableSession
+    menuSearch, setMenuSearch, inventory, workers, getTableStatus, getTableInfo, settings, NUM_TABLES,
+    openTableSession, createKOT, finalizeBill, completeOrder, socket, syncTableSession,
+    setSidebarOpen, showToast
   } = useApp();
 
   const [pm, setPm] = useState('cash');
+  const [tableSearch, setTableSearch] = useState('');
   const [busy, setBusy] = useState(false);
   const [mobileBillOpen, setMobileBillOpen] = useState(false);
   const [activeOrder, setActiveOrder] = useState(null); // Current order for this table
   const [kots, setKots] = useState([]); // KOTs for current order
   const [orderType, setOrderType] = useState('dine-in');
   const [selectedWaiter, setSelectedWaiter] = useState('');
-  const [billPanelWidth, setBillPanelWidth] = useState(360);
+  const [billPanelWidth, setBillPanelWidth] = useState(420);
   const [isResizing, setIsResizing] = useState(false);
   const searchInputRef = useRef(null);
   const billingGridRef = useRef(null);
@@ -225,25 +244,18 @@ export default function BillingPage() {
 
   const { subtotal, sgst, cgst, discountAmount, grandTotal, roundOff } = totals;
 
-  useEffect(() => {
-    if (table.items.length === 0 && selectedWaiter) {
-      setSelectedWaiter('');
-    }
-  }, [table.items.length, selectedWaiter]);
-
   const tableList = Array.from({ length: NUM_TABLES }, (_, i) => {
     const id = `T${i + 1}`;
-    const bill = tableBills[id] || { items: [] };
-    const total = bill.items.reduce((sum, item) => sum + (item.price || 0) * (item.quantity || 0), 0);
-    return { id, num: i + 1, status: getTableStatus(id), items: bill.items.length, total };
+    const info = getTableInfo(id);
+    return { id, num: i + 1, status: getTableStatus(id), items: info.itemsCount, total: info.totalAmount };
   });
   const occupiedCount = tableList.filter(t => t.status !== 'free').length;
 
   const [billError, setBillError] = useState('');
-  const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth <= 700 : false);
+  const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth <= 750 : false);
 
   useEffect(() => {
-    const onResize = () => setIsMobile(window.innerWidth <= 700);
+    const onResize = () => setIsMobile(window.innerWidth <= 750);
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);
@@ -254,7 +266,7 @@ export default function BillingPage() {
       const container = billingGridRef.current;
       if (!container) return;
       const rect = container.getBoundingClientRect();
-      const newWidth = Math.min(520, Math.max(320, rect.right - event.clientX));
+      const newWidth = Math.min(600, Math.max(420, rect.right - event.clientX));
       setBillPanelWidth(newWidth);
     };
     const onMouseUp = () => setIsResizing(false);
@@ -289,8 +301,14 @@ export default function BillingPage() {
         throw new Error('Unable to load table session');
       }
 
-      const orderId = session?.activeOrderId?._id || session?.activeOrderId || session?._id || session;
-      if (!orderId) throw new Error('Unable to determine active order');
+      const orderId = session?.activeOrderId?._id || session?.activeOrderId;
+      if (!orderId) {
+        const newSession = await openTableSession(tableNo, selectedWaiterObj?.name || '', orderType);
+        const newOrderId = newSession?.activeOrderId?._id || newSession?.activeOrderId;
+        if (!newOrderId) throw new Error('Unable to determine active order');
+        setActiveOrder(newOrderId);
+        return newOrderId;
+      }
 
       // Map database pending items to local table format
       const dbPendingItems = (session?.pendingItems || []).map(i => ({
@@ -320,10 +338,14 @@ export default function BillingPage() {
       // Update selectedWaiter and orderType from DB session
       if (session?.waiterName) {
         const waiter = waiterOptions.find(w => w.name === session.waiterName || w.userId?.name === session.waiterName);
-        if (waiter) setSelectedWaiter(waiter._id);
+        setSelectedWaiter(waiter ? waiter._id : '');
+      } else {
+        setSelectedWaiter('');
       }
       if (session?.orderType) {
         setOrderType(session.orderType);
+      } else {
+        setOrderType('dine-in');
       }
 
       return orderId;
@@ -403,7 +425,7 @@ export default function BillingPage() {
   // Print KOT
   const printKOT = async () => {
     try {
-      const orderId = await ensureActiveOrder();
+      const orderId = activeOrder || await ensureActiveOrder();
       if (table.items.length === 0) {
         setBillError('Please add items first');
         return;
@@ -416,14 +438,18 @@ export default function BillingPage() {
       const kot = await createKOT(
         orderId,
         tableNo,
-        table.items.map(i => ({
-          menuItemId: i._id,
-          name: i.name,
-          quantity: i.quantity,
-          price: i.price,
-          department: i.department || 'kitchen',
-          note: i.note || ''
-        })),
+        table.items.map(i => {
+          const master = allSellableItems.find(m => String(m._id) === String(i._id) || m.name === i.name);
+          const isInv = i.isInventory || master?.isInventory || false;
+          return {
+            menuItemId: i._id,
+            name: i.name,
+            quantity: i.quantity,
+            price: i.price,
+            department: isInv ? 'bar' : (master?.department || i.department || 'kitchen'),
+            note: i.note || ''
+          };
+        }),
         '',
         selectedWaiterObj?.name || '',
         orderType
@@ -443,6 +469,7 @@ export default function BillingPage() {
 
       setBillError('');
       setBusy(false);
+      setMobileBillOpen(false); // Close mobile bill panel
     } catch (err) {
       setBillError(err.message);
       setBusy(false);
@@ -452,7 +479,7 @@ export default function BillingPage() {
   // Print final bill
   const printFinalBill = async (paidAmount) => {
     try {
-      const orderId = await ensureActiveOrder();
+      const orderId = activeOrder || await ensureActiveOrder();
       if (!orderId) return;
 
       setBusy(true);
@@ -476,82 +503,130 @@ export default function BillingPage() {
       );
 
       // Print bill
-      printBillDocument(tableNo, { items: combinedItems.all }, grandTotal);
+      printBillDocument(tableNo, { items: combinedItems.all }, grandTotal, selectedWaiterObj?.name || '');
 
       // Mark order as complete
-      await completeOrder(activeOrder._id || activeOrder);
+      await completeOrder(orderId);
 
       // Clear table
       clearTable(activeTableId);
       setActiveOrder(null);
       setKots([]);
+      setSelectedWaiter('');
 
       setBillError('');
       setBusy(false);
+      setMobileBillOpen(false); // Close mobile bill panel
     } catch (err) {
       setBillError(err.message);
       setBusy(false);
     }
   };
 
-  const printKOTDocument = (kot, tableNo) => {
-    const printWindow = window.open('', '_blank');
-    const html = `
-      <html>
-        <head>
-          <style>
-            body { font-family: monospace; max-width: 80mm; margin: 0; padding: 0; }
-            .header { text-align: center; font-weight: bold; margin-bottom: 10px; }
-            .divider { border-top: 1px dashed #000; margin: 8px 0; }
-            .item { display: flex; justify-content: space-between; margin: 4px 0; }
-            .notes { font-size: 0.9em; margin: 10px 0; border: 1px solid #000; padding: 5px; }
-          </style>
-        </head>
-        <body>
-          <div class="header">KOT #${kot.kotNo}</div>
-          <div>Table: T${tableNo}</div>
-          <div>Time: ${new Date().toLocaleTimeString()}</div>
-          <div class="divider"></div>
-          ${kot.items.map(i => `<div class="item"><span>${i.quantity}x ${i.name}</span></div>${i.note ? `<div class="notes">Note: ${i.note}</div>` : ''}`).join('')}
-          <div class="divider"></div>
-          <div style="text-align: center; font-size: 0.85em;">${new Date().toLocaleDateString()}</div>
-        </body>
-      </html>
-    `;
-    printWindow.document.write(html);
-    printWindow.document.close();
-    setTimeout(() => printWindow.print(), 250);
+  // Helper: fire a single iframe print job with given html
+  // Helper: fire a print job (tries backend direct print first, falls back to browser dialog)
+  const firePrint = async (html, documentType = 'document') => {
+    try {
+      const response = await fetch('/api/print', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('humtum_token_v2')}`
+        },
+        body: JSON.stringify({ html, documentType })
+      });
+      if (response.ok) {
+        console.log('Direct print job sent successfully to backend printer.');
+        showToast('Print job sent to printer', 'success');
+        return;
+      }
+      const errData = await response.json().catch(() => ({}));
+      throw new Error(errData.error || 'Server print failure');
+    } catch (err) {
+      console.warn('Direct backend print failed:', err);
+      showToast(`Print failed: ${err.message || 'Direct printing error'}`, 'error');
+    }
   };
 
-  const printBillDocument = (tableNo, table, total) => {
-    const printWindow = window.open('', '_blank');
+  // Build KOT HTML for a given subset of items and target printer label
+  const buildKOTHtml = (kot, tableNo, items, printerLabel) => `
+    <html>
+      <head>
+        <title>${printerLabel}</title>
+        <style>
+          @page { size: 80mm auto; margin: 4mm; }
+          body { font-family: monospace; width: 72mm; margin: 0; padding: 0; font-size: 12px; }
+          .header { text-align: center; font-weight: bold; margin-bottom: 6px; font-size: 14px; }
+          .sub { text-align: center; font-size: 11px; margin-bottom: 4px; }
+          .divider { border-top: 1px dashed #000; margin: 5px 0; }
+          .item { display: flex; justify-content: space-between; margin: 3px 0; }
+          .qty { font-weight: bold; min-width: 24px; }
+          .note { font-size: 10px; margin: 0 0 4px 8px; border-left: 2px solid #000; padding-left: 4px; }
+        </style>
+      </head>
+      <body>
+        <div class="header">*** ${printerLabel} KOT ***</div>
+        <div class="sub">KOT #${kot.kotNo} &nbsp;|&nbsp; Table T${tableNo}</div>
+        <div class="sub">Time: ${new Date().toLocaleTimeString()}</div>
+        <div class="divider"></div>
+        ${items.map(i => `
+          <div class="item"><span class="qty">${i.quantity}x</span><span>${i.name}</span></div>
+          ${i.note ? `<div class="note">Note: ${i.note}</div>` : ''}
+        `).join('')}
+        <div class="divider"></div>
+        <div style="text-align:center;font-size:10px;">${new Date().toLocaleDateString()}</div>
+      </body>
+    </html>
+  `;
+
+  // Print KOT — splits items by department and fires separate print jobs
+  const printKOTDocument = (kot, tableNo) => {
+    const barItems     = (kot.items || []).filter(i => (i.department || 'kitchen') === 'bar');
+    const kitchenItems = (kot.items || []).filter(i => (i.department || 'kitchen') !== 'bar');
+
+    // Kitchen printer KOT (food/menu items)
+    if (kitchenItems.length > 0) {
+      firePrint(buildKOTHtml(kot, tableNo, kitchenItems, settings.kitchenPrinterName || 'KITCHEN'));
+    }
+
+    // Bar printer KOT (bar/inventory items) — fired 600ms after kitchen to sequence dialogs
+    if (barItems.length > 0) {
+      setTimeout(() => {
+        firePrint(buildKOTHtml(kot, tableNo, barItems, settings.barPrinterName || 'BAR'));
+      }, 600);
+    }
+  };
+
+  const printBillDocument = (tableNo, table, total, waiterName = '') => {
     const html = `
       <html>
         <head>
+          <title>${settings.barPrinterName || 'BAR'} BILL</title>
           <style>
-            body { font-family: monospace; max-width: 80mm; margin: 0; padding: 10px; }
-            .header { text-align: center; font-weight: bold; margin-bottom: 10px; font-size: 1.2em; }
-            .subheader { text-align: center; font-size: 0.9em; margin-bottom: 10px; }
-            .divider { border-top: 1px solid #000; margin: 8px 0; }
-            .item { display: flex; justify-content: space-between; margin: 4px 0; }
-            .summary { margin: 10px 0; }
-            .total-line { display: flex; justify-content: space-between; font-weight: bold; font-size: 1.1em; margin: 8px 0; }
-            .footer { text-align: center; font-size: 0.8em; margin-top: 15px; }
+            @page { size: 80mm auto; margin: 4mm; }
+            body { font-family: monospace; width: 72mm; margin: 0; padding: 0; font-size: 12px; }
+            .header { text-align: center; font-weight: bold; margin-bottom: 6px; font-size: 14px; }
+            .subheader { text-align: center; font-size: 11px; margin-bottom: 8px; }
+            .divider { border-top: 1px solid #000; margin: 5px 0; }
+            .item { display: flex; justify-content: space-between; margin: 3px 0; }
+            .total-line { display: flex; justify-content: space-between; font-weight: bold; font-size: 13px; margin: 5px 0; }
+            .footer { text-align: center; font-size: 10px; margin-top: 10px; }
           </style>
         </head>
         <body>
           <div class="header">${settings.restaurantName}</div>
-          <div class="subheader">BILL</div>
-          <div>Table: T${tableNo}</div>
-          <div>Date: ${new Date().toLocaleDateString()}</div>
+          <div class="subheader">BILL — Table T${tableNo}</div>
+          <div style="font-size:10px;text-align:center;">Date: ${new Date().toLocaleDateString()} &nbsp; ${new Date().toLocaleTimeString()}</div>
+          ${waiterName ? `<div style="font-size:10px;text-align:center;margin-top:2px;">Waiter: ${waiterName.toUpperCase()}</div>` : ''}
           <div class="divider"></div>
-          ${table.items.map(i => `<div class="item"><span>${i.name}</span><span>${(i.price * i.quantity).toFixed(0)}</span></div>`).join('')}
+          ${table.items.map(i => `<div class="item"><span>${i.quantity}x ${i.name}</span><span>${(i.price * i.quantity).toFixed(0)}</span></div>`).join('')}
           <div class="divider"></div>
-          <div class="summary">
-            <div class="item"><span>Subtotal</span><span>${subtotal.toFixed(0)}</span></div>
-            <div class="item"><span>Tax</span><span>${(sgst + cgst).toFixed(0)}</span></div>
-            <div class="total-line"><span>TOTAL</span><span>${total.toFixed(0)}</span></div>
-          </div>
+          <div class="item"><span>Subtotal</span><span>${subtotal.toFixed(0)}</span></div>
+          <div class="item"><span>Tax (SGST+CGST)</span><span>${(sgst + cgst).toFixed(0)}</span></div>
+          ${discountAmount > 0 ? `<div class="item"><span>Discount</span><span>-${discountAmount.toFixed(0)}</span></div>` : ''}
+          ${roundOff !== 0 ? `<div class="item" style="font-size:10px;"><span>Round Off</span><span>${roundOff > 0 ? '+' : ''}${roundOff.toFixed(2)}</span></div>` : ''}
+          <div class="divider"></div>
+          <div class="total-line"><span>TOTAL</span><span>${total.toFixed(0)}</span></div>
           <div class="divider"></div>
           <div class="footer">
             <p>${settings.thankYouMsg || 'Thank you for your visit!'}</p>
@@ -560,9 +635,7 @@ export default function BillingPage() {
         </body>
       </html>
     `;
-    printWindow.document.write(html);
-    printWindow.document.close();
-    setTimeout(() => printWindow.print(), 250);
+    firePrint(html);
   };
 
   const doGen = async paid => {
@@ -578,14 +651,14 @@ export default function BillingPage() {
       }
       if (e.defaultPrevented) return;
       const targetTag = document.activeElement?.tagName;
-      if (['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(targetTag)) return;
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(targetTag)) return;
 
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
         printKOT();
         return;
       }
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
         e.preventDefault();
         doGen(0);
         return;
@@ -605,37 +678,125 @@ export default function BillingPage() {
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [printKOT, doGen, selectTable]);
-
   if (!activeTableId) {
+    const ZONES = [
+      { name: 'Bottom Lounge', range: [1, 6], color: 'zone-bottom' },
+      { name: 'Top Lounge',    range: [7, 12],  color: 'zone-top' },
+      { name: 'Restaurant',    range: [13, 18], color: 'zone-rest' },
+      { name: 'VIP',    range: [19, 20], color: 'zone-vip' },
+    ];
+
     return (
-      <div className="fi billing-layout">
-        <BillingNavBar
-          activeTableId={null}
-          occupiedCount={occupiedCount}
-          totalTables={NUM_TABLES}
-          onBack={null}
-          onPrintKOT={null}
-          onPrintBill={null}
-        />
-        <div className="table-picker-layout">
-          <div className="table-picker-grid">
-            {tableList.map(t => (
-              <TableTile
-                key={t.id}
-                id={t.id}
-                num={t.num}
-                status={t.status}
-                total={t.total}
-                items={t.items}
-                currency={c}
-                onClick={() => selectTable(t.id)}
-              />
-            ))}
+      <div className="fi table-picker-container">
+        {/* TOP NAVBAR FOR MOBILE/HAMBURGER AND HUMTUM BRANDING */}
+        <header className="humtum-bar tp-navbar">
+          <div className="humtum-left">
+            <button
+              className="hnav-menu-btn"
+              onClick={() => setSidebarOpen(true)}
+              aria-label="Open menu"
+            >
+              <Menu size={18} />
+            </button>
+            <div className="hnav-title-group">
+              <span className="hnav-title">Dining Layout</span>
+            </div>
+          </div>
+          <div className="hnav-stats">
+            <div className="hnav-stat">
+              <span className="hnav-stat-dot occ-dot" />
+              <div>
+                <div className="hnav-stat-num">{occupiedCount}</div>
+                <div className="hnav-stat-label">Active</div>
+              </div>
+            </div>
+            <div className="hnav-stat">
+              <span className="hnav-stat-dot vac-dot" />
+              <div>
+                <div className="hnav-stat-num">{NUM_TABLES - occupiedCount}</div>
+                <div className="hnav-stat-label">Vacant</div>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        {/* Scrollable Layout Body */}
+        <div className="table-picker-page">
+          {/* Desktop-only Header */}
+          <div className="tp-desktop-header">
+            <div className="tp-header-title-group">
+              <h1 className="tp-header-title">Dining Layout</h1>
+              <p className="tp-header-subtitle">Select a table to manage orders, bills, and real-time KOTs</p>
+            </div>
+            <div className="tp-header-stats">
+              <div className="tp-stat-item occupied">
+                <span className="tp-stat-dot" />
+                <span className="tp-stat-val">{occupiedCount}</span>
+                <span className="tp-stat-lbl">Active</span>
+              </div>
+              <div className="tp-stat-item free">
+                <span className="tp-stat-dot" />
+                <span className="tp-stat-val">{NUM_TABLES - occupiedCount}</span>
+                <span className="tp-stat-lbl">Free</span>
+              </div>
+              <div className="tp-stat-item total">
+                <span className="tp-stat-val">{NUM_TABLES}</span>
+                <span className="tp-stat-lbl">Total</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Subtitle / Helper info (mobile only) */}
+          <div className="tp-picker-info-mobile">
+            <p className="tp-header-subtitle" style={{ margin: '0 0 12px 0', fontSize: 13, color: 'var(--t2)' }}>
+              Select a table to manage orders, bills, and real-time KOTs
+            </p>
+          </div>
+
+          {/* Zone sections — 2×2 block grid */}
+          <div className="tp-zones-grid">
+            {ZONES.map(zone => {
+              const zoneTables = tableList.filter(t => t.num >= zone.range[0] && t.num <= zone.range[1]);
+              const zoneActive = zoneTables.filter(t => t.status !== 'free').length;
+              const isVip = zone.color === 'zone-vip';
+              const isRest = zone.color === 'zone-rest';
+              const isFullWidth = isVip || isRest;
+              return (
+                <div key={zone.name} className={`tp-zone ${zone.color}${isFullWidth ? ' tp-zone-full' : ''}`}>
+                  <div className="tp-zone-header">
+                    <div className="tp-zone-title-group">
+                      <span className="tp-zone-name">{zone.name}</span>
+                      <span className="tp-zone-sub">Tables T{zone.range[0]}–T{zone.range[1]}</span>
+                    </div>
+                    <div className="tp-zone-badge">
+                      {zoneActive > 0 && <span className="tp-zone-active-count">{zoneActive} active</span>}
+                    </div>
+                  </div>
+                  <div className={`tp-zone-grid${isVip ? ' tp-zone-grid-vip' : isRest ? ' tp-zone-grid-rest' : ''}`}>
+                    {zoneTables.map(t => (
+                      <TableTile
+                        key={t.id}
+                        id={t.id}
+                        num={t.num}
+                        status={t.status}
+                        total={t.total}
+                        items={t.items}
+                        currency={c}
+                        onClick={() => selectTable(t.id)}
+                        isVip={isVip}
+                      />
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>
     );
   }
+
+
 
   return (
     <div className="fi billing-layout">
@@ -652,32 +813,37 @@ export default function BillingPage() {
         busy={busy}
       />
 
-      {/* TABLE STRIP - show only on mobile */}
-      {isMobile && (
-        <div className="table-strip-res">
-          <div className="tgrid-res">
-            {tableList.map(t => (
-              <TableCard
-                key={t.id}
-                id={t.id}
-                isActive={activeTableId === t.id}
-                status={t.status}
-                num={t.num}
-                onClick={() => selectTable(t.id)}
-              />
-            ))}
-          </div>
-        </div>
-      )}
 
-      <div ref={billingGridRef} className="billing-main-grid" style={{ gridTemplateColumns: isMobile ? '1fr' : `minmax(260px, 1fr) ${billPanelWidth}px` }}>
+      <div ref={billingGridRef} className="billing-main-grid" style={{ gridTemplateColumns: isMobile ? '1fr' : `minmax(350px, 1fr) auto ${billPanelWidth}px` }}>
         {/* LEFT: MENU SECTION */}
         <div className="menu-side">
           <div className="filter-bar-sticky">
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10, flexWrap: 'wrap' }}>
               <div className="search-wrap-mini" style={{ margin: 0, flex: 1 }}>
-                <Search size={14} />
-                <input value={menuSearch} onChange={e => setMenuSearch(e.target.value)} placeholder="Search menu..." ref={searchInputRef} />
+                <Search size={16} className="search-icon" />
+                <input
+                  value={menuSearch}
+                  onChange={e => setMenuSearch(e.target.value)}
+                  placeholder="Search menu..."
+                  ref={searchInputRef}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      if (filteredMenu.length > 0) {
+                        const firstAvailableItem = filteredMenu.find(item => item.available !== false);
+                        if (firstAvailableItem) {
+                          updateTableItem(activeTableId, firstAvailableItem._id, 'increase');
+                          setMenuSearch('');
+                        }
+                      }
+                    }
+                  }}
+                />
+                {menuSearch && (
+                  <button className="search-clear-btn" onClick={() => { setMenuSearch(''); searchInputRef.current?.focus(); }} title="Clear search">
+                    <X size={14} />
+                  </button>
+                )}
               </div>
             </div>
             <div className="cat-scroll-mini">
@@ -701,10 +867,27 @@ export default function BillingPage() {
           </div>
         </div>
 
+        {/* RESIZE HANDLE */}
+        {!isMobile && (
+          <div 
+            className={`resize-handle ${isResizing ? 'resizing' : ''}`} 
+            onMouseDown={(e) => {
+              e.preventDefault();
+              setIsResizing(true);
+            }}
+          />
+        )}
+
         {/* RIGHT: BILL PANEL */}
         <div className={`bill-panel-res ${mobileBillOpen ? 'open' : 'closed'}`}>
           <div className="mobile-handle" onClick={() => setMobileBillOpen(!mobileBillOpen)}>
             <div className="h-indicator" />
+            {isMobile && (
+              <div className="mobile-handle-summary">
+                <span className="summary-items">🛒 {combinedItems.all.reduce((s, i) => s + i.quantity, 0)} Items</span>
+                <span className="summary-total">Total: {c}{grandTotal.toFixed(0)}</span>
+              </div>
+            )}
           </div>
 
           <div className="bill-scroll-content">
@@ -739,63 +922,50 @@ export default function BillingPage() {
             </div>
 
             <div className="section-divider" />
-            <input className="mini-input" value={table.customerName || ''} onChange={e => setTableField(activeTableId, 'customerName', e.target.value)} placeholder="Customer Name" />
-            <input className="mini-input" value={table.customerPhone || ''} onChange={e => setTableField(activeTableId, 'customerPhone', e.target.value)} placeholder="Mobile No" maxLength={10} />
+            <input className="mini-input customer-input" value={table.customerName || ''} onChange={e => setTableField(activeTableId, 'customerName', e.target.value)} placeholder="Customer Name" />
+            <input className="mini-input customer-input" value={table.customerPhone || ''} onChange={e => setTableField(activeTableId, 'customerPhone', e.target.value)} placeholder="Mobile No" maxLength={10} />
 
+            <div className="food-items-label">Food Items</div>
             <div className="bill-items-scroller">
-              {/* New/Pending items section */}
-              {combinedItems.pending.length > 0 && (
-                <>
-                  <div className="bill-section-heading">New / Unsent Items ({combinedItems.pending.length})</div>
-                  {combinedItems.pending.map(item => (
-                    <div key={item._id} className="b-item-entry">
-                      <div className="b-item-row">
-                        <span className="b-item-name">{item.name}</span>
-                        <div className="b-item-ctrl">
-                          <button onClick={() => updateTableItem(activeTableId, item._id, 'decrease')}>−</button>
-                          <span>{item.quantity}</span>
-                          <button onClick={() => updateTableItem(activeTableId, item._id, 'increase')}>+</button>
-                        </div>
-                        <span className="b-item-price">{c}{(item.price * item.quantity).toFixed(0)}</span>
-                      </div>
-                      <textarea
-                        className="item-note"
-                        placeholder="ADD Item Notes......"
-                        value={item.note || ''}
-                        onChange={e => setItemNote(activeTableId, item._id, e.target.value)}
-                        rows={1}
-                      />
-                    </div>
-                  ))}
-                </>
+              {/* Unified flat item list — all selected items stay visible */}
+              {combinedItems.all.length === 0 && (
+                <div style={{ color: 'var(--t2)', fontSize: 12, textAlign: 'center', paddingTop: 12 }}>No items added yet</div>
               )}
 
-              {/* Sent KOT items section */}
-              {combinedItems.sent.length > 0 && (
-                <>
-                  <div className="bill-section-heading sent-heading">Sent to Kitchen / KOTs ({combinedItems.sent.length})</div>
-                  {combinedItems.sent.map(item => (
-                    <div key={`sent-${item._id}`} className="b-item-entry sent-item">
-                      <div className="b-item-row">
-                        <span className="b-item-name sent-name">
-                          🍳 {item.name}
-                        </span>
-                        <div className="b-item-qty-badge">
-                          Qty: {item.quantity}
-                        </div>
-                        <span className="b-item-price sent-price">
-                          {c}{(item.price * item.quantity).toFixed(0)}
-                        </span>
-                      </div>
-                      {item.note && (
-                        <div className="sent-note">
-                          ✎ Note: {item.note}
-                        </div>
-                      )}
+              {/* Sent (KOT-printed) items — read-only, shown first */}
+              {combinedItems.sent.map((item, idx) => (
+                <div key={item._id || idx} className="b-item-entry">
+                  <div className="b-item-row">
+                    <span className="b-item-name">{item.name}</span>
+                    <div className="b-item-ctrl">
+                      <span style={{ minWidth: 20, textAlign: 'center', fontWeight: 700, fontSize: 13 }}>{item.quantity}×</span>
                     </div>
-                  ))}
-                </>
-              )}
+                    <span className="b-item-price">{c}{(item.price * item.quantity).toFixed(0)}</span>
+                  </div>
+                </div>
+              ))}
+
+              {/* Pending items — editable with +/− */}
+              {combinedItems.pending.map(item => (
+                <div key={item._id} className="b-item-entry">
+                  <div className="b-item-row">
+                    <span className="b-item-name">{item.name}</span>
+                    <div className="b-item-ctrl">
+                      <button onClick={() => updateTableItem(activeTableId, item._id, 'decrease')}>−</button>
+                      <span>{item.quantity}</span>
+                      <button onClick={() => updateTableItem(activeTableId, item._id, 'increase')}>+</button>
+                    </div>
+                    <span className="b-item-price">{c}{(item.price * item.quantity).toFixed(0)}</span>
+                  </div>
+                  <textarea
+                    className="item-note"
+                    placeholder="Note..."
+                    value={item.note || ''}
+                    onChange={e => setItemNote(activeTableId, item._id, e.target.value)}
+                    rows={1}
+                  />
+                </div>
+              ))}
             </div>
 
             <div className="section-divider" />
@@ -804,7 +974,7 @@ export default function BillingPage() {
                 <div className="s-row"><span>Subtotal</span><span>{c}{subtotal.toFixed(0)}</span></div>
                 <div className="s-row"><span>Tax</span><span>{c}{(sgst + cgst).toFixed(0)}</span></div>
                 {roundOff !== 0 && (
-                  <div className="s-row" style={{ color: 'var(--t3)', fontSize: '11px', fontStyle: 'italic' }}>
+                  <div className="s-row" style={{ color: 'var(--t3)', fontSize: '12px', fontStyle: 'italic' }}>
                     <span>Round Off</span>
                     <span>{roundOff > 0 ? '+' : ''}{roundOff.toFixed(2)}</span>
                   </div>
@@ -855,19 +1025,19 @@ export default function BillingPage() {
 
             {/* KOT History */}
             {kots.length > 0 && (
-              <div style={{ marginTop: 12, padding: 8, background: 'var(--bg2)', borderRadius: 6 }}>
-                <div style={{ fontSize: 11, fontWeight: 'bold', marginBottom: 6, color: 'var(--t2)' }}>
-                  KOTs: {kots.length}
-                </div>
-                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                  {kots.map((k, i) => (
-                    <div key={i} style={{ fontSize: 10, background: 'var(--bg1)', padding: '3px 6px', borderRadius: 4 }}>
-                      {k.kotNo || `KOT-${i + 1}`}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+  <div className="kot-history">
+    <div style={{ fontSize: 12, fontWeight: 'bold', marginBottom: 4, color: 'var(--t1)' }}>
+      KOT History ({kots.length})
+    </div>
+    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+      {kots.map((k, i) => (
+        <div key={i} style={{ fontSize: 11, background: 'var(--s1)', border: '1px solid var(--b1)', padding: '3px 6px', borderRadius: 4, color: 'var(--t0)', fontWeight: 600 }}>
+          {k.kotNo || `KOT-${i + 1}`} · {new Date(k.createdAt || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })}
+        </div>
+      ))}
+    </div>
+  </div>
+)}
           </div>
         </div>
       </div>

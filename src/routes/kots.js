@@ -66,11 +66,18 @@ router.post('/', async (req, res) => {
     // Generate KOT number
     const kotNo = await generateKOTNo();
 
-    // Group items by department
+    // Group items by department — trust the department sent from the frontend.
+    // Only fall back to MenuItem lookup if no department was provided.
     const departmentQueues = {};
     for (const item of items) {
-      const menuItem = await MenuItem.findById(item.menuItemId);
-      const dept = menuItem?.department || 'kitchen';
+      let dept = item.department; // Use what the client sent
+      if (!dept) {
+        // Fallback: look up the menu item
+        const menuItem = await MenuItem.findById(item.menuItemId).catch(() => null);
+        dept = menuItem?.department || 'kitchen';
+      }
+      // Ensure the item carries the resolved department forward
+      item.department = dept;
       departmentQueues[dept] = 'PENDING';
     }
 
@@ -127,6 +134,7 @@ router.post('/', async (req, res) => {
     // Invalidate cache
     await deleteCache([`kots:table:${tableNo}`, `order:${orderId}`]);
   } catch (err) {
+    console.error("POST /api/kots Error:", err);
     res.status(400).json({ message: err.message });
   }
 });

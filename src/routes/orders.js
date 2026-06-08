@@ -1,11 +1,13 @@
 const express = require('express');
 const Order = require('../models/Order');
 const { getCache, setCache, deleteCache } = require('../lib/redis');
+const { requireRole } = require('../middleware/auth');
 const router = express.Router();
 const ORDERS_CACHE_KEY = 'orders:all';
 const REPORT_SUMMARY_CACHE_KEY = 'reports:daily-summary';
 const TableSession = require('../models/TableSession');
 const KOT = require('../models/KOT');
+const { getBusinessDayBoundary } = require('../lib/businessDay');
 const {
   aggregateQuantities,
   broadcastInventoryUpdate,
@@ -13,16 +15,6 @@ const {
   deductInventoryForItems,
 } = require('../lib/inventoryStock');
 
-// Helper to get the 3 AM boundary for the current business day
-function getBusinessDayBoundary() {
-  const now = new Date();
-  const boundary = new Date(now);
-  boundary.setHours(3, 0, 0, 0);
-  if (now.getHours() < 3) {
-    boundary.setDate(boundary.getDate() - 1);
-  }
-  return boundary;
-}
 
 // Generate new Bill No based on boundary
 async function generateNextBillNo() {
@@ -46,7 +38,12 @@ router.get('/', async (req, res) => {
     const cached = await getCache(ORDERS_CACHE_KEY);
     if (cached) return res.json(cached);
 
-    const orders = await Order.find().sort({ date: -1 });
+    const orders = await Order.find({
+      $or: [
+        { isActive: false },
+        { 'items.0': { $exists: true } }
+      ]
+    }).sort({ date: -1 });
     await setCache(ORDERS_CACHE_KEY, orders, 180);
     res.json(orders);
   } catch (err) { res.status(500).json({ message: err.message }); }
@@ -69,7 +66,12 @@ router.post('/table/:tableNo/open', async (req, res) => {
     // Check if table is already open
     const existingSession = await TableSession.findOne({ tableNo: parseInt(tableNo), status: { $ne: 'COMPLETED' } }).populate('activeOrderId');
     if (existingSession) {
-      return res.status(200).json(existingSession);
+      if (!existingSession.activeOrderId) {
+        // Clean up orphaned session
+        await TableSession.deleteOne({ _id: existingSession._id });
+      } else {
+        return res.status(200).json(existingSession);
+      }
     }
 
     // Clean up any old completed sessions for this table to prevent Duplicate Key errors
@@ -140,6 +142,13 @@ router.get('/table/:tableNo/session', async (req, res) => {
       .populate('activeOrderId');
     
     if (!session) return res.status(404).json({ message: 'No active session' });
+    
+    // Check if activeOrderId is orphaned
+    if (!session.activeOrderId) {
+      await TableSession.deleteOne({ _id: session._id });
+      return res.status(404).json({ message: 'No active session' });
+    }
+    
     res.json(session);
   } catch (err) { res.status(500).json({ message: err.message }); }
 });
@@ -150,6 +159,17 @@ router.put('/table/:tableNo/session', async (req, res) => {
     const { tableNo } = req.params;
     const { pendingItems, totalAmount, waiterName, orderType } = req.body;
     
+    const existingSession = await TableSession.findOne({ tableNo: parseInt(tableNo), status: { $ne: 'COMPLETED' } });
+    if (!existingSession) {
+      return res.status(404).json({ message: 'No active session found for this table' });
+    }
+    
+    // Check if activeOrderId is orphaned
+    if (!existingSession.activeOrderId) {
+      await TableSession.deleteOne({ _id: existingSession._id });
+      return res.status(404).json({ message: 'No active session found for this table' });
+    }
+
     const session = await TableSession.findOneAndUpdate(
       { tableNo: parseInt(tableNo), status: { $ne: 'COMPLETED' } },
       { 
@@ -164,7 +184,6 @@ router.put('/table/:tableNo/session', async (req, res) => {
       { new: true }
     ).populate('activeOrderId').populate('kotIds');
     
-    if (!session) return res.status(404).json({ message: 'No active session found for this table' });
     res.json(session);
   } catch (err) { res.status(400).json({ message: err.message }); }
 });
@@ -365,7 +384,7 @@ router.get('/active/all', async (req, res) => {
   } catch (err) { res.status(500).json({ message: err.message }); }
 });
 
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requireRole(['admin', 'manager']), async (req, res) => {
   try {
     const result = await Order.findByIdAndDelete(req.params.id);
     if (!result) return res.status(404).json({ message: 'Order not found' });
@@ -374,18 +393,11 @@ router.delete('/:id', async (req, res) => {
   } catch (err) { res.status(500).json({ message: err.message }); }
 });
 
-// ── ADMIN: Reset all bills and counters ──────────────────────────────────────
-router.post('/admin/reset-bills', async (req, res) => {
+// ── ADMIN: Reset all bills and counters ─────────────────────────
+router.post('/admin/reset-bills', requireRole(['admin']), async (req, res) => {
   try {
-    // Delete all orders
     await Order.deleteMany({});
-    // Clear Redis bill counters
-    const redis = require('../lib/redis');
-    const client = await redis.connectRedis();
-    if (client) {
-      const keys = await client.keys('bill_counter:*');
-      for (const key of keys) await client.del(key);
-    }
+    // Invalidate all relevant cache keys
     await deleteCache([ORDERS_CACHE_KEY, REPORT_SUMMARY_CACHE_KEY]);
     res.json({ message: 'All bills and counters have been reset.' });
   } catch (err) {

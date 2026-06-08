@@ -14,6 +14,7 @@ function ItemModal({ item, onClose, onSave }) {
     name: item?.name || '',
     category: item?.category || menuCategories[0],
     price: item?.price || '',
+    department: item?.department || 'kitchen',
     imageUrl: item?.imageUrl || '',
     available: item?.available !== false,
     shortcut: item?.shortcut || '',
@@ -53,10 +54,15 @@ function ItemModal({ item, onClose, onSave }) {
           </div>
         </div>
         <div className="frow2">
+          <div className="fgroup"><label className="lbl">Department</label>
+            <select value={form.department} onChange={e => setForm({ ...form, department: e.target.value })}>
+              <option value="kitchen">Kitchen</option>
+              <option value="bar">Bar</option>
+            </select>
+          </div>
           <div className="fgroup"><label className="lbl">Shortcut</label>
             <input value={form.shortcut} onChange={e => setForm({ ...form, shortcut: e.target.value.toLowerCase().trim() })}
               placeholder="e.g. cp, pn, ff" maxLength={10} />
-            <span style={{ fontSize: 10, color: 'var(--t2)', marginTop: 4 }}>Short code to quickly add this item (e.g., type 'cp' and press Enter)</span>
           </div>
         </div>
         {/* IMAGE URL INPUT ADDED HERE */}
@@ -116,11 +122,17 @@ export default function MenuPage() {
       <div className="menu-filters-row">
         <div style={{ display: 'flex', flex: 1, gap: 8 }}>
           <div className="searchBox-unified" style={{ flex: 1 }}>
+            <Search size={16} className="search-icon" />
             <input
               value={search}
               onChange={e => setSearch(e.target.value)}
-              placeholder="🔍 Search menu..."
+              placeholder="Search menu..."
             />
+            {search && (
+              <button className="search-clear-btn" onClick={() => setSearch('')} title="Clear">
+                <X size={14} />
+              </button>
+            )}
           </div>
           <div className="select-wrapper-unified hide-on-desktop" style={{ width: '110px', flexShrink: 0 }}>
             <select value={catFilter} onChange={e => setCatFilter(e.target.value)} style={{ paddingLeft: '14px' }}>

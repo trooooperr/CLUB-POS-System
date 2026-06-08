@@ -21,15 +21,29 @@ router.post('/', async (req, res) => {
   try {
     await fs.writeFile(htmlPath, html, 'utf8');
 
-    // Check for wkhtmltopdf
+    const chromePath = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+    let converted = false;
+
+    // Try Google Chrome headless first
     try {
-      await execP('which wkhtmltopdf');
-    } catch (e) {
-      return res.status(501).json({ error: 'wkhtmltopdf is not installed on the server' });
+      await fs.access(chromePath);
+      const cmd = `"${chromePath}" --headless --disable-gpu --print-to-pdf="${pdfPath}" "${htmlPath}"`;
+      await execP(cmd);
+      converted = true;
+    } catch (chromeErr) {
+      // Fallback to wkhtmltopdf
+      try {
+        await execP('which wkhtmltopdf');
+        await execP(`wkhtmltopdf "${htmlPath}" "${pdfPath}"`);
+        converted = true;
+      } catch (wkErr) {
+        console.error('Neither Google Chrome nor wkhtmltopdf available for PDF conversion');
+      }
     }
 
-    // Convert HTML -> PDF
-    await execP(`wkhtmltopdf ${htmlPath} ${pdfPath}`);
+    if (!converted) {
+      return res.status(501).json({ error: 'No PDF conversion utility found (Google Chrome or wkhtmltopdf)' });
+    }
 
     // Check for lp/lpr printer command
     let printCmd = 'lp';
@@ -45,9 +59,9 @@ router.post('/', async (req, res) => {
     }
 
     // Send to default printer
-    await execP(`${printCmd} ${pdfPath}`);
+    await execP(`${printCmd} "${pdfPath}"`);
 
-    // Cleanup (best-effort)
+    // Cleanup
     try { await fs.unlink(htmlPath); } catch (e) {}
     try { await fs.unlink(pdfPath); } catch (e) {}
     try { await fs.rmdir(tmpDir); } catch (e) {}
@@ -55,6 +69,10 @@ router.post('/', async (req, res) => {
     return res.json({ status: 'ok' });
   } catch (err) {
     console.error('Print failure:', err);
+    // Cleanup best-effort
+    try { await fs.unlink(htmlPath); } catch (e) {}
+    try { await fs.unlink(pdfPath); } catch (e) {}
+    try { await fs.rmdir(tmpDir); } catch (e) {}
     return res.status(500).json({ error: err.message || 'Print failed' });
   }
 });

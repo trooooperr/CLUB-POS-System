@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+              import React, { useState } from 'react';
 import { X, Share2, MessageCircle, Download, Printer } from 'lucide-react';
 
 export default function BillPreviewModal({ bill, table, tableNo, settings, onClose, onPrint }) {

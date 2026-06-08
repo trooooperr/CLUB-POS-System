@@ -18,24 +18,28 @@ router.post('/login', async (req, res) => {
     }
 
     const loginIdentity = username.toLowerCase().trim();
-    const user = await User.findOne({ 
+    const user = await User.findOne({
       $or: [
         { username: loginIdentity },
-        { email: loginIdentity }
+        { email: loginIdentity },
       ]
     });
-    
+
+    // Use a single generic message for both "user not found" and "wrong password"
+    // to prevent username enumeration attacks.
+    const GENERIC_AUTH_ERROR = 'Invalid credentials. Please check your username and password.';
+
     if (!user) {
-      return res.status(401).json({ error: 'Invalid username, email, or password' });
+      return res.status(401).json({ error: GENERIC_AUTH_ERROR });
     }
-    
+
     if (!user.isActive) {
       return res.status(403).json({ error: 'Account disabled. Please contact administrator.' });
     }
 
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
-      return res.status(401).json({ error: 'Invalid username or password' });
+      return res.status(401).json({ error: GENERIC_AUTH_ERROR });
     }
 
     const token = generateToken(user);
