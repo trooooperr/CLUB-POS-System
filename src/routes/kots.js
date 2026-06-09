@@ -14,19 +14,31 @@ const {
 // ── GENERATE KOT NUMBER ─────────────────────────────────────────
 async function generateKOTNo() {
   const redis = require('../lib/redis');
-  const kotCounterKey = `kot_seq`;
+  const { getBusinessDayBoundary } = require('../lib/businessDay');
+  const boundary = getBusinessDayBoundary();
+
+  // Format business day date string, e.g. "2026-06-09"
+  const yyyy = boundary.getFullYear();
+  const mm = String(boundary.getMonth() + 1).padStart(2, '0');
+  const dd = String(boundary.getDate()).padStart(2, '0');
+  const dateStr = `${yyyy}-${mm}-${dd}`;
+
+  const kotCounterKey = `kot_seq:${dateStr}`;
   try {
     const client = await redis.connectRedis();
     if (client) {
       const count = await client.incr(kotCounterKey);
+      if (count === 1) {
+        await client.expire(kotCounterKey, 172800); // 48 hours expiration
+      }
       return `KOT-${count.toString().padStart(3, '0')}`;
     }
   } catch (err) {
     console.error('Redis KOT counter error:', err.message);
   }
 
-  // Fallback: Database count (global)
-  const count = await KOT.countDocuments() + 1;
+  // Fallback: Database count for current business day (since 10 AM boundary)
+  const count = await KOT.countDocuments({ createdAt: { $gte: boundary } }) + 1;
   return `KOT-${count.toString().padStart(3, '0')}`;
 }
 
