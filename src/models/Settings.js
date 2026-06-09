@@ -10,6 +10,7 @@ const settingsSchema = new mongoose.Schema({
   currency:       { type: String, default: '₹' },
   thankYouMsg:    { type: String, default: '' },
   darkMode:       { type: Boolean, default: true },
+  directPrinting: { type: Boolean, default: false },
   adminEmail:     { type: String, default: '' },
   senderEmail:    { type: String, default: '' },
   senderPassword: { type: String, default: '' },

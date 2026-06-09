@@ -113,22 +113,7 @@ export default function InvoiceModal() {
       </html>
     `;
 
-    try {
-      const response = await authFetch(apiUrl('/api/print'), {
-        method: 'POST',
-        body: JSON.stringify({ html, documentType: 'bill' })
-      });
-      if (response.ok) {
-        console.log('Direct print job sent successfully to backend printer.');
-        showToast('Print job sent to printer', 'success');
-        return;
-      }
-      const errData = await response.json().catch(() => ({}));
-      throw new Error(errData.error || 'Server print failure');
-    } catch (err) {
-      console.warn('Direct backend print failed, falling back to browser print:', err);
-      
-      // Fallback: Browser Print Dialog
+    const runBrowserPrint = () => {
       try {
         const iframe = document.createElement('iframe');
         iframe.style.position = 'fixed';
@@ -150,12 +135,33 @@ export default function InvoiceModal() {
           iframe.contentWindow.print();
           document.body.removeChild(iframe);
         }, 500);
-        
-        showToast('Backend print failed. Fallback: browser print dialog opened.', 'info');
       } catch (printErr) {
-        console.error('Browser print fallback failed:', printErr);
-        showToast(`Print failed: ${err.message || 'Direct printing error'}`, 'error');
+        console.error('Browser print failed:', printErr);
+        showToast('Browser printing failed', 'error');
       }
+    };
+
+    // If direct printing setting is disabled, bypass backend printing entirely and use browser dialog directly.
+    if (!s.directPrinting) {
+      runBrowserPrint();
+      return;
+    }
+
+    try {
+      const response = await authFetch(apiUrl('/api/print'), {
+        method: 'POST',
+        body: JSON.stringify({ html, documentType: 'bill' })
+      });
+      if (response.ok) {
+        console.log('Direct print job sent successfully to backend printer.');
+        showToast('Print job sent to printer', 'success');
+        return;
+      }
+      const errData = await response.json().catch(() => ({}));
+      throw new Error(errData.error || 'Server print failure');
+    } catch (err) {
+      console.warn('Direct backend print failed, falling back to browser print:', err);
+      runBrowserPrint();
     }
   };
 

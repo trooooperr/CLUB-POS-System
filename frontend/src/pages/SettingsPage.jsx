@@ -272,6 +272,10 @@ export default function SettingsPage() {
               <input type="checkbox" checked={!!form.darkMode} onChange={e => set('darkMode', e.target.checked)} />
               <span>Use dark mode by default</span>
             </label>
+            <label className="settings-toggle">
+              <input type="checkbox" checked={!!form.directPrinting} onChange={e => set('directPrinting', e.target.checked)} />
+              <span>Direct Server Printing (Silent printing, skips print dialog if possible)</span>
+            </label>
           </div>
         </section>
 

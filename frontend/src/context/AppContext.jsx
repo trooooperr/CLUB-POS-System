@@ -47,6 +47,7 @@ const DEFAULT_SETTINGS = {
   currency:        '₹',
   thankYouMsg:     'Thank you for visiting!',
   darkMode:        true,
+  directPrinting:  false,
   adminEmail:      '',
   senderEmail:     '',
 };
