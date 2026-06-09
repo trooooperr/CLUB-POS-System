@@ -160,8 +160,12 @@ function BillingNavBar({
 
 export default function BillingPage() {
   const {
-    tableBills, setTableBills, activeTableId, selectTable, updateTableItem, clearTable, setTableField,
-    setItemNote, allSellableItems,
+    tableBills, setTableBills, activeTableId, selectTable,
+    updateTableItem: updateTableItemRaw,
+    clearTable: clearTableRaw,
+    setTableField: setTableFieldRaw,
+    setItemNote: setItemNoteRaw,
+    allSellableItems,
     billTotals, filteredMenu, categories, categoryFilter, setCategoryFilter,
     menuSearch, setMenuSearch, inventory, workers, getTableStatus, getTableInfo, settings, NUM_TABLES,
     openTableSession, createKOT, finalizeBill, completeOrder, socket, syncTableSession,
@@ -174,8 +178,49 @@ export default function BillingPage() {
   const [mobileBillOpen, setMobileBillOpen] = useState(false);
   const [activeOrder, setActiveOrder] = useState(null); // Current order for this table
   const [kots, setKots] = useState([]); // KOTs for current order
-  const [orderType, setOrderType] = useState('dine-in');
-  const [selectedWaiter, setSelectedWaiter] = useState('');
+  
+  // Wrap state setters and actions to track user edit timestamps
+  const lastEditRef = useRef({}); // { tableId: timestamp }
+  
+  const recordLocalEdit = (tableId) => {
+    if (tableId) {
+      lastEditRef.current[tableId] = Date.now();
+    }
+  };
+
+  const [orderType, setOrderTypeRaw] = useState('dine-in');
+  const [selectedWaiter, setSelectedWaiterRaw] = useState('');
+
+  const setOrderType = (val) => {
+    recordLocalEdit(activeTableId);
+    setOrderTypeRaw(val);
+  };
+
+  const setSelectedWaiter = (val) => {
+    recordLocalEdit(activeTableId);
+    setSelectedWaiterRaw(val);
+  };
+
+  const updateTableItem = (tableId, itemId, action) => {
+    recordLocalEdit(tableId);
+    updateTableItemRaw(tableId, itemId, action);
+  };
+
+  const clearTable = (tableId) => {
+    recordLocalEdit(tableId);
+    clearTableRaw(tableId);
+  };
+
+  const setTableField = (tableId, field, val) => {
+    recordLocalEdit(tableId);
+    setTableFieldRaw(tableId, field, val);
+  };
+
+  const setItemNote = (tableId, itemId, note) => {
+    recordLocalEdit(tableId);
+    setItemNoteRaw(tableId, itemId, note);
+  };
+
   const [billPanelWidth, setBillPanelWidth] = useState(420);
   const [isResizing, setIsResizing] = useState(false);
   const searchInputRef = useRef(null);
@@ -317,40 +362,38 @@ export default function BillingPage() {
         note: i.notes || ''
       }));
 
-      // Update local storage/state table bills
-      setTableBills(prev => {
-        const localItems = prev[targetTableId]?.items || [];
-        // If local items exist but DB pending items are empty, keep local items to avoid race condition
-        if (localItems.length > 0 && dbPendingItems.length === 0) {
-          return prev;
-        }
-        return {
+      // Update local storage/state table bills if not edited recently
+      const lastEdit = lastEditRef.current[targetTableId] || 0;
+      const timeSinceLastEdit = Date.now() - lastEdit;
+
+      if (timeSinceLastEdit >= 2500) {
+        setTableBills(prev => ({
           ...prev,
           [targetTableId]: {
             ...prev[targetTableId],
-            items: dbPendingItems.length > 0 ? dbPendingItems : localItems,
+            items: dbPendingItems,
             customerName: session?.activeOrderId?.customerName || prev[targetTableId]?.customerName || '',
             customerPhone: session?.activeOrderId?.customerPhone || prev[targetTableId]?.customerPhone || '',
             discount: session?.activeOrderId?.discount?.toString() || prev[targetTableId]?.discount || ''
           }
-        };
-      });
+        }));
+
+        // Update selectedWaiter and orderType from DB session
+        if (session?.waiterName) {
+          const waiter = waiterOptions.find(w => w.name === session.waiterName || w.userId?.name === session.waiterName);
+          setSelectedWaiterRaw(waiter ? waiter._id : '');
+        } else {
+          setSelectedWaiterRaw('');
+        }
+        if (session?.orderType) {
+          setOrderTypeRaw(session.orderType);
+        } else {
+          setOrderTypeRaw('dine-in');
+        }
+      }
 
       setActiveOrder(orderId);
       setKots(session?.kotIds || []);
-
-      // Update selectedWaiter and orderType from DB session
-      if (session?.waiterName) {
-        const waiter = waiterOptions.find(w => w.name === session.waiterName || w.userId?.name === session.waiterName);
-        setSelectedWaiter(waiter ? waiter._id : '');
-      } else {
-        setSelectedWaiter('');
-      }
-      if (session?.orderType) {
-        setOrderType(session.orderType);
-      } else {
-        setOrderType('dine-in');
-      }
 
       return orderId;
     } catch (err) {
