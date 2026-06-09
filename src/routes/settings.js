@@ -66,6 +66,7 @@ function normalizeSettings(data) {
     currency: data.currency || '₹',
     thankYouMsg: data.thankYouMsg || '',
     darkMode: data.darkMode !== false,
+    directPrinting: !!data.directPrinting,
     inventoryCategories: cleanCategoryList(data.inventoryCategories) || [],
     menuCategories: cleanCategoryList(data.menuCategories) || [],
     senderEmail: FIXED_SENDER_EMAIL,
@@ -160,6 +161,7 @@ router.put('/', requireRole('admin'), async (req, res) => {
   if (req.body.currency !== undefined) settings.currency = cleanString(req.body.currency, '₹').slice(0, 4) || '₹';
   if (req.body.thankYouMsg !== undefined) settings.thankYouMsg = cleanString(req.body.thankYouMsg);
   if (req.body.darkMode !== undefined) settings.darkMode = !!req.body.darkMode;
+  if (req.body.directPrinting !== undefined) settings.directPrinting = !!req.body.directPrinting;
   if (req.body.adminEmail !== undefined) settings.adminEmail = cleanString(req.body.adminEmail).toLowerCase();
 
   const inventoryCategories = cleanCategoryList(req.body.inventoryCategories);
