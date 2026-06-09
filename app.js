@@ -107,6 +107,7 @@ app.get('/api/health', async (req, res) => {
     redis:  redisOk,
     uptime: process.uptime(),
     env:    process.env.NODE_ENV || 'development',
+    version: '3.0.2',
   });
 });
 

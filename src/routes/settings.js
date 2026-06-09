@@ -150,7 +150,12 @@ router.get('/', async (req, res) => {
 
 // UPDATE settings (Admin only)
 router.put('/', requireRole('admin'), async (req, res) => {
+  console.log('--- Settings update request received ---');
+  console.log('User Role:', req.user?.role);
+  console.log('Incoming settings payload:', req.body);
+
   const settings = await getOrCreateSettings();
+  console.log('Existing settings in DB directPrinting:', settings.directPrinting);
 
   if (req.body.restaurantName !== undefined) settings.restaurantName = cleanString(req.body.restaurantName);
   if (req.body.address !== undefined) settings.address = cleanString(req.body.address);
@@ -171,8 +176,13 @@ router.put('/', requireRole('admin'), async (req, res) => {
   if (menuCategories) settings.menuCategories = menuCategories;
 
   settings.senderEmail = FIXED_SENDER_EMAIL;
+  
+  console.log('Saving settings directPrinting property:', settings.directPrinting);
   await settings.save();
+  
   const normalized = normalizeSettings(settings);
+  console.log('Normalized settings response directPrinting:', normalized.directPrinting);
+
   await deleteCache(SETTINGS_CACHE_KEY);
   res.json(normalized);
 });

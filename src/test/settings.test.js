@@ -50,11 +50,13 @@ describe('Settings API', () => {
       .set('Authorization', `Bearer ${token}`)
       .send({
         restaurantName: 'HumTum Updated',
-        sgstRate: 3.5
+        sgstRate: 3.5,
+        directPrinting: true
       });
     
     expect(res.statusCode).toBe(200);
     expect(res.body.restaurantName).toBe('HumTum Updated');
     expect(res.body.sgstRate).toBe(3.5);
+    expect(res.body.directPrinting).toBe(true);
   });
 });
