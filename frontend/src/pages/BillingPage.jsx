@@ -575,28 +575,21 @@ export default function BillingPage() {
   const firePrint = async (html, documentType = 'document', printerName = '') => {
     const runBrowserPrint = () => {
       try {
-        let iframe = document.getElementById('print-iframe');
-        if (!iframe) {
-          iframe = document.createElement('iframe');
-          iframe.id = 'print-iframe';
-          iframe.style.position = 'fixed';
-          iframe.style.right = '0';
-          iframe.style.bottom = '0';
-          iframe.style.width = '0';
-          iframe.style.height = '0';
-          iframe.style.border = '0';
-          document.body.appendChild(iframe);
+        const printWindow = window.open('', '_blank', 'width=400,height=600');
+        if (!printWindow) {
+          showToast('Popup blocked! Please allow popups to print.', 'error');
+          return;
         }
         
-        const doc = iframe.contentDocument || iframe.contentWindow.document;
-        doc.open();
-        doc.write(html);
-        doc.close();
+        printWindow.document.open();
+        printWindow.document.write(html);
+        printWindow.document.close();
+        printWindow.focus();
         
         // Wait for images / assets to load and print
         setTimeout(() => {
-          iframe.contentWindow.focus();
-          iframe.contentWindow.print();
+          printWindow.print();
+          // We do not auto-close the window so the user can debug margins
         }, 500);
       } catch (printErr) {
         console.error('Browser print failed:', printErr);
