@@ -211,6 +211,33 @@ router.post('/send-daily', requireRole(['admin', 'manager']), async (req, res) =
   }
 });
 
+// ── GET /daily-html (For External Cron / Google Apps Script) ───
+router.get('/daily-html', async (req, res) => {
+  try {
+    const { token } = req.query;
+    if (!token || token !== (process.env.CRON_SECRET || process.env.JWT_SECRET)) {
+      return res.status(401).send('Unauthorized: Invalid CRON_SECRET token');
+    }
+    
+    const persistedSettings = await getPersistedSettings();
+    const resolvedSettings = {
+      ...persistedSettings.toObject(),
+      restaurantName: persistedSettings.restaurantName || process.env.RESTAURANT_NAME || 'HumTum',
+      currency: persistedSettings.currency || '₹',
+    };
+
+    const { start, end } = getBusinessDayBounds();
+    const orders = await Order.find({ date: { $gte: start, $lt: end } });
+    const inventory = await Inventory.find().sort({ category: 1, name: 1 });
+
+    const html = buildReportHTML({ date: start, orders, settings: resolvedSettings, inventory });
+    res.send(html);
+  } catch (err) {
+    console.error('Error generating daily HTML:', err.message);
+    res.status(500).send('Error generating report HTML: ' + err.message);
+  }
+});
+
 router.get('/daily-summary', requireRole(['admin', 'manager']), async (req, res) => {
   try {
     const cached = await getCache(REPORT_SUMMARY_CACHE_KEY);
