@@ -39,10 +39,12 @@ export default function Sidebar() {
             <img src="/favicon.ico" alt="Logo" style={{ width: '32px', height: '32px', objectFit: 'contain' }} />
           </div>
           <div style={{ flex:1 }}>
-            <div className="logo-name" style={{ fontWeight: 900, letterSpacing: '-0.08em', color: 'var(--a)', fontSize: 14, textTransform: 'uppercase', textShadow: '0 1px 2px rgba(0,0,0,0.18)' }}>
-              {settings.restaurantName?.toUpperCase() || 'HUMTUM'}
+            <div className="logo-name" style={{ fontFamily: "'Cinzel', serif", fontWeight: 900, letterSpacing: '1px', color: 'var(--a)', fontSize: 22, textTransform: 'uppercase', textShadow: '0 2px 4px rgba(0,0,0,0.2)' }}>
+              HUMTUM
             </div>
-
+            <div className="logo-sub" style={{ color: 'var(--t2)', fontSize: 11, letterSpacing: '0.02em', marginTop: '-2px' }}>
+              The BAR & Restaurant
+            </div>
           </div>
           <button className="iBtn" style={{ padding:4 }} onClick={()=>setSidebarOpen(false)}><X size={12}/></button>
         </div>
