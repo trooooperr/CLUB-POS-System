@@ -67,6 +67,9 @@ function normalizeSettings(data) {
     thankYouMsg: data.thankYouMsg || '',
     darkMode: data.darkMode !== false,
     directPrinting: !!data.directPrinting,
+    qzTrayEnabled: !!data.qzTrayEnabled,
+    kitchenPrinterName: data.kitchenPrinterName || '',
+    barPrinterName: data.barPrinterName || '',
     inventoryCategories: cleanCategoryList(data.inventoryCategories) || [],
     menuCategories: cleanCategoryList(data.menuCategories) || [],
     senderEmail: FIXED_SENDER_EMAIL,
@@ -167,6 +170,9 @@ router.put('/', requireRole('admin'), async (req, res) => {
   if (req.body.thankYouMsg !== undefined) settings.thankYouMsg = cleanString(req.body.thankYouMsg);
   if (req.body.darkMode !== undefined) settings.darkMode = !!req.body.darkMode;
   if (req.body.directPrinting !== undefined) settings.directPrinting = !!req.body.directPrinting;
+  if (req.body.qzTrayEnabled !== undefined) settings.qzTrayEnabled = !!req.body.qzTrayEnabled;
+  if (req.body.kitchenPrinterName !== undefined) settings.kitchenPrinterName = cleanString(req.body.kitchenPrinterName);
+  if (req.body.barPrinterName !== undefined) settings.barPrinterName = cleanString(req.body.barPrinterName);
   if (req.body.adminEmail !== undefined) settings.adminEmail = cleanString(req.body.adminEmail).toLowerCase();
 
   const inventoryCategories = cleanCategoryList(req.body.inventoryCategories);

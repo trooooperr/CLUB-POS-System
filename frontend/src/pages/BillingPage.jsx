@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import { ArrowLeft, Search, Trash2, Printer, UtensilsCrossed, X, Menu } from 'lucide-react';
 import { apiUrl, authFetch } from '../lib/api';
+import * as qz from 'qz-tray';
 const PM = ['cash', 'card', 'upi'];
 
 /* COMPACT TABLE PILL */
@@ -571,7 +572,7 @@ export default function BillingPage() {
   };
 
   // Helper: fire a print job (tries backend direct print first if directPrinting is enabled, falls back to/uses browser dialog otherwise)
-  const firePrint = async (html, documentType = 'document') => {
+  const firePrint = async (html, documentType = 'document', printerName = '') => {
     const runBrowserPrint = () => {
       try {
         const iframe = document.createElement('iframe');
@@ -600,28 +601,31 @@ export default function BillingPage() {
       }
     };
 
-    // If direct printing setting is disabled, bypass backend printing entirely and use browser dialog directly.
-    if (!settings.directPrinting) {
-      runBrowserPrint();
-      return;
+    // QZ Tray local printing
+    if (settings.qzTrayEnabled) {
+      try {
+        if (!qz.websocket.isActive()) {
+          await qz.websocket.connect({ retries: 2, delay: 1 });
+        }
+        const targetPrinter = printerName || null;
+        const config = qz.configs.create(targetPrinter);
+        const printData = [{
+          type: 'html',
+          format: 'plain',
+          data: html
+        }];
+        await qz.print(config, printData);
+        showToast(`Print sent to ${targetPrinter || 'default'} via QZ Tray`, 'success');
+        return;
+      } catch (err) {
+        console.error('QZ Tray print failed:', err);
+        showToast('QZ Tray Error: ' + (err.message || err), 'error');
+        return; // Don't fall back to directServer if QZ Tray fails
+      }
     }
 
-    try {
-      const response = await authFetch(apiUrl('/api/print'), {
-        method: 'POST',
-        body: JSON.stringify({ html, documentType })
-      });
-      if (response.ok) {
-        console.log('Direct print job sent successfully to backend printer.');
-        showToast('Print job sent to printer', 'success');
-        return;
-      }
-      const errData = await response.json().catch(() => ({}));
-      throw new Error(errData.error || 'Server print failure');
-    } catch (err) {
-      console.warn('Direct backend print failed, falling back to browser print:', err);
-      runBrowserPrint();
-    }
+    // If QZ Tray is disabled, fall back to standard browser printing (with dialog)
+    runBrowserPrint();
   };
 
   // Build KOT HTML for a given subset of items and target printer label
@@ -662,13 +666,13 @@ export default function BillingPage() {
 
     // Kitchen printer KOT (food/menu items)
     if (kitchenItems.length > 0) {
-      firePrint(buildKOTHtml(kot, tableNo, kitchenItems, settings.kitchenPrinterName || 'KITCHEN'));
+      firePrint(buildKOTHtml(kot, tableNo, kitchenItems, settings.kitchenPrinterName || 'KITCHEN'), 'document', settings.kitchenPrinterName || '');
     }
 
     // Bar printer KOT (bar/inventory items) — fired 600ms after kitchen to sequence dialogs
     if (barItems.length > 0) {
       setTimeout(() => {
-        firePrint(buildKOTHtml(kot, tableNo, barItems, settings.barPrinterName || 'BAR'));
+        firePrint(buildKOTHtml(kot, tableNo, barItems, settings.barPrinterName || 'BAR'), 'document', settings.barPrinterName || '');
       }, 600);
     }
   };
@@ -711,7 +715,7 @@ export default function BillingPage() {
         </body>
       </html>
     `;
-    firePrint(html);
+    firePrint(html, 'document', settings.barPrinterName || '');
   };
 
   const doGen = async paid => {

@@ -272,10 +272,31 @@ export default function SettingsPage() {
               <input type="checkbox" checked={!!form.darkMode} onChange={e => set('darkMode', e.target.checked)} />
               <span>Use dark mode by default</span>
             </label>
-            <label className="settings-toggle">
-              <input type="checkbox" checked={!!form.directPrinting} onChange={e => set('directPrinting', e.target.checked)} />
-              <span>Direct Server Printing (Silent printing, skips print dialog if possible)</span>
-            </label>
+          </div>
+        </section>
+
+        <section className="settings-card">
+          <div className="settings-card-head">
+            <div>
+              <h2>Printing</h2>
+              <p>Configure local receipt and KOT routing via QZ Tray.</p>
+            </div>
+          </div>
+          <div className="settings-fields">
+            <div className="settings-printing-row">
+              <label className="settings-toggle">
+                <input type="checkbox" checked={!!form.qzTrayEnabled} onChange={e => set('qzTrayEnabled', e.target.checked)} />
+                <span>Use QZ Tray for Local Printing</span>
+              </label>
+              <div className="settings-field">
+                <label>Kitchen Printer (System Name)</label>
+                <input value={form.kitchenPrinterName || ''} onChange={e => set('kitchenPrinterName', e.target.value)} placeholder="e.g. KITCHEN_PRINTER" />
+              </div>
+              <div className="settings-field">
+                <label>Bar & Bill Printer (System Name)</label>
+                <input value={form.barPrinterName || ''} onChange={e => set('barPrinterName', e.target.value)} placeholder="e.g. BAR_PRINTER" />
+              </div>
+            </div>
           </div>
         </section>
 

@@ -126,7 +126,6 @@ app.use('/api/reports',   allowCronSecret, reportsRouter);
 app.use('/api/settings',  requireAuth, require('./src/routes/settings'));
 app.use('/api/inventory', requireAuth, require('./src/routes/inventory'));
 app.use('/api/admin',     requireAuth, require('./src/routes/admin'));
-app.use('/api/print',     requireAuth, require('./src/routes/print'));
 
 // ── Static files (frontend dist) ────────────────────────────────
 const frontendDist = path.join(__dirname, 'frontend', 'dist');

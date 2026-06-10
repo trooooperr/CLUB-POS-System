@@ -5651,6 +5651,19 @@ textarea,
   margin-top: 14px;
 }
 
+.settings-printing-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 16px;
+  grid-column: 1 / -1;
+  flex-wrap: wrap;
+}
+
+.settings-printing-row .settings-toggle {
+  margin-top: 20px;
+}
+
 .staff-reset-grid {
   grid-template-columns: minmax(180px, 1fr) minmax(200px, 1.2fr) minmax(180px, 1fr) auto;
   align-items: end;

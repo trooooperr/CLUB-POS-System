@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { X, Printer, Phone, Send, Check, Download, Share2 } from 'lucide-react';
 import { apiUrl, authFetch } from '../lib/api';
+import * as qz from 'qz-tray';
 
 export default function InvoiceModal() {
   const { invoiceOrder, setInvoiceOrder, settings, showToast } = useApp();
@@ -141,28 +142,31 @@ export default function InvoiceModal() {
       }
     };
 
-    // If direct printing setting is disabled, bypass backend printing entirely and use browser dialog directly.
-    if (!s.directPrinting) {
-      runBrowserPrint();
-      return;
+    // QZ Tray local printing
+    if (s.qzTrayEnabled) {
+      try {
+        if (!qz.websocket.isActive()) {
+          await qz.websocket.connect({ retries: 2, delay: 1 });
+        }
+        const targetPrinter = s.barPrinterName || null;
+        const config = qz.configs.create(targetPrinter);
+        const printData = [{
+          type: 'html',
+          format: 'plain',
+          data: html
+        }];
+        await qz.print(config, printData);
+        showToast(`Print sent to ${targetPrinter || 'default'} via QZ Tray`, 'success');
+        return;
+      } catch (err) {
+        console.error('QZ Tray print failed:', err);
+        showToast('QZ Tray Error: ' + (err.message || err), 'error');
+        return; // Don't fall back if QZ Tray fails
+      }
     }
 
-    try {
-      const response = await authFetch(apiUrl('/api/print'), {
-        method: 'POST',
-        body: JSON.stringify({ html, documentType: 'bill' })
-      });
-      if (response.ok) {
-        console.log('Direct print job sent successfully to backend printer.');
-        showToast('Print job sent to printer', 'success');
-        return;
-      }
-      const errData = await response.json().catch(() => ({}));
-      throw new Error(errData.error || 'Server print failure');
-    } catch (err) {
-      console.warn('Direct backend print failed, falling back to browser print:', err);
-      runBrowserPrint();
-    }
+    // Fallback to browser print
+    runBrowserPrint();
   };
 
 const sendBill = () => {
