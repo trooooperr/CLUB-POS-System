@@ -622,7 +622,6 @@ export default function BillingPage() {
         showToast(`Print sent to ${targetPrinter || 'default'} via QZ Tray`, 'success');
         return;
       } catch (err) {
-        console.error('QZ Tray print failed:', err);
         showToast('QZ Tray disconnected, falling back to browser print...', 'error');
         runBrowserPrint();
         return;
