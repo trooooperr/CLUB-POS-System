@@ -43,7 +43,9 @@ function assertEmailConfig(emailConfig) {
   }
 }
 
-function createTransport(emailConfig) {
+const dns = require('dns').promises;
+
+async function createTransport(emailConfig) {
   if (process.env.SMTP_HOST) {
     return nodemailer.createTransport({
       host: process.env.SMTP_HOST,
@@ -56,14 +58,27 @@ function createTransport(emailConfig) {
     });
   }
 
+  let host = 'smtp.gmail.com';
+  try {
+    const addresses = await dns.resolve4(host);
+    if (addresses && addresses.length > 0) {
+      host = addresses[0];
+    }
+  } catch (err) {
+    console.warn('DNS resolve4 failed for Gmail, falling back to hostname', err.message);
+  }
+
   return nodemailer.createTransport({
-    host: 'smtp.gmail.com',
+    host,
     port: 465,
     secure: true,
     auth: {
       user: emailConfig.authEmail,
       pass: emailConfig.senderPassword,
     },
+    tls: {
+      servername: 'smtp.gmail.com' // Crucial for SSL when connecting via IP
+    }
   });
 }
 
@@ -177,7 +192,7 @@ async function sendDailyReportInternal(options = {}) {
   const inventory = await Inventory.find().sort({ category: 1, name: 1 });
 
   const html = buildReportHTML({ date: start, orders, settings: resolvedSettings, inventory });
-  const transporter = createTransport(resolvedEmailConfig);
+  const transporter = await createTransport(resolvedEmailConfig);
   await transporter.verify();
 
   const result = await transporter.sendMail({
