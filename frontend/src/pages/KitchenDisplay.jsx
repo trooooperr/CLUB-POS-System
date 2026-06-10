@@ -70,9 +70,9 @@ function KOTCard({ kot }) {
           >
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--t0)' }}>{item.name}</div>
-              {item.notes && (
+              {(item.notes || item.note) && (
                 <div style={{ fontSize: 10, color: '#f5c518', fontStyle: 'italic', marginTop: 2 }}>
-                  ✎ {item.notes}
+                  ✎ {item.notes || item.note}
                 </div>
               )}
             </div>
