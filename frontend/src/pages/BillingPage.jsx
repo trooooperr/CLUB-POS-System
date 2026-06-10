@@ -523,7 +523,7 @@ export default function BillingPage() {
           quantity: i.quantity,
           price: i.price,
           department: isInv ? 'bar' : (master?.department || i.department || 'kitchen'),
-          note: i.note || ''
+          notes: i.note || ''
         };
       });
 
@@ -693,7 +693,7 @@ export default function BillingPage() {
         <div class="divider"></div>
         ${items.map(i => `
           <div class="item"><span>${i.name}</span><span class="qty">${i.quantity}</span></div>
-          ${i.note ? `<div class="note">Note: ${i.note}</div>` : ''}
+          ${(i.notes || i.note) ? `<div class="note">Note: ${i.notes || i.note}</div>` : ''}
         `).join('')}
         <div class="divider"></div>
       </body>
