@@ -22,6 +22,9 @@ export async function authFetch(url, options = {}) {
   const token = localStorage.getItem('humtum_token_v2');
   const headers = {
     ...options.headers,
+    'Cache-Control': 'no-cache, no-store, must-revalidate',
+    'Pragma': 'no-cache',
+    'Expires': '0'
   };
 
   if (token) {
@@ -33,7 +36,7 @@ export async function authFetch(url, options = {}) {
     headers['Content-Type'] = 'application/json';
   }
 
-  const res = await fetch(url, { ...options, headers });
+  const res = await fetch(url, { cache: 'no-store', ...options, headers });
 
   // Auto-logout on 401 (token expired)
   if (res.status === 401) {

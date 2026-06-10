@@ -5,7 +5,7 @@ const kotSchema = new mongoose.Schema({
   orderId:      { type: mongoose.Schema.Types.ObjectId, ref: 'Order', required: true, index: true },
   tableNo:      { type: Number, required: true, index: true },
   items:        [{
-    menuItemId: { type: String },
+    menuItemId: { type: mongoose.Schema.Types.ObjectId, ref: 'MenuItem' },
     name:       { type: String, required: true },
     quantity:   { type: Number, required: true },
     price:      { type: Number, required: true },
