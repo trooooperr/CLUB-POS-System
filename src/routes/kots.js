@@ -27,9 +27,21 @@ async function generateKOTNo() {
   try {
     const client = await redis.connectRedis();
     if (client) {
-      const count = await client.incr(kotCounterKey);
+      let count = await client.incr(kotCounterKey);
       if (count === 1) {
         await client.expire(kotCounterKey, 172800); // 48 hours expiration
+        // Sync with DB in case Redis was flushed or restarted
+        const latestKOT = await KOT.findOne({ createdAt: { $gte: boundary } }).sort({ createdAt: -1 });
+        if (latestKOT && latestKOT.kotNo) {
+          const parts = latestKOT.kotNo.split('-');
+          if (parts.length === 2) {
+            const dbCount = parseInt(parts[1], 10);
+            if (dbCount >= 1) {
+              await client.set(kotCounterKey, dbCount + 1);
+              count = dbCount + 1;
+            }
+          }
+        }
       }
       return `KOT-${count.toString().padStart(3, '0')}`;
     }
@@ -37,9 +49,16 @@ async function generateKOTNo() {
     console.error('Redis KOT counter error:', err.message);
   }
 
-  // Fallback: Database count for current business day (since 10 AM boundary)
-  const count = await KOT.countDocuments({ createdAt: { $gte: boundary } }) + 1;
-  return `KOT-${count.toString().padStart(3, '0')}`;
+  // Fallback: Find the latest KOT for today and increment its number
+  const latestKOT = await KOT.findOne({ createdAt: { $gte: boundary } }).sort({ createdAt: -1 });
+  let nextCount = 1;
+  if (latestKOT && latestKOT.kotNo) {
+    const parts = latestKOT.kotNo.split('-');
+    if (parts.length === 2) {
+      nextCount = parseInt(parts[1], 10) + 1;
+    }
+  }
+  return `KOT-${nextCount.toString().padStart(3, '0')}`;
 }
 
 // ── GET ALL KOTs FOR A TABLE ────────────────────────────────────
