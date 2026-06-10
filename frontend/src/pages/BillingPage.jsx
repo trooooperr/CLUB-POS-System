@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import { ArrowLeft, Search, Trash2, Printer, UtensilsCrossed, X, Menu } from 'lucide-react';
 import { apiUrl, authFetch } from '../lib/api';
-import * as qz from 'qz-tray';
+import qz from 'qz-tray';
 const PM = ['cash', 'card', 'upi'];
 
 /* COMPACT TABLE PILL */
