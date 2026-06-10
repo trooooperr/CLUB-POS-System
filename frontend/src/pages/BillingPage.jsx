@@ -636,7 +636,7 @@ export default function BillingPage() {
         <style>
           @page { size: 80mm auto; margin: 4mm; }
           body { font-family: monospace; width: 72mm; margin: 0; padding: 0; font-size: 12px; }
-          .header { text-align: center; font-weight: bold; margin-bottom: 6px; font-size: 14px; }
+          .header { text-align: center; font-weight: bold; margin-bottom: 6px; font-size: 11px; }
           .sub { text-align: center; font-size: 11px; margin-bottom: 4px; }
           .divider { border-top: 1px dashed #000; margin: 5px 0; }
           .item { display: flex; justify-content: space-between; margin: 3px 0; }
@@ -685,7 +685,7 @@ export default function BillingPage() {
           <style>
             @page { size: 80mm auto; margin: 4mm; }
             body { font-family: monospace; width: 72mm; margin: 0; padding: 0; font-size: 12px; }
-            .header { text-align: center; font-weight: bold; margin-bottom: 6px; font-size: 14px; }
+            .header { text-align: center; font-weight: bold; margin-bottom: 6px; font-size: 11px; }
             .subheader { text-align: center; font-size: 11px; margin-bottom: 8px; }
             .divider { border-top: 1px solid #000; margin: 5px 0; }
             .item { display: flex; justify-content: space-between; margin: 3px 0; }
