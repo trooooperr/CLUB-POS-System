@@ -593,7 +593,13 @@ export default function BillingPage() {
         setTimeout(() => {
           iframe.contentWindow.focus();
           iframe.contentWindow.print();
-          document.body.removeChild(iframe);
+          
+          // Wait for the print dialog to finish/close before removing the iframe
+          iframe.contentWindow.addEventListener('afterprint', () => {
+            if (document.body.contains(iframe)) {
+              document.body.removeChild(iframe);
+            }
+          });
         }, 500);
       } catch (printErr) {
         console.error('Browser print failed:', printErr);
