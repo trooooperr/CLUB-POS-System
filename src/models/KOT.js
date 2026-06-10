@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 
 const kotSchema = new mongoose.Schema({
-  kotNo:        { type: String, required: true, unique: true, index: true },
+  kotNo:        { type: String, required: true, index: true },
   orderId:      { type: mongoose.Schema.Types.ObjectId, ref: 'Order', required: true, index: true },
   tableNo:      { type: Number, required: true, index: true },
   items:        [{
