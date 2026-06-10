@@ -2579,27 +2579,29 @@ input:checked + .slider:before {
 
   .date-field {
     min-width: 0;
-    height: 32px;
-    padding: 0 6px;
-    gap: 4px;
-    border-radius: 6px;
+    height: 38px;
+    padding: 0 4px;
+    gap: 2px;
+    border-radius: 8px;
   }
 
   .date-field-label {
-    font-size: 9px;
+    font-size: 10px;
     margin-bottom: 1px;
   }
 
   .date-group-unified input,
   .unified-date-input {
-    height: 28px;
-    font-size: 10px;
+    height: 100% !important;
+    font-size: 12px !important;
     padding: 2px 4px;
+    min-width: 0;
   }
 
   .calendar-trigger {
     width: 22px;
     height: 22px;
+    flex-shrink: 0;
   }
 
   .clear-filter-btn {
@@ -2706,13 +2708,13 @@ input:checked + .slider:before {
 @media (max-width: 380px) {
 
   .date-field-label {
-    font-size: 8px;
+    font-size: 10px;
   }
 
   .date-group-unified input,
   .unified-date-input {
-    font-size: 9px;
-    height: 26px;
+    font-size: 13px !important;
+    height: 100% !important;
   }
 
   .clear-filter-btn {
@@ -4536,7 +4538,7 @@ textarea,
   background: var(--s2);
   border-radius: 6px;
   border: 1px solid var(--b1);
-  padding: 8px;
+  padding: 4px;
 }
 
 .s-row {
@@ -4547,11 +4549,11 @@ textarea,
 }
 
 .total-big {
-  font-size: 18px; /* increased from 16px */
+  font-size: 15px; 
   font-weight: 900;
   color: var(--a);
   border-top: 1px dashed var(--b1);
-  padding-top: 6px;
+  padding-top: 3px;
 }
 
 /* ================= PAYMENT ================= */
@@ -5999,5 +6001,36 @@ textarea,
   .category-input-row {
     flex-direction: column;
     align-items: stretch;
+  }
+}
+
+@media (max-width: 640px) {
+  /* Remove nominal padding on all pages */
+  .page-inner > .fi {
+    padding: 0px !important;
+  }
+  
+  .card {
+    padding: 8px !important;
+  }
+
+  /* Table picker page */
+  .table-picker-page {
+    padding: 6px !important;
+  }
+
+  /* Inside table picker zones */
+  .tp-zone.zone-vip {
+    padding: 8px !important;
+  }
+  
+  /* Billing Menu Side */
+  .menu-side {
+    padding: 0 4px !important;
+    padding-bottom: 80px !important;
+  }
+  
+  .bill-scroll-content {
+    padding: 0px !important;
   }
 }

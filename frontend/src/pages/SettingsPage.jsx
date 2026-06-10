@@ -366,10 +366,6 @@ export default function SettingsPage() {
                 <span>Orders</span>
                 <strong>{summary.ordersCount || 0}</strong>
               </div>
-              <div className="settings-kpi">
-                <span>Dues</span>
-                <strong>{c}{summary.due?.toFixed(0) || 0}</strong>
-              </div>
             </div>
           )}
 
@@ -384,10 +380,7 @@ export default function SettingsPage() {
             </div>
           </div>
           <div className="settings-actions">
-            <button className="btn btn-ghost" onClick={handleSaveEmail}>Save Email</button>
-            <div style={{color: '#525870', fontSize: '13px', marginLeft: '10px'}}>
-              ✨ Daily report is automated
-            </div>
+            <button className="btn btn-primary settings-grid-action" onClick={handleSaveEmail}>Save Email</button>
           </div>
         </section>
 

@@ -290,7 +290,6 @@ ${s.thankYouMsg}
                   <div className="grand-value">{s.currency}{o.grandTotal.toFixed(2)}</div>
                 </div>
 
-                <div className="sum-row paid-row"><span>Amount Paid</span><span>{s.currency}{(o.paidAmount || o.grandTotal).toFixed(2)}</span></div>
                 {o.dueAmount > 0 && <div className="sum-row due-row"><span>DUE AMOUNT</span><span>{s.currency}{o.dueAmount.toFixed(2)}</span></div>}
               </div>
 
@@ -359,28 +358,29 @@ ${s.thankYouMsg}
         .meta-item strong { color: #334155; }
         .full-row { grid-column: span 2; }
 
-        .bill-items-table { width: 100%; border-collapse: collapse; margin: 6px 0; font-size: 11px; }
-        .bill-items-table th { border-bottom: 1px solid #475569; padding-bottom: 3px; font-size: 10px; color: #64748b; font-weight: 900; }
-        .bill-items-table td { padding: 4px 0; color: #334155; }
+        .bill-items-table { width: 100%; border-collapse: collapse; margin: 4px 0; font-size: 11px; }
+        .bill-items-table th { border-bottom: 1px solid #475569; padding-bottom: 2px; font-size: 10px; color: #64748b; font-weight: 900; }
+        .bill-items-table td { padding: 1px 0; color: #334155; }
         .item-name-bold { font-weight: 700; text-transform: uppercase; }
 
-        .bill-summary-stack { display: flex; flex-direction: column; gap: 3px; }
+        .bill-summary-stack { display: flex; flex-direction: column; gap: 1px; }
         .sum-row { display: flex; justify-content: space-between; font-size: 11px; color: #475569; margin-bottom: 1px; }
         .discount { color: #dc2626; font-weight: bold; }
         
         .grand-total-box { 
-          margin: 6px 0; padding: 6px 10px; background: #f8fafc; border-radius: 6px; text-align: center;
+          display: flex; justify-content: space-between; align-items: center;
+          margin: 2px 0; padding: 4px 6px; background: #f8fafc; border-radius: 4px; 
           border: 1px solid #e2e8f0;
         }
-        .grand-label { font-size: 9px; font-weight: 800; color: #64748b; letter-spacing: 0.5px; }
-        .grand-value { font-size: 18px; font-weight: 900; color: #0f172a; }
+        .grand-label { font-size: 11px; font-weight: 800; color: #64748b; letter-spacing: 0.2px; }
+        .grand-value { font-size: 14px; font-weight: 900; color: #0f172a; }
         
         .due-row { color: #dc2626; font-weight: 900; font-size: 12px; margin-top: 2px; }
         .paid-row { border-top: 1px dashed #e2e8f0; padding-top: 4px; margin-top: 2px; }
-        .bill-footer-note { text-align: center; font-size: 10px; margin-top: 8px; color: #94a3b8; font-weight: bold; text-transform: uppercase; }
+        .bill-footer-note { text-align: center; font-size: 9px; margin-top: 4px; color: #94a3b8; font-weight: bold; text-transform: uppercase; }
 
         /* Share Control Styling */
-        .share-section-card { background: #161b22; border-radius: 14px; padding: 10px; border: 1px solid #232830; }
+        .share-section-card { background: #161b22; border-radius: 14px; padding: 8px; border: 1px solid #232830; }
         .share-header { font-size: 9px; font-weight: 900; color: #4b5563; margin-bottom: 8px; letter-spacing: 0.5px; display: flex; align-items: center; gap: 6px; }
         
         .tab-segment-control { display: flex; background: #0d1117; padding: 3px; border-radius: 8px; margin-bottom: 8px; }
