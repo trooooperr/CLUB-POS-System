@@ -1,4 +1,6 @@
 require('dotenv').config();
+const dns = require('dns');
+dns.setDefaultResultOrder('ipv4first'); // Force IPv4 globally to fix Render outbound email block
 
 // ── Validate critical env vars before anything else ──────────────
 const JWT_SECRET = process.env.JWT_SECRET;

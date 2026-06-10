@@ -116,14 +116,19 @@ export default function InvoiceModal() {
 
     const runBrowserPrint = () => {
       try {
-        const iframe = document.createElement('iframe');
-        iframe.style.position = 'fixed';
-        iframe.style.right = '0';
-        iframe.style.bottom = '0';
-        iframe.style.width = '0';
-        iframe.style.height = '0';
-        iframe.style.border = '0';
-        document.body.appendChild(iframe);
+        let iframe = document.getElementById('print-iframe-invoice');
+        if (!iframe) {
+          iframe = document.createElement('iframe');
+          iframe.id = 'print-iframe-invoice';
+          iframe.style.position = 'fixed';
+          iframe.style.right = '0';
+          iframe.style.bottom = '0';
+          iframe.style.width = '1px';
+          iframe.style.height = '1px';
+          iframe.style.opacity = '0';
+          iframe.style.pointerEvents = 'none';
+          document.body.appendChild(iframe);
+        }
         
         const doc = iframe.contentDocument || iframe.contentWindow.document;
         doc.open();
@@ -134,7 +139,6 @@ export default function InvoiceModal() {
         setTimeout(() => {
           iframe.contentWindow.focus();
           iframe.contentWindow.print();
-          document.body.removeChild(iframe);
         }, 500);
       } catch (printErr) {
         console.error('Browser print failed:', printErr);
