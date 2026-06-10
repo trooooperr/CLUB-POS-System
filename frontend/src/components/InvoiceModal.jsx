@@ -60,7 +60,7 @@ export default function InvoiceModal() {
             .footer-msg { font-size: 10px; margin-top: 15px; font-weight: bold; font-style: italic; }
           </style>
         </head>
-        <body onload="window.print(); window.close();">
+        <body>
           <div class="center">
             <div class="brand">${s.restaurantName}</div>
             <div class="address">${s.address}<br>GSTIN: ${s.gstin}</div>
