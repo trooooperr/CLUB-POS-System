@@ -5,7 +5,7 @@ const { getCache, setCache, deleteCache } = require('../lib/redis');
 const { requireRole } = require('../middleware/auth');
 
 const SETTINGS_CACHE_KEY = 'settings:current';
-const FIXED_SENDER_EMAIL = process.env.GMAIL_SENDER || '2k23.cs2312451@gmail.com';
+const FIXED_SENDER_EMAIL = process.env.GMAIL_SENDER || 'cafeteriahumtum@gmail.com';
 
 const DEFAULTS = {
   senderEmail: FIXED_SENDER_EMAIL,

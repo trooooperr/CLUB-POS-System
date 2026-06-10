@@ -679,39 +679,83 @@ export default function BillingPage() {
   };
 
   const printBillDocument = (tableNo, table, total, waiterName = '') => {
+    // Generate bill number similar to InvoiceModal
+    const tempBillNo = 'HTB-' + String(Date.now()).slice(-5);
+    
     const html = `
       <html>
         <head>
           <title>${settings.barPrinterName || 'BAR'} BILL</title>
           <style>
-            @page { size: 80mm auto; margin: 4mm; }
-            body { font-family: monospace; width: 72mm; margin: 0; padding: 0; font-size: 12px; }
-            .header { text-align: center; font-weight: bold; margin-bottom: 6px; font-size: 11px; }
-            .subheader { text-align: center; font-size: 11px; margin-bottom: 8px; }
-            .divider { border-top: 1px solid #000; margin: 5px 0; }
-            .item { display: flex; justify-content: space-between; margin: 3px 0; }
-            .total-line { display: flex; justify-content: space-between; font-weight: bold; font-size: 13px; margin: 5px 0; }
-            .footer { text-align: center; font-size: 10px; margin-top: 10px; }
+            @page { size: 80mm auto; margin: 2mm; }
+            body { font-family: 'Courier New', Courier, monospace; width: 74mm; margin: 0; padding: 0; font-size: 11px; color: #000; line-height: 1.2; }
+            .center { text-align: center; }
+            .brand { font-size: 16px; font-weight: 900; margin-bottom: 2px; text-transform: uppercase; }
+            .address { font-size: 10px; margin-bottom: 6px; line-height: 1.2; }
+            .dash-line { border-top: 1px dashed #000; margin: 6px 0; }
+            .thick-line { border-top: 2px solid #000; margin: 4px 0; }
+            .row { display: flex; justify-content: space-between; margin-bottom: 2px; font-size: 10px; }
+            .item-header { font-size: 10px; font-weight: 900; display: flex; margin-bottom: 4px; border-bottom: 1px solid #000; padding-bottom: 2px; }
+            .item-row { display: flex; margin-bottom: 3px; align-items: flex-start; font-size: 10px; }
+            .col-name { flex: 1; padding-right: 4px; text-transform: uppercase; }
+            .col-qty { width: 30px; text-align: center; }
+            .col-amt { width: 55px; text-align: right; font-weight: bold; }
+            .footer-msg { font-size: 10px; margin-top: 10px; font-weight: bold; font-style: italic; }
+            .qr-code { width: 70px; height: 70px; margin: 8px auto 2px; display: block; }
           </style>
         </head>
         <body>
-          <div class="header">${settings.restaurantName}</div>
-          <div class="subheader">BILL — Table T${tableNo}</div>
-          <div style="font-size:10px;text-align:center;">Date: ${new Date().toLocaleDateString()} &nbsp; ${new Date().toLocaleTimeString()}</div>
-          ${waiterName ? `<div style="font-size:10px;text-align:center;margin-top:2px;">Waiter: ${waiterName.toUpperCase()}</div>` : ''}
-          <div class="divider"></div>
-          ${table.items.map(i => `<div class="item"><span>${i.quantity}x ${i.name}</span><span>${(i.price * i.quantity).toFixed(0)}</span></div>`).join('')}
-          <div class="divider"></div>
-          <div class="item"><span>Subtotal</span><span>${subtotal.toFixed(0)}</span></div>
-          <div class="item"><span>Tax (SGST+CGST)</span><span>${(sgst + cgst).toFixed(0)}</span></div>
-          ${discountAmount > 0 ? `<div class="item"><span>Discount</span><span>-${discountAmount.toFixed(0)}</span></div>` : ''}
-          ${roundOff !== 0 ? `<div class="item" style="font-size:10px;"><span>Round Off</span><span>${roundOff > 0 ? '+' : ''}${roundOff.toFixed(2)}</span></div>` : ''}
-          <div class="divider"></div>
-          <div class="total-line"><span>TOTAL</span><span>${total.toFixed(0)}</span></div>
-          <div class="divider"></div>
-          <div class="footer">
-            <p>${settings.thankYouMsg || 'Thank you for your visit!'}</p>
-            <p>${settings.phone || ''}</p>
+          <div class="center">
+            <div class="brand">${settings.restaurantName || 'HUMTUM'}</div>
+            ${settings.address ? `<div class="address">${settings.address}</div>` : ''}
+            ${settings.gstin ? `<div class="address" style="margin-top:-4px">GSTIN: ${settings.gstin}</div>` : ''}
+          </div>
+
+          <div class="dash-line"></div>
+
+          <div class="row"><span>BILL: ${tempBillNo}</span><span>TABLE: ${tableNo}</span></div>
+          <div class="row">DATE: ${new Date().toLocaleString('en-IN')}</div>
+          ${waiterName ? `<div class="row">WAITER: ${waiterName.toUpperCase()}</div>` : ''}
+
+          <div class="dash-line"></div>
+
+          <div class="item-header">
+            <span class="col-name">ITEM</span>
+            <span class="col-qty">QTY</span>
+            <span class="col-amt">AMT</span>
+          </div>
+
+          ${table.items.map(i => `
+            <div class="item-row">
+              <span class="col-name">${i.name}</span>
+              <span class="col-qty">${i.quantity}</span>
+              <span class="col-amt">${(i.price * i.quantity).toFixed(0)}</span>
+            </div>
+          `).join('')}
+
+          <div class="dash-line"></div>
+
+          <div class="row"><span>Subtotal</span><span>${subtotal.toFixed(2)}</span></div>
+          ${(sgst + cgst) > 0 ? `<div class="row"><span>Taxes</span><span>${(sgst + cgst).toFixed(2)}</span></div>` : ''}
+          ${discountAmount > 0 ? `<div class="row"><span>Discount</span><span>-${discountAmount.toFixed(2)}</span></div>` : ''}
+          ${roundOff !== 0 ? `<div class="row"><span>Round Off</span><span>${roundOff > 0 ? '+' : ''}${roundOff.toFixed(2)}</span></div>` : ''}
+
+          <div class="thick-line"></div>
+          
+          <div class="row" style="font-size: 14px; font-weight: 900; margin: 4px 0;">
+            <span>TOTAL PAYABLE</span>
+            <span>Rs. ${total.toFixed(0)}</span>
+          </div>
+
+          <div class="thick-line"></div>
+
+          <div class="center">
+            <!-- Dummy QR Code image: replace URL with real payment integration later -->
+            <img class="qr-code" src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=upi://pay?pa=dummy@upi&pn=HUMTUM&am=${total.toFixed(0)}" alt="QR Code" />
+            <div style="font-size: 9px; margin-top: 2px;">SCAN TO PAY</div>
+            
+            <div class="footer-msg">${settings.thankYouMsg || 'THANK YOU FOR VISITING!'}</div>
+            ${settings.phone ? `<div style="font-size: 9px; margin-top: 4px;">Ph: ${settings.phone}</div>` : ''}
           </div>
         </body>
       </html>
