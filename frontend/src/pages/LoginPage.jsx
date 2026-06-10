@@ -231,7 +231,7 @@ export default function LoginPage() {
         <div className="llogo">
           <img src="/favicon.ico" alt="Logo" className="llogo-img" />
           <div className="ltitle">{settings.restaurantName || 'HumTum'}</div>
-          <div className="lsub">THE BAR &amp; RESTAURANT · POS</div>
+          <div className="lsub">POINT OF SALE</div>
         </div>
 
         {/* Form */}

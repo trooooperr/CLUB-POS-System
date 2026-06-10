@@ -1412,17 +1412,7 @@ input:checked + .slider:before {
   z-index: 0;
 }
 
-/* glowing accent line top */
-.lpage::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 15%;
-  right: 15%;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(245,158,11,0.4), transparent);
-  z-index: 1;
-}
+/* top glow removed per user request */
 
 .lcard {
   position: relative;
@@ -1432,7 +1422,7 @@ input:checked + .slider:before {
   background: rgba(10, 14, 20, 0.82);
   border: 1px solid rgba(255, 255, 255, 0.07);
   border-radius: 20px;
-  padding: 48px;
+  padding: 48px !important;
   box-shadow:
     0 0 0 1px rgba(245,158,11,0.06),
     0 8px 32px rgba(0,0,0,0.5),
@@ -1463,13 +1453,6 @@ input:checked + .slider:before {
   border-radius: 50%;
   border: 2px solid rgba(245, 158, 11, 0.45);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
-  filter: drop-shadow(0 4px 16px rgba(245,158,11,0.35));
-  animation: logoPulse 3s ease-in-out infinite;
-}
-
-@keyframes logoPulse {
-  0%, 100% { filter: drop-shadow(0 4px 16px rgba(245,158,11,0.35)); }
-  50%       { filter: drop-shadow(0 4px 24px rgba(245,158,11,0.55)); }
 }
 
 .ltitle {
@@ -1545,7 +1528,7 @@ input:checked + .slider:before {
 }
 
 .lcard input::placeholder {
-  color: rgba(255, 255, 255, 0.22) !important;
+  color: rgba(255, 255, 255, 0.45) !important;
   font-weight: 400 !important;
 }
 
@@ -1574,15 +1557,18 @@ input:checked + .slider:before {
 /* copyright line */
 .lcard > p {
   font-size: 10px !important;
-  color: #1f2937 !important;
+  color: rgba(255, 255, 255, 0.5) !important;
   letter-spacing: 0.05em !important;
 }
 
 /* responsive */
 @media (max-width: 480px) {
+  .lpage { padding: 16px; }
   .lcard {
-    padding: 40px 32px 36px;
-    border-radius: 18px;
+    padding: 32px 24px !important;
+    border-radius: 16px;
+    width: calc(100% - 32px);
+    margin: 0 auto;
   }
   .ltitle {
     font-size: 22px;
@@ -2174,6 +2160,9 @@ input:checked + .slider:before {
 @media (max-width: 640px) {
   .main {
     padding: 12px;
+  }
+  .main.full-page-section {
+    padding: 0px !important;
   }
   .ph-title {
     font-size: 22px;
@@ -6006,7 +5995,7 @@ textarea,
 
 @media (max-width: 640px) {
   /* Remove nominal padding on all pages */
-  .page-inner > .fi {
+  .page-inner > .fi:not(.lcard) {
     padding: 0px !important;
   }
   
