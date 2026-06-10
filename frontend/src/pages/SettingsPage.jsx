@@ -275,27 +275,25 @@ export default function SettingsPage() {
           </div>
         </section>
 
-        <section className="settings-card">
+        <section className="settings-card settings-full">
           <div className="settings-card-head">
             <div>
               <h2>Printing</h2>
               <p>Configure local receipt and KOT routing via QZ Tray.</p>
             </div>
           </div>
-          <div className="settings-fields">
-            <div className="settings-printing-row">
-              <label className="settings-toggle">
-                <input type="checkbox" checked={!!form.qzTrayEnabled} onChange={e => set('qzTrayEnabled', e.target.checked)} />
-                <span>Use QZ Tray for Local Printing</span>
-              </label>
-              <div className="settings-field">
-                <label>Kitchen Printer (System Name)</label>
-                <input value={form.kitchenPrinterName || ''} onChange={e => set('kitchenPrinterName', e.target.value)} placeholder="e.g. KITCHEN_PRINTER" />
-              </div>
-              <div className="settings-field">
-                <label>Bar & Bill Printer (System Name)</label>
-                <input value={form.barPrinterName || ''} onChange={e => set('barPrinterName', e.target.value)} placeholder="e.g. BAR_PRINTER" />
-              </div>
+          <div className="settings-printing-row" style={{ marginTop: '14px' }}>
+            <label className="settings-toggle" style={{ margin: 0 }}>
+              <input type="checkbox" checked={!!form.qzTrayEnabled} onChange={e => set('qzTrayEnabled', e.target.checked)} />
+              <span>Use QZ Tray for Local Printing</span>
+            </label>
+            <div className="settings-field" style={{ flex: 1, minWidth: '200px' }}>
+              <label>Kitchen Printer (System Name)</label>
+              <input value={form.kitchenPrinterName || ''} onChange={e => set('kitchenPrinterName', e.target.value)} placeholder="e.g. KITCHEN_PRINTER" />
+            </div>
+            <div className="settings-field" style={{ flex: 1, minWidth: '200px' }}>
+              <label>Bar & Bill Printer (System Name)</label>
+              <input value={form.barPrinterName || ''} onChange={e => set('barPrinterName', e.target.value)} placeholder="e.g. BAR_PRINTER" />
             </div>
           </div>
         </section>
