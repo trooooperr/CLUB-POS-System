@@ -79,12 +79,12 @@ function saveTableBills(bills) {
 async function safeFetch(url) {
   try {
     const res = await authFetch(url);
-    if (!res.ok) { console.error(`API ${res.status}: ${url}`); return []; }
+    if (!res.ok) { console.log(`API ${res.status}: ${url}`); return null; }
     const data = await res.json();
-    return Array.isArray(data) ? data : [];
+    return data;
   } catch (err) {
-    console.error(`Fetch failed: ${url}`, err.message);
-    return [];
+    console.warn(`Fetch failed: ${url}`, err.message);
+    return null;
   }
 }
 
@@ -341,20 +341,22 @@ export function AppProvider({ children }) {
         safeFetch(apiUrl('/api/orders/sessions/active')),
       ]);
 
-      if (results[0].status === 'fulfilled') {
+      if (results[0].status === 'fulfilled' && Array.isArray(results[0].value)) {
         setMenuItems(results[0].value);
       }
-      if (results[1].status === 'fulfilled') setOrderHistory([...results[1].value].sort((a,b)=>new Date(b.date)-new Date(a.date)));
-      if (results[2].status === 'fulfilled') {
+      if (results[1].status === 'fulfilled' && Array.isArray(results[1].value)) {
+        setOrderHistory([...results[1].value].sort((a,b)=>new Date(b.date)-new Date(a.date)));
+      }
+      if (results[2].status === 'fulfilled' && Array.isArray(results[2].value)) {
         setWorkers(results[2].value);
       }
-      if (results[3].status === 'fulfilled') {
+      if (results[3].status === 'fulfilled' && Array.isArray(results[3].value)) {
         setInventory(results[3].value);
       }
       if (results[4].status === 'fulfilled' && results[4].value && !Array.isArray(results[4].value)) {
         setSettings(results[4].value);
       }
-      if (results[5].status === 'fulfilled') {
+      if (results[5].status === 'fulfilled' && Array.isArray(results[5].value)) {
         setActiveSessions(results[5].value);
       }
 
