@@ -575,14 +575,18 @@ export default function BillingPage() {
   const firePrint = async (html, documentType = 'document', printerName = '') => {
     const runBrowserPrint = () => {
       try {
-        const iframe = document.createElement('iframe');
-        iframe.style.position = 'fixed';
-        iframe.style.right = '0';
-        iframe.style.bottom = '0';
-        iframe.style.width = '0';
-        iframe.style.height = '0';
-        iframe.style.border = '0';
-        document.body.appendChild(iframe);
+        let iframe = document.getElementById('print-iframe');
+        if (!iframe) {
+          iframe = document.createElement('iframe');
+          iframe.id = 'print-iframe';
+          iframe.style.position = 'fixed';
+          iframe.style.right = '0';
+          iframe.style.bottom = '0';
+          iframe.style.width = '0';
+          iframe.style.height = '0';
+          iframe.style.border = '0';
+          document.body.appendChild(iframe);
+        }
         
         const doc = iframe.contentDocument || iframe.contentWindow.document;
         doc.open();
@@ -593,13 +597,6 @@ export default function BillingPage() {
         setTimeout(() => {
           iframe.contentWindow.focus();
           iframe.contentWindow.print();
-          
-          // Wait for the print dialog to finish/close before removing the iframe
-          iframe.contentWindow.addEventListener('afterprint', () => {
-            if (document.body.contains(iframe)) {
-              document.body.removeChild(iframe);
-            }
-          });
         }, 500);
       } catch (printErr) {
         console.error('Browser print failed:', printErr);
