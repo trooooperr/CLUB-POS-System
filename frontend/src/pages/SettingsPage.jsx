@@ -385,11 +385,10 @@ export default function SettingsPage() {
           </div>
           <div className="settings-actions">
             <button className="btn btn-ghost" onClick={handleSaveEmail}>Save Email</button>
-            <button className="btn btn-primary" onClick={handleSendReport} disabled={sending}>
-              {sending ? 'Sending...' : <><Send size={14} />Send Report</>}
-            </button>
+            <div style={{color: '#525870', fontSize: '13px', marginLeft: '10px'}}>
+              ✨ Daily report is automated
+            </div>
           </div>
-          {sendResult && <div className={`settings-result ${sendResult.ok ? 'ok' : 'bad'}`}>{sendResult.msg}</div>}
         </section>
 
         <section className="settings-card settings-full settings-security-card">
