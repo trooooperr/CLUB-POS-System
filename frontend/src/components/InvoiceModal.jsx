@@ -163,9 +163,9 @@ export default function InvoiceModal() {
         showToast(`Print sent to ${targetPrinter || 'default'} via QZ Tray`, 'success');
         return;
       } catch (err) {
-        console.error('QZ Tray print failed:', err);
-        showToast('QZ Tray Error: ' + (err.message || err), 'error');
-        return; // Don't fall back if QZ Tray fails
+        showToast('QZ Tray disconnected, falling back to browser print...', 'error');
+        runBrowserPrint();
+        return;
       }
     }
 

@@ -623,7 +623,7 @@ export default function BillingPage() {
         return;
       } catch (err) {
         console.error('QZ Tray print failed:', err);
-        showToast('QZ Tray Error: ' + (err.message || err), 'error');
+        showToast('QZ Tray disconnected, falling back to browser print...', 'error');
         runBrowserPrint();
         return;
       }
