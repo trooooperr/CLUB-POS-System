@@ -31,7 +31,7 @@ const { seedDefaultUsers }       = require('./src/routes/auth');
 const { sendDailyReportInternal } = require('./src/routes/reports');
 
 const PORT        = Number(process.env.PORT || 3000);
-const REPORT_TIME = process.env.REPORT_CRON || '55 23 * * *';
+const REPORT_TIME = process.env.REPORT_CRON || '0 5 * * *';
 
 // ── HTTP Server + Socket.IO ──────────────────────────────────────
 const server = http.createServer(app);

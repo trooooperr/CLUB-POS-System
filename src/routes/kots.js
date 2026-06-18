@@ -243,10 +243,8 @@ router.patch('/:id/print', async (req, res) => {
 // ── GET KITCHEN DISPLAY (Full KOT History for Today) ─────────────
 router.get('/kitchen/display', async (req, res) => {
   try {
-    const now = new Date();
-    const start = new Date(now);
-    if (start.getHours() < 10) start.setDate(start.getDate() - 1);
-    start.setHours(10, 0, 0, 0);
+    const { getBusinessDayBoundary } = require('../lib/businessDay');
+    const start = getBusinessDayBoundary();
 
     const kots = await KOT.find({ createdAt: { $gte: start } })
       .sort({ createdAt: -1 })

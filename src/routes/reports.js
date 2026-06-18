@@ -147,7 +147,7 @@ function buildReportHTML({ date, orders, settings, inventory }) {
   <div class="section">
     <h3>📋 Today's Orders (${orders.length})</h3>
     <table><thead><tr><th>Bill No</th><th>Table</th><th>Amount</th><th>Mode</th></tr></thead><tbody>
-      ${orders.slice(0,15).map(o=>`<tr><td style="font-family:monospace">HTG-${o.billNo}</td><td>T${o.tableNo}</td><td style="font-family:monospace">${settings.currency||'₹'}${o.grandTotal.toFixed(2)}</td><td>${o.paymentMode?.toUpperCase()}</td></tr>`).join('')}
+      ${orders.slice(0,15).map(o=>`<tr><td style="font-family:monospace">${o.billNo}</td><td>T${o.tableNo}</td><td style="font-family:monospace">${settings.currency||'₹'}${o.grandTotal.toFixed(2)}</td><td>${o.paymentMode?.toUpperCase()}</td></tr>`).join('')}
       ${orders.length>15?`<tr><td colspan="4" style="text-align:center;color:#525870">+${orders.length-15} more orders</td></tr>`:''}
     </tbody></table>
   </div>
