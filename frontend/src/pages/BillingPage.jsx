@@ -588,6 +588,31 @@ export default function BillingPage() {
         table.customerPhone || ''
       );
 
+      // Pre-load dynamic UPI QR code image into browser cache before printing to guarantee it renders
+      try {
+        const upiId = settings.upiId || 'dummy@upi';
+        const merchantName = settings.restaurantName || 'HUMTUM';
+        const includeAmount = settings.includeUpiAmount !== false;
+        const upiUrl = `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(merchantName)}${includeAmount ? `&am=${grandTotal.toFixed(0)}` : ''}&cu=INR`;
+        const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(upiUrl)}`;
+        
+        await new Promise((resolve) => {
+          const img = new Image();
+          const timer = setTimeout(() => resolve(), 3000);
+          img.onload = () => {
+            clearTimeout(timer);
+            resolve();
+          };
+          img.onerror = () => {
+            clearTimeout(timer);
+            resolve();
+          };
+          img.src = qrCodeUrl;
+        });
+      } catch (e) {
+        console.error('QR pre-load error:', e);
+      }
+
       // Print bill
       printBillDocument(tableNo, { items: combinedItems.all }, grandTotal, selectedWaiterObj?.name || '', finalizedOrder?.billNo);
 
@@ -636,7 +661,7 @@ export default function BillingPage() {
         setTimeout(() => {
           iframe.contentWindow.focus();
           iframe.contentWindow.print();
-        }, 500);
+        }, 1000);
       } catch (printErr) {
         console.error('Browser print failed:', printErr);
         showToast('Browser printing failed', 'error');
@@ -725,7 +750,8 @@ export default function BillingPage() {
     // Generate dynamic UPI Payment QR Code
     const upiId = settings.upiId || 'dummy@upi';
     const merchantName = settings.restaurantName || 'HUMTUM';
-    const upiUrl = `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(merchantName)}&am=${total.toFixed(0)}&cu=INR`;
+    const includeAmount = settings.includeUpiAmount !== false;
+    const upiUrl = `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(merchantName)}${includeAmount ? `&am=${total.toFixed(0)}` : ''}&cu=INR`;
     const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(upiUrl)}`;
 
     const html = `

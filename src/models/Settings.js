@@ -15,6 +15,7 @@ const settingsSchema = new mongoose.Schema({
   kitchenPrinterName: { type: String, default: '' },
   barPrinterName: { type: String, default: '' },
   upiId:          { type: String, default: '' },
+  includeUpiAmount: { type: Boolean, default: true },
   adminEmail:     { type: String, default: '' },
   senderEmail:    { type: String, default: '' },
   senderPassword: { type: String, default: '' },

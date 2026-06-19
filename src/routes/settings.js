@@ -71,6 +71,7 @@ function normalizeSettings(data) {
     kitchenPrinterName: data.kitchenPrinterName || '',
     barPrinterName: data.barPrinterName || '',
     upiId: data.upiId || '',
+    includeUpiAmount: data.includeUpiAmount !== false,
     inventoryCategories: cleanCategoryList(data.inventoryCategories) || [],
     menuCategories: cleanCategoryList(data.menuCategories) || [],
     senderEmail: FIXED_SENDER_EMAIL,
@@ -175,6 +176,7 @@ router.put('/', requireRole('admin'), async (req, res) => {
   if (req.body.kitchenPrinterName !== undefined) settings.kitchenPrinterName = cleanString(req.body.kitchenPrinterName);
   if (req.body.barPrinterName !== undefined) settings.barPrinterName = cleanString(req.body.barPrinterName);
   if (req.body.upiId !== undefined) settings.upiId = cleanString(req.body.upiId);
+  if (req.body.includeUpiAmount !== undefined) settings.includeUpiAmount = !!req.body.includeUpiAmount;
   if (req.body.adminEmail !== undefined) settings.adminEmail = cleanString(req.body.adminEmail).toLowerCase();
 
   const inventoryCategories = cleanCategoryList(req.body.inventoryCategories);

@@ -273,6 +273,10 @@ export default function SettingsPage() {
               <input value={form.upiId || ''} onChange={e => set('upiId', e.target.value)} placeholder="e.g. restaurant@upi" />
             </div>
             <label className="settings-toggle">
+              <input type="checkbox" checked={form.includeUpiAmount !== false} onChange={e => set('includeUpiAmount', e.target.checked)} />
+              <span>Include total bill amount in QR code</span>
+            </label>
+            <label className="settings-toggle">
               <input type="checkbox" checked={!!form.darkMode} onChange={e => set('darkMode', e.target.checked)} />
               <span>Use dark mode by default</span>
             </label>
