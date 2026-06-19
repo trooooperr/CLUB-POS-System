@@ -833,12 +833,11 @@ export default function BillingPage() {
             <div style="font-size: 13px; font-weight: bold; margin-bottom: 4px;">SCAN TO PAY BILL</div>
             <!-- Dynamic QR Code generated from UPI settings -->
             <img class="qr-code" src="${qrCodeUrl}" alt="QR Code" />
-            <div style="font-size: 11px; margin-top: 2px; font-weight: bold;">Amount: Rs. ${total.toFixed(0)}</div>
             
             ${waiterTipQrUrl ? `
               <div class="dash-line" style="margin: 12px 0 8px 0;"></div>
               <div style="font-size: 13px; font-weight: bold; margin-bottom: 2px;">TIP YOUR WAITER</div>
-              <div style="font-size: 11px; color: #555; margin-bottom: 4px;">Scan to Tip ${selectedWaiterObj.name.toUpperCase()} directly</div>
+              <div style="font-size: 11px; font-weight: bold; color: #555; margin-bottom: 4px;">Scan to Tip ${selectedWaiterObj.name.toUpperCase()} directly</div>
               <img class="qr-code" style="width: 100px; height: 100px; margin: 4px auto 2px; display: block;" src="${waiterTipQrUrl}" alt="Tip QR Code" />
             ` : ''}
 
