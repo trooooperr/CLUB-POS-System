@@ -70,6 +70,7 @@ function normalizeSettings(data) {
     qzTrayEnabled: !!data.qzTrayEnabled,
     kitchenPrinterName: data.kitchenPrinterName || '',
     barPrinterName: data.barPrinterName || '',
+    upiId: data.upiId || '',
     inventoryCategories: cleanCategoryList(data.inventoryCategories) || [],
     menuCategories: cleanCategoryList(data.menuCategories) || [],
     senderEmail: FIXED_SENDER_EMAIL,
@@ -173,6 +174,7 @@ router.put('/', requireRole('admin'), async (req, res) => {
   if (req.body.qzTrayEnabled !== undefined) settings.qzTrayEnabled = !!req.body.qzTrayEnabled;
   if (req.body.kitchenPrinterName !== undefined) settings.kitchenPrinterName = cleanString(req.body.kitchenPrinterName);
   if (req.body.barPrinterName !== undefined) settings.barPrinterName = cleanString(req.body.barPrinterName);
+  if (req.body.upiId !== undefined) settings.upiId = cleanString(req.body.upiId);
   if (req.body.adminEmail !== undefined) settings.adminEmail = cleanString(req.body.adminEmail).toLowerCase();
 
   const inventoryCategories = cleanCategoryList(req.body.inventoryCategories);

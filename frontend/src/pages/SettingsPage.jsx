@@ -268,6 +268,10 @@ export default function SettingsPage() {
               <label>Thank You Message</label>
               <input value={form.thankYouMsg || ''} onChange={e => set('thankYouMsg', e.target.value)} placeholder="Thank you for visiting!" />
             </div>
+            <div className="settings-field settings-wide">
+              <label>UPI ID for QR Payments</label>
+              <input value={form.upiId || ''} onChange={e => set('upiId', e.target.value)} placeholder="e.g. restaurant@upi" />
+            </div>
             <label className="settings-toggle">
               <input type="checkbox" checked={!!form.darkMode} onChange={e => set('darkMode', e.target.checked)} />
               <span>Use dark mode by default</span>

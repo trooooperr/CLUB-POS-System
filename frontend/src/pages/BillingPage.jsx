@@ -722,6 +722,12 @@ export default function BillingPage() {
     // Generate bill number similar to InvoiceModal
     const tempBillNo = billNoOverride ? `HTB-${billNoOverride.split('-').pop()}` : ('HTB-' + String(Date.now()).slice(-5));
     
+    // Generate dynamic UPI Payment QR Code
+    const upiId = settings.upiId || 'dummy@upi';
+    const merchantName = settings.restaurantName || 'HUMTUM';
+    const upiUrl = `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(merchantName)}&am=${total.toFixed(0)}&cu=INR`;
+    const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(upiUrl)}`;
+
     const html = `
       <html>
         <head>
@@ -790,8 +796,8 @@ export default function BillingPage() {
           <div class="thick-line"></div>
 
           <div class="center">
-            <!-- Dummy QR Code image: replace URL with real payment integration later -->
-            <img class="qr-code" src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=upi://pay?pa=dummy@upi&pn=HUMTUM&am=${total.toFixed(0)}" alt="QR Code" />
+            <!-- Dynamic QR Code generated from UPI settings -->
+            <img class="qr-code" src="${qrCodeUrl}" alt="QR Code" />
             <div style="font-size: 11px; margin-top: 2px;">SCAN TO PAY</div>
             
             <div class="footer-msg">${settings.thankYouMsg || 'THANK YOU FOR VISITING!'}</div>

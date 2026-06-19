@@ -14,6 +14,7 @@ const settingsSchema = new mongoose.Schema({
   qzTrayEnabled:  { type: Boolean, default: false },
   kitchenPrinterName: { type: String, default: '' },
   barPrinterName: { type: String, default: '' },
+  upiId:          { type: String, default: '' },
   adminEmail:     { type: String, default: '' },
   senderEmail:    { type: String, default: '' },
   senderPassword: { type: String, default: '' },
