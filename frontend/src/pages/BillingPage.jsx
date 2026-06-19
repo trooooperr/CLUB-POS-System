@@ -307,6 +307,22 @@ export default function BillingPage() {
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
+  // Pre-load dynamic UPI QR code image in the background whenever totals change to prevent latency during printing
+  useEffect(() => {
+    if (!activeTableId || !grandTotal) return;
+    try {
+      const upiId = settings.upiId || 'dummy@upi';
+      const merchantName = settings.restaurantName || 'HUMTUM';
+      const includeAmount = settings.includeUpiAmount !== false;
+      const upiUrl = `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(merchantName)}${includeAmount ? `&am=${grandTotal.toFixed(0)}` : ''}&cu=INR`;
+      const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(upiUrl)}`;
+      const img = new Image();
+      img.src = qrCodeUrl;
+    } catch (e) {
+      console.error('Background QR pre-load error:', e);
+    }
+  }, [activeTableId, grandTotal, settings.upiId, settings.restaurantName, settings.includeUpiAmount]);
+
   useEffect(() => {
     if (!isResizing) return;
     const onMouseMove = (event) => {
@@ -564,11 +580,15 @@ export default function BillingPage() {
 
   // Print final bill
   const printFinalBill = async (paidAmount) => {
+    if (busy) return;
+    setBusy(true);
+
     try {
       const orderId = activeOrder || await ensureActiveOrder();
-      if (!orderId) return;
-
-      setBusy(true);
+      if (!orderId) {
+        setBusy(false);
+        return;
+      }
 
       const tableNo = parseInt(activeTableId.substring(1));
 
@@ -587,31 +607,6 @@ export default function BillingPage() {
         table.customerName || '',
         table.customerPhone || ''
       );
-
-      // Pre-load dynamic UPI QR code image into browser cache before printing to guarantee it renders
-      try {
-        const upiId = settings.upiId || 'dummy@upi';
-        const merchantName = settings.restaurantName || 'HUMTUM';
-        const includeAmount = settings.includeUpiAmount !== false;
-        const upiUrl = `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(merchantName)}${includeAmount ? `&am=${grandTotal.toFixed(0)}` : ''}&cu=INR`;
-        const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(upiUrl)}`;
-        
-        await new Promise((resolve) => {
-          const img = new Image();
-          const timer = setTimeout(() => resolve(), 3000);
-          img.onload = () => {
-            clearTimeout(timer);
-            resolve();
-          };
-          img.onerror = () => {
-            clearTimeout(timer);
-            resolve();
-          };
-          img.src = qrCodeUrl;
-        });
-      } catch (e) {
-        console.error('QR pre-load error:', e);
-      }
 
       // Print bill
       printBillDocument(tableNo, { items: combinedItems.all }, grandTotal, selectedWaiterObj?.name || '', finalizedOrder?.billNo);
@@ -835,6 +830,7 @@ export default function BillingPage() {
   };
 
   const doGen = async paid => {
+    if (busy) return;
     await printFinalBill(paid);
   };
 
