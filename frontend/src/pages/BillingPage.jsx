@@ -843,7 +843,7 @@ export default function BillingPage() {
       }
       if (e.defaultPrevented) return;
       const targetTag = document.activeElement?.tagName;
-      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(targetTag)) return;
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(targetTag) && !e.ctrlKey && !e.metaKey) return;
 
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
