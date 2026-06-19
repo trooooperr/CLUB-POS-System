@@ -62,6 +62,7 @@ function StockModal({ item, onClose, onSave }) {
     name: '', category: categories[0] || '', unit: 'Bottles', stock: 0, minStock: 5, price: '', shortcut: ''
   });
   const [error, setError] = useState(null);
+  const [saving, setSaving] = useState(false);
 
   // If categories change and no category selected, set default
   useEffect(() => {
@@ -73,6 +74,7 @@ function StockModal({ item, onClose, onSave }) {
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
   const handleSave = async () => {
+    if (saving) return;
     if (!form.name || !form.category || !form.unit) {
       setError('Name, category, and unit are required.');
       return;
@@ -85,8 +87,13 @@ function StockModal({ item, onClose, onSave }) {
       shortcut: (form.shortcut || '').toLowerCase().trim()
     };
     setError(null);
-    // Await onSave and only close if successful
-    await onSave(data, setError, onClose);
+    setSaving(true);
+    try {
+      await onSave(data, setError, onClose);
+    } catch (err) {
+      setError(err.message || 'Failed to save');
+      setSaving(false);
+    }
   };
 
   return (
@@ -144,8 +151,10 @@ function StockModal({ item, onClose, onSave }) {
         {error && <div style={{ color: 'red', marginBottom: 8 }}>{error}</div>}
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-          <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
-          <button className="btn btn-primary" onClick={handleSave}>Save</button>
+          <button className="btn btn-ghost" disabled={saving} onClick={onClose}>Cancel</button>
+          <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
+            {saving ? 'Saving...' : item ? 'Update' : 'Save'}
+          </button>
         </div>
       </div>
     </div>

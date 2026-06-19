@@ -76,17 +76,23 @@ function WorkerModal({ worker, onClose, onSave }) {
     upiId: worker?.upiId || '',
   });
   const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
 
   const handleSubmit = async () => {
+    if (busy) return;
     if (!form.name.trim()) { setError('Full Name is required'); return; }
     if (form.contact && !/^\d{10}$/.test(form.contact)) { setError('Contact must be 10 digits'); return; }
 
+    setBusy(true);
     try {
       const currentPaid = parseFloat(worker?.paidSalary) || 0;
       const newAddition = parseFloat(form.paidSalary) || 0;
       await onSave({ ...form, salary: parseFloat(form.salary) || 0, paidSalary: currentPaid + newAddition });
       onClose();
-    } catch (e) { setError(e.response?.data?.message || e.message); }
+    } catch (e) {
+      setError(e.response?.data?.message || e.message);
+      setBusy(false);
+    }
   };
 
   return (
@@ -124,8 +130,10 @@ function WorkerModal({ worker, onClose, onSave }) {
         {error && <div className="badge b-red" style={{ width: '100%', padding: '8px', marginBottom: '12px' }}>{error}</div>}
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
-          <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
-          <button className="btn btn-primary" onClick={handleSubmit}>Update</button>
+          <button className="btn btn-ghost" disabled={busy} onClick={onClose}>Cancel</button>
+          <button className="btn btn-primary" onClick={handleSubmit} disabled={busy}>
+            {busy ? 'Updating...' : worker ? 'Update' : 'Save'}
+          </button>
         </div>
       </div>
     </div>

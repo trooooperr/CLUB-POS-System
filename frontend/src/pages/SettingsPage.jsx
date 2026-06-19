@@ -65,6 +65,8 @@ export default function SettingsPage() {
   });
   const [profileSaved, setProfileSaved] = useState(false);
   const [profileError, setProfileError] = useState('');
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [savingEmail, setSavingEmail] = useState(false);
 
   useEffect(() => {
     setProfileForm({
@@ -75,7 +77,9 @@ export default function SettingsPage() {
   }, [currentUser]);
 
   const handleUpdateProfile = async () => {
+    if (profileSaving) return;
     setProfileError('');
+    setProfileSaving(true);
     try {
       const res = await authFetch(apiUrl('/api/auth/profile'), {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
@@ -95,6 +99,8 @@ export default function SettingsPage() {
       setTimeout(() => window.location.reload(), 1500);
     } catch (e) {
       setProfileError(e.message);
+    } finally {
+      setProfileSaving(false);
     }
   };
 
@@ -159,11 +165,15 @@ export default function SettingsPage() {
 
 
   const handleSaveEmail = async () => {
+    if (savingEmail) return;
+    setSavingEmail(true);
     try {
       await saveSettings({ ...settings, adminEmail: email.adminEmail });
       showToast('Email settings saved successfully');
     } catch (e) {
       showToast('Error saving email: ' + e.message, 'error');
+    } finally {
+      setSavingEmail(false);
     }
   };
 
@@ -388,7 +398,9 @@ export default function SettingsPage() {
             </div>
           </div>
           <div className="settings-actions">
-            <button className="btn btn-primary settings-grid-action" onClick={handleSaveEmail}>Save Email</button>
+            <button className="btn btn-primary settings-grid-action" onClick={handleSaveEmail} disabled={savingEmail}>
+              {savingEmail ? 'Saving...' : 'Save Email'}
+            </button>
           </div>
         </section>
 
@@ -413,8 +425,8 @@ export default function SettingsPage() {
                 <label>New Password</label>
                 <input type="password" value={profileForm.password} onChange={e => setProfileForm(f => ({ ...f, password: e.target.value }))} placeholder="Leave blank to keep current password" />
               </div>
-              <button className="btn btn-primary settings-grid-action" onClick={handleUpdateProfile}>
-                {profileSaved ? <><Check size={14} />Updated</> : 'Update Profile'}
+              <button className="btn btn-primary settings-grid-action" onClick={handleUpdateProfile} disabled={profileSaving}>
+                {profileSaving ? 'Updating...' : profileSaved ? <><Check size={14} />Updated</> : 'Update Profile'}
               </button>
             </div>
             {profileError && <p className="settings-error">{profileError}</p>}
