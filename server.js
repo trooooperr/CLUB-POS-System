@@ -307,6 +307,7 @@ function setupDbChangeStreams(io) {
         const doc = change.fullDocument;
         if (doc) {
           io.to('kitchen').emit('NEW_KOT', doc);
+          io.emit('NEW_KOT', doc); // Broadcast globally
           io.emit('TABLE_SESSION_UPDATED', { tableNo: doc.tableNo });
           console.log('🎫 Change Stream: New KOT broadcast:', doc.kotNo);
         }

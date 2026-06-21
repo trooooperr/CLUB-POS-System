@@ -191,7 +191,7 @@ export default function BillingPage() {
     billTotals, filteredMenu, categories, categoryFilter, setCategoryFilter,
     menuSearch, setMenuSearch, inventory, workers, getTableStatus, getTableInfo, settings, NUM_TABLES,
     openTableSession, createKOT, finalizeBill, completeOrder, socket, syncTableSession,
-    setSidebarOpen, showToast
+    setSidebarOpen, showToast, printKOTDocument, printBillDocument
   } = useApp();
 
   const [pm, setPm] = useState('cash');
@@ -490,6 +490,13 @@ export default function BillingPage() {
     const tableNo = parseInt(activeTableId.substring(1));
 
     const delayDebounceFn = setTimeout(() => {
+      // ONLY sync if the user made local changes recently (in the last 2 seconds)
+      const lastEdit = lastEditRef.current[activeTableId] || 0;
+      const timeSinceLastEdit = Date.now() - lastEdit;
+      if (timeSinceLastEdit > 2000) {
+        return;
+      }
+
       const pendingItemsForDb = (table.items || []).map(i => ({
         menuItemId: i._id || i.menuItemId,
         name: i.name,
@@ -638,237 +645,12 @@ export default function BillingPage() {
       );
 
       // Print bill
-      printBillDocument(tableNo, { items: combinedItems.all }, grandTotal, selectedWaiterObj?.name || '', finalizedOrder?.billNo);
-
-      // Mark order as complete
-      await completeOrder(orderId);
-
-      // Clear table
-      clearTable(activeTableId);
-      setActiveOrder(null);
-      setKots([]);
-      setSelectedWaiter('');
-
-      setBillError('');
-      setBusy(false);
-      setMobileBillOpen(false); // Close mobile bill panel
+      printBillDocument(tableNo, { items: combinedItems.all }, grandTotal, selectedWaiterObj?.name || '', finalizedOrder?.billNo, selectedWaiterObj);
     } catch (err) {
       setBillError(err.message);
+    } finally {
       setBusy(false);
     }
-  };
-
-  // Helper: fire a print job (tries backend direct print first if directPrinting is enabled, falls back to/uses browser dialog otherwise)
-  const firePrint = async (html, documentType = 'document', printerName = '') => {
-    const runBrowserPrint = () => {
-      try {
-        let iframe = document.getElementById('print-iframe');
-        if (!iframe) {
-          iframe = document.createElement('iframe');
-          iframe.id = 'print-iframe';
-          iframe.style.position = 'fixed';
-          iframe.style.right = '0';
-          iframe.style.bottom = '0';
-          iframe.style.width = '1px';
-          iframe.style.height = '1px';
-          iframe.style.opacity = '0';
-          iframe.style.pointerEvents = 'none';
-          document.body.appendChild(iframe);
-        }
-        
-        const doc = iframe.contentDocument || iframe.contentWindow.document;
-        doc.open();
-        doc.write(html);
-        doc.close();
-        
-        // Wait for images / assets to load and print
-        setTimeout(() => {
-          iframe.contentWindow.focus();
-          iframe.contentWindow.print();
-        }, 1000);
-      } catch (printErr) {
-        console.error('Browser print failed:', printErr);
-        showToast('Browser printing failed', 'error');
-      }
-    };
-
-    // QZ Tray local printing
-    if (settings.qzTrayEnabled) {
-      try {
-        if (!qz.websocket.isActive()) {
-          await qz.websocket.connect({ retries: 2, delay: 1 });
-        }
-        const targetPrinter = printerName || null;
-        const config = qz.configs.create(targetPrinter);
-        const printData = [{
-          type: 'html',
-          format: 'plain',
-          data: html
-        }];
-        await qz.print(config, printData);
-        showToast(`Print sent to ${targetPrinter || 'default'} via QZ Tray`, 'success');
-        return;
-      } catch (err) {
-        showToast('QZ Tray disconnected, falling back to browser print...', 'error');
-        runBrowserPrint();
-        return;
-      }
-    }
-
-    // If QZ Tray is disabled, fall back to standard browser printing (with dialog)
-    runBrowserPrint();
-  };
-
-  // Build KOT HTML for a given subset of items and target printer label
-  const buildKOTHtml = (kot, tableNo, items, printerLabel) => `
-    <html>
-      <head>
-        <title>${printerLabel}</title>
-        <style>
-          @page { size: 80mm auto; margin: 2mm; }
-          body { font-family: monospace; width: 72mm; margin: 0; padding: 0; font-size: 12px; }
-          .header { text-align: center; font-weight: bold; margin-bottom: 6px; font-size: 11px; }
-          .sub { text-align: center; font-size: 11px; margin-bottom: 4px; }
-          .divider { border-top: 1px dashed #000; margin: 5px 0; }
-          .item { display: flex; justify-content: space-between; margin: 3px 0; }
-          .qty { font-weight: bold; min-width: 24px; }
-          .note { font-size: 10px; margin: 0 0 4px 8px; border-left: 2px solid #000; padding-left: 4px; }
-        </style>
-      </head>
-      <body>
-        <div class="header" style="font-size: 14px;">${printerLabel.toUpperCase()} KOT</div>
-        <div class="header">${kot.kotNo} &nbsp;&nbsp;|&nbsp;&nbsp; Table: ${tableNo}</div>
-        <div class="sub">${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}</div>
-        <div class="divider"></div>
-        ${items.map(i => `
-          <div class="item"><span>${i.name}</span><span class="qty">${i.quantity}</span></div>
-          ${(i.notes || i.note) ? `<div class="note">${i.notes || i.note}</div>` : ''}
-        `).join('')}
-        <div class="divider"></div>
-      </body>
-    </html>
-  `;
-
-  // Print KOT — splits items by department and fires separate print jobs
-  const printKOTDocument = (kot, tableNo) => {
-    const barItems     = (kot.items || []).filter(i => (i.department || 'kitchen') === 'bar');
-    const kitchenItems = (kot.items || []).filter(i => (i.department || 'kitchen') !== 'bar');
-
-    // Kitchen printer KOT (food/menu items)
-    if (kitchenItems.length > 0) {
-      firePrint(buildKOTHtml(kot, tableNo, kitchenItems, settings.kitchenPrinterName || 'KITCHEN'), 'document', settings.kitchenPrinterName || '');
-    }
-
-    // Bar printer KOT (bar/inventory items) — fired 600ms after kitchen to sequence dialogs
-    if (barItems.length > 0) {
-      setTimeout(() => {
-        firePrint(buildKOTHtml(kot, tableNo, barItems, settings.barPrinterName || 'BAR'), 'document', settings.barPrinterName || '');
-      }, 600);
-    }
-  };
-
-  const printBillDocument = (tableNo, table, total, waiterName = '', billNoOverride = '') => {
-    // Generate bill number similar to InvoiceModal
-    const tempBillNo = billNoOverride ? `HTB-${billNoOverride.split('-').pop()}` : ('HTB-' + String(Date.now()).slice(-5));
-    
-    // Generate dynamic UPI Payment QR Code
-    const upiId = settings.upiId || 'dummy@upi';
-    const merchantName = settings.restaurantName || 'HUMTUM';
-    const includeAmount = settings.includeUpiAmount !== false;
-    const upiUrl = `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(merchantName)}${includeAmount ? `&am=${total.toFixed(0)}` : ''}&cu=INR`;
-    const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(upiUrl)}`;
-
-    // Generate Waiter Tip QR Code if assigned and has UPI ID
-    const waiterTipQrUrl = selectedWaiterObj?.upiId
-      ? `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(`upi://pay?pa=${encodeURIComponent(selectedWaiterObj.upiId)}&pn=${encodeURIComponent(selectedWaiterObj.name)}&cu=INR`)}`
-      : '';
-
-    const html = `
-      <html>
-        <head>
-          <title>${settings.barPrinterName || 'BAR'} BILL</title>
-          <style>
-            @page { size: 80mm auto; margin: 2mm; }
-            body { font-family: 'Courier New', Courier, monospace; width: 74mm; margin: 0; padding: 0; font-size: 13px; color: #000; line-height: 1.2; }
-            .center { text-align: center; }
-            .brand { font-size: 18px; font-weight: 900; margin-bottom: 2px; text-transform: uppercase; }
-            .address { font-size: 12px; margin-bottom: 6px; line-height: 1.2; }
-            .dash-line { border-top: 1px dashed #000; margin: 6px 0; }
-            .thick-line { border-top: 2px solid #000; margin: 4px 0; }
-            .row { display: flex; justify-content: space-between; margin-bottom: 2px; font-size: 12px; }
-            .item-header { font-size: 12px; font-weight: 900; display: flex; margin-bottom: 4px; border-bottom: 1px solid #000; padding-bottom: 2px; }
-            .item-row { display: flex; margin-bottom: 3px; align-items: flex-start; font-size: 12px; }
-            .col-name { flex: 1; padding-right: 4px; text-transform: uppercase; }
-            .col-qty { width: 35px; text-align: center; }
-            .col-amt { width: 65px; text-align: right; font-weight: bold; }
-            .footer-msg { font-size: 12px; margin-top: 10px; font-weight: bold; font-style: italic; }
-            .qr-code { width: 130px; height: 130px; margin: 8px auto 2px; display: block; }
-          </style>
-        </head>
-        <body>
-          <div class="center">
-            <div class="brand">${settings.restaurantName || 'HUMTUM'}</div>
-            ${settings.address ? `<div class="address">${settings.address}</div>` : ''}
-            ${settings.gstin ? `<div class="address" style="margin-top:-4px">GSTIN: ${settings.gstin}</div>` : ''}
-          </div>
-
-          <div class="dash-line"></div>
-
-          <div class="row"><span>BILL: ${tempBillNo}</span><span>TABLE: ${tableNo}</span></div>
-          <div class="row">DATE: ${new Date().toLocaleString('en-IN')}</div>
-          ${waiterName ? `<div class="row">WAITER: ${waiterName.toUpperCase()}</div>` : ''}
-
-          <div class="dash-line"></div>
-
-          <div class="item-header">
-            <span class="col-name">ITEM</span>
-            <span class="col-qty">QTY</span>
-            <span class="col-amt">AMT</span>
-          </div>
-
-          ${table.items.map(i => `
-            <div class="item-row">
-              <span class="col-name">${i.name}</span>
-              <span class="col-qty">${i.quantity}</span>
-              <span class="col-amt">${(i.price * i.quantity).toFixed(0)}</span>
-            </div>
-          `).join('')}
-
-          <div class="dash-line"></div>
-
-          <div class="row"><span>Subtotal</span><span>${subtotal.toFixed(2)}</span></div>
-          ${(sgst + cgst) > 0 ? `<div class="row"><span>Taxes</span><span>${(sgst + cgst).toFixed(2)}</span></div>` : ''}
-          ${discountAmount > 0 ? `<div class="row"><span>Discount</span><span>-${discountAmount.toFixed(2)}</span></div>` : ''}
-          ${roundOff !== 0 ? `<div class="row"><span>Round Off</span><span>${roundOff > 0 ? '+' : ''}${roundOff.toFixed(2)}</span></div>` : ''}
-
-          <div class="thick-line"></div>
-          
-          <div class="row" style="font-size: 16px; font-weight: 900; margin: 4px 0;">
-            <span>TOTAL PAYABLE</span>
-            <span>Rs. ${total.toFixed(0)}</span>
-          </div>
-
-          <div class="thick-line"></div>
-
-          <div class="center">
-            <div style="font-size: 13px; font-weight: bold; margin-bottom: 4px;">SCAN TO PAY BILL</div>
-            <!-- Dynamic QR Code generated from UPI settings -->
-            <img class="qr-code" src="${qrCodeUrl}" alt="QR Code" />
-            
-            ${waiterTipQrUrl ? `
-              <div class="dash-line" style="margin: 12px 0 8px 0;"></div>
-              <div style="font-size: 13px; font-weight: bold; margin-bottom: 2px;">TIP YOUR WAITER</div>
-              <div style="font-size: 11px; font-weight: bold; color: #555; margin-bottom: 4px;">Scan to Tip ${selectedWaiterObj.name.toUpperCase()} directly</div>
-              <img class="qr-code" style="width: 100px; height: 100px; margin: 4px auto 2px; display: block;" src="${waiterTipQrUrl}" alt="Tip QR Code" />
-            ` : ''}
-
-            <div class="dash-line" style="margin-top: 10px;"></div>
-            <div class="footer-msg">${settings.thankYouMsg || 'THANK YOU FOR VISITING!'}</div>
-          </div>
-        </body>
-      </html>
-    `;
-    firePrint(html, 'document', settings.barPrinterName || '');
   };
 
   const doGen = async paid => {

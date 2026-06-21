@@ -2,6 +2,38 @@ import React, { createContext, useContext, useState, useMemo, useCallback, useEf
 import { apiUrl, authFetch } from '../lib/api';
 import io from 'socket.io-client';
 
+const qz = typeof window !== 'undefined' ? window.qz : null;
+
+const playAlarmChime = () => {
+  try {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContext) return;
+    const ctx = new AudioContext();
+    
+    const playTone = (freq, time, dur) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      
+      gain.gain.setValueAtTime(0.15, time);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + dur);
+      
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(time);
+      osc.stop(time + dur);
+    };
+    
+    const now = ctx.currentTime;
+    // Pleasant dual chime: C5 and E5
+    playTone(523.25, now, 0.15);
+    playTone(659.25, now + 0.12, 0.25);
+  } catch (err) {
+    console.error('Audio play error:', err);
+  }
+};
+
 const AppContext = createContext(null);
 const TABLES_KEY = 'humtum_table_bills_v2';
 const AUTH_KEY   = 'humtum_auth_v2';
@@ -97,53 +129,7 @@ export function AppProvider({ children }) {
   // ── Socket.IO ────────────────────────────────────────────────────
   const [socket, setSocket] = useState(null);
   
-  useEffect(() => {
-    if (!currentUser) {
-      if (socket) socket.disconnect();
-      setSocket(null);
-      return;
-    }
-
-    const newSocket = io(window.location.origin, {
-      reconnection: true,
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
-      reconnectionAttempts: 5,
-      transports: ['websocket'], // Force websocket to fix Render disconnect loops
-      auth: {
-        token: localStorage.getItem(TOKEN_KEY),
-      }
-    });
-
-    newSocket.on('connect', () => {
-      console.log('✅ Socket.IO connected');
-    });
-
-    newSocket.on('disconnect', () => {
-      console.log('❌ Socket.IO disconnected');
-    });
-
-    newSocket.on('INVENTORY_UPDATED', (data) => {
-      if (data && data.inventory) {
-        setInventory(data.inventory);
-        setMenuItems(prev => prev.map(item => {
-          const match = data.inventory.find(inv => inv.name?.toLowerCase().trim() === item.name?.toLowerCase().trim());
-          return match ? { ...item, available: match.stock > 0 } : item;
-        }));
-        localStorage.setItem(INVENTORY_CACHE, JSON.stringify(data.inventory));
-      }
-    });
-
-    newSocket.on('TABLE_SESSION_UPDATED', () => {
-      safeFetch(apiUrl('/api/orders/sessions/active')).then(setActiveSessions);
-    });
-
-    setSocket(newSocket);
-
-    return () => {
-      if (newSocket) newSocket.disconnect();
-    };
-  }, [currentUser]);
+  // Socket initialization relocated lower in the provider
 
   // ── KOT & Table Session State ───────────────────────────────────
   const [kotSessions, setKotSessions] = useState({}); // { tableNo: { kots: [], status, etc } }
@@ -264,6 +250,273 @@ export function AppProvider({ children }) {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 3000);
   }, []);
+
+  // ── Printing Utilities ──────────────────────────────────────────
+  const firePrint = useCallback(async (html, documentType = 'document', printerName = '') => {
+    const runBrowserPrint = () => {
+      try {
+        let iframe = document.getElementById('print-iframe');
+        if (!iframe) {
+          iframe = document.createElement('iframe');
+          iframe.id = 'print-iframe';
+          iframe.style.position = 'absolute';
+          iframe.style.width = '0px';
+          iframe.style.height = '0px';
+          iframe.style.border = 'none';
+          document.body.appendChild(iframe);
+        }
+        
+        const doc = iframe.contentDocument || iframe.contentWindow.document;
+        doc.open();
+        doc.write(html);
+        doc.close();
+        
+        setTimeout(() => {
+          iframe.contentWindow.focus();
+          iframe.contentWindow.print();
+        }, 1000);
+      } catch (printErr) {
+        console.error('Browser print failed:', printErr);
+        showToast('Browser printing failed', 'error');
+      }
+    };
+
+    if (settings.qzTrayEnabled && qz) {
+      try {
+        if (!qz.websocket.isActive()) {
+          await qz.websocket.connect({ retries: 2, delay: 1 });
+        }
+        const targetPrinter = printerName || null;
+        const config = qz.configs.create(targetPrinter);
+        const printData = [{
+          type: 'html',
+          format: 'plain',
+          data: html
+        }];
+        await qz.print(config, printData);
+        showToast(`Print sent to ${targetPrinter || 'default'} via QZ Tray`, 'success');
+        return;
+      } catch (err) {
+        showToast('QZ Tray disconnected, falling back to browser print...', 'error');
+        runBrowserPrint();
+        return;
+      }
+    }
+
+    runBrowserPrint();
+  }, [settings, showToast]);
+
+  const buildKOTHtml = useCallback((kot, tableNo, items, printerLabel) => `
+    <html>
+      <head>
+        <title>${printerLabel}</title>
+        <style>
+          @page { size: 80mm auto; margin: 2mm; }
+          body { font-family: monospace; width: 72mm; margin: 0; padding: 0; font-size: 12px; }
+          .header { text-align: center; font-weight: bold; margin-bottom: 6px; font-size: 11px; }
+          .sub { text-align: center; font-size: 11px; margin-bottom: 4px; }
+          .divider { border-top: 1px dashed #000; margin: 5px 0; }
+          .item { display: flex; justify-content: space-between; margin: 3px 0; }
+          .qty { font-weight: bold; min-width: 24px; }
+          .note { font-size: 10px; margin: 0 0 4px 8px; border-left: 2px solid #000; padding-left: 4px; }
+        </style>
+      </head>
+      <body>
+        <div class="header" style="font-size: 14px;">${printerLabel.toUpperCase()} KOT</div>
+        <div class="header">${kot.kotNo} &nbsp;&nbsp;|&nbsp;&nbsp; Table: ${tableNo}</div>
+        <div class="sub">${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}</div>
+        <div class="divider"></div>
+        ${items.map(i => `
+          <div class="item"><span>${i.name}</span><span class="qty">${i.quantity}</span></div>
+          ${(i.notes || i.note) ? `<div class="note">${i.notes || i.note}</div>` : ''}
+        `).join('')}
+        <div class="divider"></div>
+      </body>
+    </html>
+  `, []);
+
+  const printKOTDocument = useCallback((kot, tableNo) => {
+    const barItems     = (kot.items || []).filter(i => (i.department || 'kitchen') === 'bar');
+    const kitchenItems = (kot.items || []).filter(i => (i.department || 'kitchen') !== 'bar');
+
+    if (kitchenItems.length > 0) {
+      firePrint(buildKOTHtml(kot, tableNo, kitchenItems, settings.kitchenPrinterName || 'KITCHEN'), 'document', settings.kitchenPrinterName || '');
+    }
+
+    if (barItems.length > 0) {
+      setTimeout(() => {
+        firePrint(buildKOTHtml(kot, tableNo, barItems, settings.barPrinterName || 'BAR'), 'document', settings.barPrinterName || '');
+      }, 600);
+    }
+  }, [settings, firePrint, buildKOTHtml]);
+
+  const printBillDocument = useCallback((tableNo, table, total, waiterName = '', billNoOverride = '', waiterObj = null) => {
+    const tempBillNo = billNoOverride ? `HTB-${billNoOverride.split('-').pop()}` : ('HTB-' + String(Date.now()).slice(-5));
+    
+    const upiId = settings.upiId || 'dummy@upi';
+    const merchantName = settings.restaurantName || 'HUMTUM';
+    const includeAmount = settings.includeUpiAmount !== false;
+    const upiUrl = `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(merchantName)}${includeAmount ? `&am=${total.toFixed(0)}` : ''}&cu=INR`;
+    const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(upiUrl)}`;
+
+    const waiterTipQrUrl = waiterObj?.upiId
+      ? `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(`upi://pay?pa=${encodeURIComponent(waiterObj.upiId)}&pn=${encodeURIComponent(waiterObj.name)}&cu=INR`)}`
+      : '';
+
+    const subtotal = table.items.reduce((s, i) => s + (i.price || 0) * (i.quantity || 0), 0);
+    const sgst = subtotal * (settings.sgstRate / 100);
+    const cgst = subtotal * (settings.cgstRate / 100);
+    const dv = (table.discount || '').trim();
+    const discountAmount = Math.round(dv.endsWith('%')
+      ? subtotal * (parseFloat(dv) / 100) || 0
+      : parseFloat(dv) || 0);
+    const rawTotal = subtotal + sgst + cgst - discountAmount;
+    const grandTotal = Math.max(0, Math.round(rawTotal));
+    const roundOff = grandTotal - rawTotal;
+
+    const html = `
+      <html>
+        <head>
+          <title>${settings.barPrinterName || 'BAR'} BILL</title>
+          <style>
+            @page { size: 80mm auto; margin: 2mm; }
+            body { font-family: 'Courier New', Courier, monospace; width: 74mm; margin: 0; padding: 0; font-size: 13px; color: #000; line-height: 1.2; }
+            .center { text-align: center; }
+            .brand { font-size: 18px; font-weight: 900; margin-bottom: 2px; text-transform: uppercase; }
+            .address { font-size: 12px; margin-bottom: 6px; line-height: 1.2; }
+            .dash-line { border-top: 1px dashed #000; margin: 6px 0; }
+            .thick-line { border-top: 2px solid #000; margin: 4px 0; }
+            .row { display: flex; justify-content: space-between; margin-bottom: 2px; font-size: 12px; }
+            .item-header { font-size: 12px; font-weight: 900; display: flex; margin-bottom: 4px; border-bottom: 1px solid #000; padding-bottom: 2px; }
+            .item-row { display: flex; margin-bottom: 3px; align-items: flex-start; font-size: 12px; }
+            .col-name { flex: 1; padding-right: 4px; text-transform: uppercase; }
+            .col-qty { width: 35px; text-align: center; }
+            .col-amt { width: 65px; text-align: right; font-weight: bold; }
+            .footer-msg { font-size: 12px; margin-top: 10px; font-weight: bold; font-style: italic; }
+            .qr-code { width: 130px; height: 130px; margin: 8px auto 2px; display: block; }
+          </style>
+        </head>
+        <body>
+          <div class="center">
+            <div class="brand">${settings.restaurantName || 'HUMTUM'}</div>
+            ${settings.address ? `<div class="address">${settings.address}</div>` : ''}
+            ${settings.gstin ? `<div class="address" style="margin-top:-4px">GSTIN: ${settings.gstin}</div>` : ''}
+          </div>
+
+          <div class="dash-line"></div>
+
+          <div class="row"><span>BILL: ${tempBillNo}</span><span>TABLE: ${tableNo}</span></div>
+          <div class="row">DATE: ${new Date().toLocaleString('en-IN')}</div>
+          ${waiterName ? `<div class="row">WAITER: ${waiterName.toUpperCase()}</div>` : ''}
+
+          <div class="dash-line"></div>
+
+          <div class="item-header">
+            <span class="col-name">ITEM</span>
+            <span class="col-qty">QTY</span>
+            <span class="col-amt">AMT</span>
+          </div>
+
+          ${table.items.map(i => `
+            <div class="item-row">
+              <span class="col-name">${i.name}</span>
+              <span class="col-qty">${i.quantity}</span>
+              <span class="col-amt">${(i.price * i.quantity).toFixed(0)}</span>
+            </div>
+          `).join('')}
+
+          <div class="dash-line"></div>
+
+          <div class="row"><span>Subtotal</span><span>${subtotal.toFixed(2)}</span></div>
+          ${(sgst + cgst) > 0 ? `<div class="row"><span>Taxes</span><span>${(sgst + cgst).toFixed(2)}</span></div>` : ''}
+          ${discountAmount > 0 ? `<div class="row"><span>Discount</span><span>-${discountAmount.toFixed(2)}</span></div>` : ''}
+          ${roundOff !== 0 ? `<div class="row"><span>Round Off</span><span>${roundOff > 0 ? '+' : ''}${roundOff.toFixed(2)}</span></div>` : ''}
+
+          <div class="thick-line"></div>
+          
+          <div class="row" style="font-size: 16px; font-weight: 900; margin: 4px 0;">
+            <span>TOTAL PAYABLE</span>
+            <span>Rs. ${total.toFixed(0)}</span>
+          </div>
+
+          <div class="thick-line"></div>
+
+          <div class="center">
+            <div style="font-size: 13px; font-weight: bold; margin-bottom: 4px;">SCAN TO PAY BILL</div>
+            <img class="qr-code" src="${qrCodeUrl}" alt="QR Code" />
+            
+            ${waiterTipQrUrl ? `
+              <div class="dash-line" style="margin: 12px 0 8px 0;"></div>
+              <div style="font-size: 13px; font-weight: bold; margin-bottom: 2px;">TIP YOUR WAITER</div>
+              <div style="font-size: 11px; font-weight: bold; color: #555; margin-bottom: 4px;">Scan to Tip ${waiterObj.name.toUpperCase()} directly</div>
+              <img class="qr-code" style="width: 100px; height: 100px; margin: 4px auto 2px; display: block;" src="${waiterTipQrUrl}" alt="Tip QR Code" />
+            ` : ''}
+
+            <div class="dash-line" style="margin-top: 10px;"></div>
+            <div class="footer-msg">${settings.thankYouMsg || 'THANK YOU FOR VISITING!'}</div>
+          </div>
+        </body>
+      </html>
+    `;
+    firePrint(html, 'document', settings.barPrinterName || '');
+  }, [settings, firePrint]);
+
+  // ── Socket.IO ────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!currentUser) {
+      if (socket) socket.disconnect();
+      setSocket(null);
+      return;
+    }
+
+    const newSocket = io(window.location.origin, {
+      reconnection: true,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      reconnectionAttempts: 5,
+      transports: ['websocket'], // Force websocket to fix Render disconnect loops
+      auth: {
+        token: localStorage.getItem(TOKEN_KEY),
+      }
+    });
+
+    newSocket.on('connect', () => {
+      console.log('✅ Socket.IO connected');
+    });
+
+    newSocket.on('disconnect', () => {
+      console.log('❌ Socket.IO disconnected');
+    });
+
+    newSocket.on('INVENTORY_UPDATED', (data) => {
+      if (data && data.inventory) {
+        setInventory(data.inventory);
+        setMenuItems(prev => prev.map(item => {
+          const match = data.inventory.find(inv => inv.name?.toLowerCase().trim() === item.name?.toLowerCase().trim());
+          return match ? { ...item, available: match.stock > 0 } : item;
+        }));
+        localStorage.setItem(INVENTORY_CACHE, JSON.stringify(data.inventory));
+      }
+    });
+
+    newSocket.on('TABLE_SESSION_UPDATED', () => {
+      safeFetch(apiUrl('/api/orders/sessions/active')).then(setActiveSessions);
+    });
+
+    newSocket.on('NEW_KOT', (kot) => {
+      playAlarmChime();
+      showToast(`New order placed on Table ${kot.tableNo}!`, 'info');
+      if (kot && kot.items && kot.items.length > 0) {
+        printKOTDocument(kot, kot.tableNo);
+      }
+    });
+
+    setSocket(newSocket);
+
+    return () => {
+      if (newSocket) newSocket.disconnect();
+    };
+  }, [currentUser, printKOTDocument, showToast]);
 
   // ── Auth helpers ────────────────────────────────────────────────
   const login = useCallback(async (username, password) => {
@@ -878,6 +1131,7 @@ export function AppProvider({ children }) {
       socket,
       kotSessions, currentSession, kots,
       openTableSession, syncTableSession, createKOT, updateKOTStatus, finalizeBill, completeOrder,
+      printKOTDocument, printBillDocument,
     }}>
       {children}
     </AppContext.Provider>
