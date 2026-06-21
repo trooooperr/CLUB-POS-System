@@ -307,6 +307,7 @@ router.patch('/:id/finalize-bill', async (req, res) => {
       try {
         const deductedKots = await KOT.find({
           orderId: order._id,
+          tableNo: order.tableNo,
           inventoryDeducted: true
         }).select('items');
         const alreadyDeducted = aggregateQuantities(deductedKots.flatMap(kot => kot.items || []));

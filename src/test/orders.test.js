@@ -120,4 +120,53 @@ describe('Orders API', () => {
     item = await Inventory.findOne({ name: 'Test Soda' });
     expect(item.stock).toBe(7);
   });
+
+  it('should reduce only extra inventory added after KOT when final bill is printed', async () => {
+    await Inventory.findOneAndUpdate({ name: 'Test Soda' }, { stock: 10 });
+
+    const sessionRes = await request(app)
+      .post('/api/orders/table/2/open')
+      .set('Authorization', `Bearer ${token}`)
+      .send({});
+
+    expect(sessionRes.statusCode).toBe(201);
+    const orderId = sessionRes.body.activeOrderId._id;
+    const menuItem = await MenuItem.findOne({ name: 'Test Soda' });
+
+    const kotRes = await request(app)
+      .post('/api/kots')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        orderId,
+        tableNo: 2,
+        items: [{
+          menuItemId: menuItem._id,
+          name: 'Test Soda',
+          quantity: 2,
+          price: 50,
+          department: 'bar'
+        }]
+      });
+
+    expect(kotRes.statusCode).toBe(201);
+    let item = await Inventory.findOne({ name: 'Test Soda' });
+    expect(item.stock).toBe(8);
+
+    const finalRes = await request(app)
+      .patch(`/api/orders/${orderId}/finalize-bill`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        items: [{ name: 'Test Soda', quantity: 3, price: 50 }],
+        subtotal: 150,
+        sgst: 3.75,
+        cgst: 3.75,
+        discount: 0,
+        roundOff: -0.5,
+        grandTotal: 157
+      });
+
+    expect(finalRes.statusCode).toBe(200);
+    item = await Inventory.findOne({ name: 'Test Soda' });
+    expect(item.stock).toBe(7);
+  });
 });
