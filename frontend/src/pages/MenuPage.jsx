@@ -18,6 +18,7 @@ function ItemModal({ item, onClose, onSave }) {
     imageUrl: item?.imageUrl || '',
     available: item?.available !== false,
     shortcut: item?.shortcut || '',
+    isVeg: item?.isVeg !== false,
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -71,16 +72,29 @@ function ItemModal({ item, onClose, onSave }) {
             placeholder="https://images.unsplash.com/photo..." />
         </div>
         <div className="fgroup" style={{ marginBottom: 20 }}>
-          <div className="menu-availability-row">
-            <label className="lbl">Menu Availability</label>
-            <label className="switch">
-              <input
-                type="checkbox"
-                checked={form.available}
-                onChange={e => setForm({ ...form, available: e.target.checked })}
-              />
-              <span className="slider round"></span>
-            </label>
+          <div style={{ display: 'flex', gap: '30px' }}>
+            <div className="menu-availability-row" style={{ flex: 1 }}>
+              <label className="lbl">Menu Availability</label>
+              <label className="switch">
+                <input
+                  type="checkbox"
+                  checked={form.available}
+                  onChange={e => setForm({ ...form, available: e.target.checked })}
+                />
+                <span className="slider round"></span>
+              </label>
+            </div>
+            <div className="menu-availability-row" style={{ flex: 1 }}>
+              <label className="lbl">Is Veg (Green)</label>
+              <label className="switch">
+                <input
+                  type="checkbox"
+                  checked={form.isVeg}
+                  onChange={e => setForm({ ...form, isVeg: e.target.checked })}
+                />
+                <span className="slider round"></span>
+              </label>
+            </div>
           </div>
         </div>
         <div className="m-actions">
