@@ -332,6 +332,7 @@ router.patch('/:id/finalize-bill', async (req, res) => {
     if (updatedInventory) response.inventory = updatedInventory;
     response.inventoryFinalized = order.inventoryFinalized;
     response.inventoryFinalizedAt = order.inventoryFinalizedAt;
+    await TableSession.findOneAndDelete({ activeOrderId: order._id });
     res.json(response);
     await deleteCache([ORDERS_CACHE_KEY, REPORT_SUMMARY_CACHE_KEY]);
   } catch (err) {

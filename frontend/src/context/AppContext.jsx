@@ -1097,12 +1097,17 @@ export function AppProvider({ children }) {
           return [order, ...historyArray];
         }
       });
+      setActiveSessions(prev => prev.filter(session => {
+        const sessionOrderId = session.activeOrderId?._id || session.activeOrderId;
+        return String(sessionOrderId) !== String(orderId) && session.tableNo !== order.tableNo;
+      }));
+      if (socket && order.tableNo) socket.emit('order-completed', { tableNo: order.tableNo, orderId });
       return order;
     } catch (err) {
       console.error('Finalize bill error:', err);
       throw err;
     }
-  }, [applyInventoryUpdate]);
+  }, [applyInventoryUpdate, socket]);
 
   const completeOrder = useCallback(async (orderId) => {
     try {

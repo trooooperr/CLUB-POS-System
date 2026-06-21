@@ -646,6 +646,13 @@ export default function BillingPage() {
 
       // Print bill
       printBillDocument(tableNo, { items: combinedItems.all }, grandTotal, selectedWaiterObj?.name || '', finalizedOrder?.billNo, selectedWaiterObj);
+      clearTable(activeTableId);
+      setKots([]);
+      setActiveOrder(null);
+      setSelectedWaiterRaw('');
+      setOrderTypeRaw('dine-in');
+      setBillError('');
+      setMobileBillOpen(false);
     } catch (err) {
       setBillError(err.message);
     } finally {
