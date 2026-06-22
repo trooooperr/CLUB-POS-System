@@ -63,7 +63,7 @@ function StockModal({ item, onClose, onSave }) {
       return { ...item, isAlcoholic: !!(item.isAlcoholic || item.isAlcohol) };
     }
     return {
-      name: '', category: categories[0] || '', unit: 'Bottles', stock: 0, minStock: 5, price: '', shortcut: '', isAlcoholic: false
+      name: '', category: '', unit: 'Bottles', stock: 0, minStock: 5, price: '', shortcut: '', isAlcoholic: false
     };
   });
   const [error, setError] = useState(null);

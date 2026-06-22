@@ -12,7 +12,7 @@ function ItemModal({ item, onClose, onSave }) {
     : ['General'];
   const [form, setForm] = useState({
     name: item?.name || '',
-    category: item?.category || menuCategories[0],
+    category: '',
     price: item?.price || '',
     department: item?.department || 'kitchen',
     imageUrl: item?.imageUrl || '',
