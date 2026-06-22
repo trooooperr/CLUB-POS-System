@@ -382,21 +382,6 @@ export function AppProvider({ children }) {
     }
   }, [settings, firePrint, buildKOTHtml]);
 
-  const markKotAsPrintedLocally = useCallback((kotId) => {
-    if (!kotId) return;
-    try {
-      const stored = localStorage.getItem('humtum_printed_kots');
-      let printedList = stored ? JSON.parse(stored) : [];
-      printedList.push(String(kotId));
-      if (printedList.length > 100) {
-        printedList = printedList.slice(-100);
-      }
-      localStorage.setItem('humtum_printed_kots', JSON.stringify(printedList));
-    } catch (e) {
-      console.error('Error marking KOT as printed:', e);
-    }
-  }, []);
-
   const printBillDocument = useCallback((tableNo, table, total, waiterName = '', billNoOverride = '', waiterObj = null) => {
     const tempBillNo = billNoOverride ? `HTB-${billNoOverride.split('-').pop()}` : ('HTB-' + String(Date.now()).slice(-5));
     
@@ -669,15 +654,9 @@ export function AppProvider({ children }) {
     });
 
     newSocket.on('NEW_KOT', (kot) => {
-      try {
-        const stored = localStorage.getItem('humtum_printed_kots');
-        const printedList = stored ? JSON.parse(stored) : [];
-        if (kot && kot._id && printedList.includes(String(kot._id))) {
-          console.log('Skipping NEW_KOT socket print/chime because it was printed locally:', kot._id);
-          return;
-        }
-      } catch (e) {
-        console.error('Error checking printed KOTs:', e);
+      if (kot && kot.source === 'pos') {
+        console.log('Skipping NEW_KOT print/alarm for POS-created KOT:', kot.kotNo);
+        return;
       }
 
       playAlarmChime();
@@ -1214,7 +1193,6 @@ export function AppProvider({ children }) {
       kotSessions, currentSession, kots,
       openTableSession, syncTableSession, createKOT, updateKOTStatus, finalizeBill, completeOrder,
       printKOTDocument, printBillDocument,
-      markKotAsPrintedLocally,
     }}>
       {children}
     </AppContext.Provider>

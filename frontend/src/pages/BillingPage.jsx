@@ -191,7 +191,7 @@ export default function BillingPage() {
     billTotals, filteredMenu, categories, categoryFilter, setCategoryFilter,
     menuSearch, setMenuSearch, inventory, workers, getTableStatus, getTableInfo, settings, NUM_TABLES,
     openTableSession, createKOT, finalizeBill, completeOrder, socket, syncTableSession,
-    setSidebarOpen, showToast, printKOTDocument, printBillDocument, markKotAsPrintedLocally
+    setSidebarOpen, showToast, printKOTDocument, printBillDocument
   } = useApp();
 
   const [pm, setPm] = useState('cash');
@@ -588,7 +588,6 @@ export default function BillingPage() {
           orderId, tableNo, kitchenItems, '', selectedWaiterObj?.name || '', orderType
         );
         setKots(prev => [...prev, kot]);
-        markKotAsPrintedLocally(kot._id);
         printKOTDocument(kot, tableNo);
       }
 
@@ -597,7 +596,6 @@ export default function BillingPage() {
           orderId, tableNo, barItems, '', selectedWaiterObj?.name || '', orderType
         );
         setKots(prev => [...prev, kot]);
-        markKotAsPrintedLocally(kot._id);
         printKOTDocument(kot, tableNo);
       }
 

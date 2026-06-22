@@ -122,7 +122,8 @@ router.post('/', async (req, res) => {
       waiterName: waiterName || order.waiterName || '',
       orderType: orderType || order.orderType || 'dine-in',
       departmentQueues,
-      status: 'PENDING'
+      status: 'PENDING',
+      source: 'pos'
     });
 
     const saved = await kot.save();

@@ -30,6 +30,7 @@ const kotSchema = new mongoose.Schema({
   printCount:   { type: Number, default: 0 },
   inventoryDeducted: { type: Boolean, default: false, index: true },
   inventoryDeductedAt: { type: Date },
+  source:       { type: String, default: 'table', index: true },
 }, { timestamps: true });
 
 // Index for common queries
