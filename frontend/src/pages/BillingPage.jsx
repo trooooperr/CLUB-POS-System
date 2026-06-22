@@ -584,16 +584,28 @@ export default function BillingPage() {
 
       // Create separate KOTs for Kitchen and Bar to ensure separate KOT numbers
       if (kitchenItems.length > 0) {
+        const kitchenPrintJobId = 'pos_print_' + Math.random().toString(36).substring(2, 9);
+        try {
+          sessionStorage.setItem(kitchenPrintJobId, 'true');
+        } catch (e) {
+          console.error(e);
+        }
         const kot = await createKOT(
-          orderId, tableNo, kitchenItems, '', selectedWaiterObj?.name || '', orderType
+          orderId, tableNo, kitchenItems, kitchenPrintJobId, selectedWaiterObj?.name || '', orderType
         );
         setKots(prev => [...prev, kot]);
         printKOTDocument(kot, tableNo);
       }
 
       if (barItems.length > 0) {
+        const barPrintJobId = 'pos_print_' + Math.random().toString(36).substring(2, 9);
+        try {
+          sessionStorage.setItem(barPrintJobId, 'true');
+        } catch (e) {
+          console.error(e);
+        }
         const kot = await createKOT(
-          orderId, tableNo, barItems, '', selectedWaiterObj?.name || '', orderType
+          orderId, tableNo, barItems, barPrintJobId, selectedWaiterObj?.name || '', orderType
         );
         setKots(prev => [...prev, kot]);
         printKOTDocument(kot, tableNo);

@@ -655,8 +655,22 @@ export function AppProvider({ children }) {
 
     newSocket.on('NEW_KOT', (kot) => {
       if (kot && kot.source === 'pos') {
-        console.log('Skipping NEW_KOT print/alarm for POS-created KOT:', kot.kotNo);
+        console.log('Skipping NEW_KOT print/alarm for POS-created KOT (source):', kot.kotNo);
         return;
+      }
+      if (kot && kot.notes && kot.notes.includes('pos_print_')) {
+        const match = kot.notes.match(/(pos_print_[a-z0-9]+)/);
+        if (match) {
+          const printJobId = match[1];
+          try {
+            if (sessionStorage.getItem(printJobId)) {
+              console.log('Skipping NEW_KOT print/alarm for POS-created KOT (sessionStorage):', kot.kotNo);
+              return;
+            }
+          } catch (e) {
+            console.error(e);
+          }
+        }
       }
 
       playAlarmChime();

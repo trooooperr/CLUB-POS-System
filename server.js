@@ -177,10 +177,8 @@ function setupSocketIO() {
     });
 
     socket.on('kot-created', (data) => {
-      io.to('kitchen').emit('NEW_KOT', data);
-      io.emit('NEW_KOT', data); // Broadcast globally for print receivers on any tab
       io.emit('TABLE_SESSION_UPDATED', { tableNo: data.tableNo });
-      console.log('🎫 New KOT broadcast:', data.kotNo);
+      console.log('🎫 Socket.io: kot-created received, broadcasting TABLE_SESSION_UPDATED:', data.kotNo);
     });
 
     socket.on('kot-status-updated', (data) => {
