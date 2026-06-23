@@ -753,7 +753,10 @@ export function AppProvider({ children }) {
   }, [allSellableItems, categoryFilter, menuSearch]);
 
   const categories = useMemo(() => {
-    const cats = allSellableItems.map(i => i.category).filter(Boolean);
+    const cats = allSellableItems
+      .map(i => i.category)
+      .filter(Boolean)
+      .filter(c => c.toLowerCase() !== 'all');
     return ['All', ...new Set(cats)];
   }, [allSellableItems]);
 
