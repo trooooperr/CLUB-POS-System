@@ -64,7 +64,7 @@ router.post(
       const savedInv = await invItem.save();
       await MenuItem.findOneAndUpdate(
         { name },
-        { name, category, price, available: stock > 0, shortcut },
+        { name, category, price, available: stock > 0, shortcut, department: 'bar' },
         { upsert: true, new: true, setDefaultsOnInsert: true }
       );
       await deleteCache([INVENTORY_CACHE_KEY, MENU_CACHE_KEY]);
@@ -113,6 +113,7 @@ router.put(
           price: updated.price,
           available: updated.stock > 0,
           shortcut: (updated.shortcut || '').toLowerCase().trim(),
+          department: 'bar',
         },
         { upsert: true, new: true, setDefaultsOnInsert: true }
       );

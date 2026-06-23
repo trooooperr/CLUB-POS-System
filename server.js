@@ -88,6 +88,26 @@ async function warmupCache() {
   }
 }
 
+// ── Startup migration: fix inventory-backed MenuItems department ──
+async function migrateInventoryMenuItems() {
+  try {
+    const MenuItem  = require('./src/models/MenuItem');
+    const Inventory = require('./src/models/Inventory');
+    const inventoryItems = await Inventory.find().select('name');
+    const inventoryNames = inventoryItems.map(i => i.name);
+    if (inventoryNames.length === 0) return;
+    const result = await MenuItem.updateMany(
+      { name: { $in: inventoryNames }, department: { $ne: 'bar' } },
+      { $set: { department: 'bar' } }
+    );
+    if (result.modifiedCount > 0) {
+      console.log(`✅ Migrated ${result.modifiedCount} inventory-backed MenuItem(s) → department:'bar'`);
+    }
+  } catch (err) {
+    console.warn('⚠️  Inventory-MenuItem migration failed (non-fatal):', err.message);
+  }
+}
+
 // ── Graceful shutdown ────────────────────────────────────────────
 let isShuttingDown = false;
 
@@ -280,6 +300,7 @@ async function startServer() {
     await seedDefaultUsers();
     await connectRedis();
     await warmupCache();
+    await migrateInventoryMenuItems();
 
     setupSocketIO();
 

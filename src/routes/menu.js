@@ -45,6 +45,8 @@ router.get('/shortcut/:code', async (req, res) => {
 router.post('/sync', requireRole(['admin', 'manager']), async (req, res) => {
   try {
     const inventory = await Inventory.find();
+    const inventoryNames = inventory.map(i => i.name);
+
     for (const inv of inventory) {
       await MenuItem.findOneAndUpdate(
         { name: inv.name },
@@ -54,10 +56,20 @@ router.post('/sync', requireRole(['admin', 'manager']), async (req, res) => {
           price: inv.price,
           available: inv.stock > 0,
           shortcut: inv.shortcut || '',
+          department: 'bar',
         },
         { upsert: true, new: true, setDefaultsOnInsert: true }
       );
     }
+
+    // Bulk-correct any existing inventory-backed MenuItems that were saved without department:'bar'
+    if (inventoryNames.length > 0) {
+      await MenuItem.updateMany(
+        { name: { $in: inventoryNames }, department: { $ne: 'bar' } },
+        { $set: { department: 'bar' } }
+      );
+    }
+
     await deleteCache([MENU_CACHE_KEY, INVENTORY_CACHE_KEY]);
     if (req.app.locals.io) {
       req.app.locals.io.emit('REFRESH_MENU');
