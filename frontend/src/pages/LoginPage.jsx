@@ -230,9 +230,12 @@ export default function LoginPage() {
         {/* Brand */}
         <div className="llogo">
           <img src="/favicon.ico" alt="Logo" className="llogo-img" />
-          <div className="ltitle">{settings.restaurantName || 'HumTum'}</div>
-          <div className="lsub">POINT OF SALE</div>
+          <div className="ltitle">{settings.restaurantName || 'HumTum The Bar & Restaurant'}</div>
+          <div className="lsub">Point of Sale</div>
         </div>
+
+        {/* Accent divider */}
+        <div className="lcard-divider" />
 
         {/* Form */}
         <form onSubmit={submit}>
@@ -293,7 +296,7 @@ export default function LoginPage() {
 
 
 
-        <p style={{ textAlign:'center', fontSize:10, color:'var(--t2)', marginTop:14 }}>
+        <p style={{ textAlign:'center', fontSize:10, color:'rgba(255,255,255,0.3)', marginTop:12, letterSpacing:'0.04em' }}>
           © {new Date().getFullYear()} {settings.restaurantName}
         </p>
       </div>
