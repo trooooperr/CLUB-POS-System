@@ -235,7 +235,7 @@ export default function LoginPage() {
         </div>
 
         {/* Accent divider */}
-        <div className="lcard-divider" />
+  
 
         {/* Form */}
         <form onSubmit={submit}>
