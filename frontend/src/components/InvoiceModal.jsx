@@ -151,27 +151,27 @@ export default function InvoiceModal() {
     const isQzActive = qz && (s.qzTrayEnabled || qz.websocket.isActive());
     if (isQzActive) {
       try {
+        // Configure digital certificate for secure silent printing (Must be set every time)
+        qz.security.setCertificatePromise(() => {
+          return authFetch(apiUrl('/api/settings/qz-certificate'))
+            .then(res => res.text());
+        });
+
+        // Configure digital signature backend handler (Must be set every time)
+        qz.security.setSignaturePromise((toSign) => {
+          return (resolve, reject) => {
+            authFetch(apiUrl('/api/settings/qz-sign'), {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ toSign })
+            })
+              .then(res => res.text())
+              .then(resolve)
+              .catch(reject);
+          };
+        });
+
         if (!qz.websocket.isActive()) {
-          // Configure digital certificate for secure silent printing
-          qz.security.setCertificatePromise(() => {
-            return authFetch(apiUrl('/api/settings/qz-certificate'))
-              .then(res => res.text());
-          });
-
-          // Configure digital signature backend handler
-          qz.security.setSignaturePromise((toSign) => {
-            return (resolve, reject) => {
-              authFetch(apiUrl('/api/settings/qz-sign'), {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ toSign })
-              })
-                .then(res => res.text())
-                .then(resolve)
-                .catch(reject);
-            };
-          });
-
           await qz.websocket.connect({ retries: 2, delay: 1 });
         }
         const targetPrinter = s.barPrinterName || null;
