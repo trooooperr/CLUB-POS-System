@@ -298,14 +298,14 @@ export function AppProvider({ children }) {
       try {
         // Configure digital certificate for secure silent printing
         qz.security.setCertificatePromise(() => {
-          return authFetch(apiUrl('/api/settings/qz-certificate'))
+          return authFetch(apiUrl('/api/qz/certificate'))
             .then(res => res.text());
         });
 
         // Configure digital signature backend handler
         qz.security.setSignaturePromise((toSign) => {
           return (resolve, reject) => {
-            authFetch(apiUrl('/api/settings/qz-sign'), {
+            authFetch(apiUrl('/api/qz/sign'), {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ toSign })
@@ -621,16 +621,16 @@ export function AppProvider({ children }) {
 
   // ── QZ Tray Auto Connect ──────────────────────────────────────────
   useEffect(() => {
-    if (qz) {
+    if (qz && currentUser && settings.qzTrayEnabled) {
       // Configure digital certificate and signature globally on load
       qz.security.setCertificatePromise(() => {
-        return authFetch(apiUrl('/api/settings/qz-certificate'))
+        return authFetch(apiUrl('/api/qz/certificate'))
           .then(res => res.text());
       });
 
       qz.security.setSignaturePromise((toSign) => {
         return (resolve, reject) => {
-          authFetch(apiUrl('/api/settings/qz-sign'), {
+          authFetch(apiUrl('/api/qz/sign'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ toSign })
@@ -653,7 +653,7 @@ export function AppProvider({ children }) {
       };
       connectQz();
     }
-  }, [settings.qzTrayEnabled]);
+  }, [currentUser, settings.qzTrayEnabled]);
 
   // ── Socket.IO ────────────────────────────────────────────────────
   useEffect(() => {

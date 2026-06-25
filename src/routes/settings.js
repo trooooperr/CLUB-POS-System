@@ -197,48 +197,4 @@ router.put('/', requireRole('admin'), async (req, res) => {
   res.json(normalized);
 });
 
-// Route to get the public QZ Certificate for browser-to-tray handshakes
-router.get('/qz-certificate', async (req, res) => {
-  try {
-    const fs = require('fs');
-    const path = require('path');
-    const certPath = path.join(__dirname, '../../keys/qz-certificate.crt');
-    if (!fs.existsSync(certPath)) {
-      return res.status(404).json({ message: 'QZ Certificate not found' });
-    }
-    const certificate = fs.readFileSync(certPath, 'utf8');
-    res.type('text/plain').send(certificate);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-});
-
-// Route to sign the QZ Tray print request using private key
-router.post('/qz-sign', async (req, res) => {
-  try {
-    const fs = require('fs');
-    const path = require('path');
-    const crypto = require('crypto');
-    const { toSign, request } = req.body;
-    const dataToSign = toSign || request;
-    if (!dataToSign) {
-      return res.status(400).json({ message: 'Nothing to sign' });
-    }
-
-    const keyPath = path.join(__dirname, '../../keys/qz-private.key');
-    if (!fs.existsSync(keyPath)) {
-      return res.status(404).json({ message: 'QZ Private Key not found' });
-    }
-
-    const privateKey = fs.readFileSync(keyPath, 'utf8');
-    const sign = crypto.createSign('RSA-SHA512');
-    sign.update(dataToSign);
-    const signature = sign.sign(privateKey, 'base64');
-    
-    res.send(signature);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-});
-
 module.exports = router;

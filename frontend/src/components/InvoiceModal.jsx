@@ -153,14 +153,14 @@ export default function InvoiceModal() {
       try {
         // Configure digital certificate for secure silent printing (Must be set every time)
         qz.security.setCertificatePromise(() => {
-          return authFetch(apiUrl('/api/settings/qz-certificate'))
+          return authFetch(apiUrl('/api/qz/certificate'))
             .then(res => res.text());
         });
 
         // Configure digital signature backend handler (Must be set every time)
         qz.security.setSignaturePromise((toSign) => {
           return (resolve, reject) => {
-            authFetch(apiUrl('/api/settings/qz-sign'), {
+            authFetch(apiUrl('/api/qz/sign'), {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ toSign })
