@@ -6096,3 +6096,38 @@ textarea,
     padding: 0px !important;
   }
 }
+
+.category-drag-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.category-drag-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: var(--s2);
+  border: 1px solid var(--b1);
+  border-radius: 8px;
+  transition: background 0.2s;
+}
+
+.category-drag-row:hover {
+  background: var(--s3);
+}
+
+.category-drag-row .drag-handle {
+  cursor: grab;
+  color: var(--t3);
+  display: flex;
+  align-items: center;
+  padding: 4px;
+}
+
+.category-drag-row .drag-handle:active {
+  cursor: grabbing;
+}
+
