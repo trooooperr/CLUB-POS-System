@@ -29,11 +29,11 @@ function itemsFromQuantityMap(quantities) {
 async function updateMenuAvailability(names) {
   if (!names.length) return;
 
-  const inventoryItems = await Inventory.find({ name: { $in: names } }).select('name stock');
+  const inventoryItems = await Inventory.find({ name: { $in: names } }).select('name stock trackStock');
   const ops = inventoryItems.map(item => ({
     updateOne: {
       filter: { name: item.name },
-      update: { $set: { available: item.stock > 0 } }
+      update: { $set: { available: item.trackStock === false ? true : (item.stock > 0) } }
     }
   }));
 
@@ -73,16 +73,30 @@ async function deductInventoryForItems(items = []) {
   const names = [...quantities.keys()];
   if (!names.length) return getInventorySnapshot();
 
-  const ops = [...quantities.entries()].map(([name, quantity]) => ({
-    updateOne: {
-      filter: { name },
-      update: [
-        { $set: { stock: { $max: [0, { $subtract: ['$stock', quantity] }] } } }
-      ]
-    }
-  }));
+  const inventoryItems = await Inventory.find({ name: { $in: names } }).select('name trackStock');
+  const trackedNames = new Set(
+    inventoryItems
+      .filter(item => item.trackStock !== false)
+      .map(item => item.name)
+  );
 
-  await Inventory.bulkWrite(ops, { ordered: false });
+  const ops = [];
+  for (const [name, quantity] of quantities.entries()) {
+    if (trackedNames.has(name)) {
+      ops.push({
+        updateOne: {
+          filter: { name },
+          update: [
+            { $set: { stock: { $max: [0, { $subtract: ['$stock', quantity] }] } } }
+          ]
+        }
+      });
+    }
+  }
+
+  if (ops.length) {
+    await Inventory.bulkWrite(ops, { ordered: false });
+  }
   await updateMenuAvailability(names);
   await deleteCache([INVENTORY_CACHE_KEY, MENU_CACHE_KEY]);
   return getInventorySnapshot();

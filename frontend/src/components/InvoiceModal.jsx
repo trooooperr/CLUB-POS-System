@@ -5,7 +5,7 @@ import { apiUrl, authFetch } from '../lib/api';
 const qz = typeof window !== 'undefined' ? window.qz : null;
 
 export default function InvoiceModal() {
-  const { invoiceOrder, setInvoiceOrder, settings, showToast } = useApp();
+  const { invoiceOrder, setInvoiceOrder, settings, showToast, workers } = useApp();
   const [phone, setPhone] = useState(invoiceOrder?.customerPhone || '');
   const [sent, setSent] = useState(false);
   const [tab, setTab] = useState('whatsapp');
@@ -14,8 +14,20 @@ export default function InvoiceModal() {
   const o = invoiceOrder;
   const s = settings;
 
+  // Calculate QR urls for both screen preview and print
+  const roundedGrandTotal = Math.round(o.grandTotal);
+  const upiId = s.upiId || 'dummy@upi';
+  const merchantName = s.restaurantName || 'HUMTUM';
+  const includeAmount = s.includeUpiAmount !== false;
+  const upiUrl = `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(merchantName)}${includeAmount ? `&am=${roundedGrandTotal}` : ''}&cu=INR`;
+  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(upiUrl)}`;
+
+  const waiterObj = (workers || []).find(w => w.name?.toLowerCase().trim() === o.waiterName?.toLowerCase().trim()) || null;
+  const waiterTipQrUrl = waiterObj?.upiId
+    ? `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(`upi://pay?pa=${encodeURIComponent(waiterObj.upiId)}&pn=${encodeURIComponent(waiterObj.name)}&cu=INR`)}`
+    : '';
+
   const handlePrint = async () => {
-    const roundedGrandTotal = Math.round(o.grandTotal);
     const html = `
       <html>
         <head>
@@ -59,6 +71,7 @@ export default function InvoiceModal() {
             .total-amount { font-size: 11px; }
             
             .footer-msg { font-size: 11px; margin-top: 15px; font-weight: bold; font-style: italic; }
+            .qr-code { width: 130px; height: 130px; margin: 8px auto 2px; display: block; }
           </style>
         </head>
         <body>
@@ -103,6 +116,20 @@ export default function InvoiceModal() {
 
           <div class="center" style="margin-top: 10px; font-size: 13px; font-weight: 900;">
             PAID VIA ${o.paymentMode?.toUpperCase()}
+          </div>
+
+          <div class="dash-line"></div>
+
+          <div class="center" style="margin-top: 8px;">
+            <div style="font-size: 13px; font-weight: bold; margin-bottom: 4px;">SCAN TO PAY BILL</div>
+            <img class="qr-code" src="${qrCodeUrl}" alt="QR Code" />
+
+            ${waiterTipQrUrl ? `
+              <div class="dash-line" style="margin: 12px 0 8px 0;"></div>
+              <div style="font-size: 13px; font-weight: bold; margin-bottom: 2px;">TIP YOUR WAITER</div>
+              <div style="font-size: 11px; font-weight: bold; color: #555; margin-bottom: 4px;">Scan to Tip ${waiterObj.name.toUpperCase()} directly</div>
+              <img class="qr-code" style="width: 100px; height: 100px; margin: 4px auto 2px; display: block;" src="${waiterTipQrUrl}" alt="Tip QR Code" />
+            ` : ''}
           </div>
 
           <div class="dash-line"></div>
@@ -313,6 +340,20 @@ ${s.thankYouMsg}
                 </div>
 
                 {o.dueAmount > 0 && <div className="sum-row due-row"><span>DUE AMOUNT</span><span>{s.currency}{o.dueAmount.toFixed(2)}</span></div>}
+              </div>
+
+              {/* QR Code on screen */}
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', margin: '12px 0' }}>
+                <div style={{ fontSize: 11, fontWeight: 'bold', color: '#1e293b', marginBottom: 4 }}>SCAN TO PAY</div>
+                <img src={qrCodeUrl} alt="QR Code" style={{ width: 110, height: 110 }} />
+                {waiterTipQrUrl && (
+                  <>
+                    <div style={{ borderTop: '1px dashed #cbd5e1', width: '100%', margin: '12px 0 8px 0' }}></div>
+                    <div style={{ fontSize: 11, fontWeight: 'bold', color: '#1e293b', marginBottom: 2 }}>TIP WAITER</div>
+                    <div style={{ fontSize: 9, color: '#64748b', marginBottom: 4 }}>Scan to tip {waiterObj?.name?.toUpperCase()}</div>
+                    <img src={waiterTipQrUrl} alt="Tip QR Code" style={{ width: 90, height: 90 }} />
+                  </>
+                )}
               </div>
 
               <div className="bill-footer-note">

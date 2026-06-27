@@ -162,6 +162,37 @@ describe('HumTum POS - Rigorous API and Security Audit Suite', () => {
         .send({ quantityChange: 5 });
       expect(res.statusCode).toBe(403);
     });
+
+    it('should ALLOW manager to reorder inventory items successfully', async () => {
+      const res = await request(app)
+        .put('/api/inventory/reorder')
+        .set('Authorization', `Bearer ${managerToken}`)
+        .send({ orderedIds: [sampleInventoryItem._id] });
+
+      expect(res.statusCode).toBe(200);
+      expect(res.body.success).toBe(true);
+    });
+
+    it('should ALLOW creating an inventory item with trackStock: false and verify it is available with no stock', async () => {
+      const res = await request(app)
+        .post('/api/inventory')
+        .set('Authorization', `Bearer ${managerToken}`)
+        .send({
+          name: 'Chocolate Milkshake',
+          category: 'Dessert',
+          unit: 'Pieces',
+          price: 150,
+          trackStock: false
+        });
+
+      expect(res.statusCode).toBe(201);
+      expect(res.body.trackStock).toBe(false);
+
+      // Verify that corresponding MenuItem has available: true
+      const menuItem = await MenuItem.findOne({ name: 'Chocolate Milkshake' });
+      expect(menuItem).toBeDefined();
+      expect(menuItem.available).toBe(true);
+    });
   });
 
   describe('3. Menu Operations Checks', () => {

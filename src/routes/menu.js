@@ -1,4 +1,5 @@
 const express = require('express');
+const mongoose = require('mongoose');
 const MenuItem = require('../models/MenuItem');
 const Inventory = require('../models/Inventory');
 const { getCache, setCache, deleteCache } = require('../lib/redis');
@@ -76,12 +77,14 @@ router.put('/reorder', requireRole(['admin', 'manager']), async (req, res) => {
     if (!Array.isArray(orderedIds)) {
       return res.status(400).json({ message: 'orderedIds array is required' });
     }
-    const bulkOps = orderedIds.map((id, index) => ({
-      updateOne: {
-        filter: { _id: id },
-        update: { $set: { order: index } }
-      }
-    }));
+    const bulkOps = orderedIds
+      .filter(id => mongoose.Types.ObjectId.isValid(id))
+      .map((id, index) => ({
+        updateOne: {
+          filter: { _id: new mongoose.Types.ObjectId(id) },
+          update: { $set: { order: index } }
+        }
+      }));
     if (bulkOps.length > 0) {
       await MenuItem.bulkWrite(bulkOps);
     }
@@ -108,7 +111,7 @@ router.post('/sync', requireRole(['admin', 'manager']), async (req, res) => {
           name: inv.name,
           category: inv.category,
           price: inv.price,
-          available: inv.stock > 0,
+          available: inv.trackStock === false ? true : (inv.stock > 0),
           shortcut: inv.shortcut || '',
           department: 'bar',
         },

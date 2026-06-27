@@ -9,6 +9,7 @@ const UNITS = ['Bottles', 'Cans', 'Litre', 'ml', 'Kg', 'Gram', 'Pieces'];
 
 /* STATUS */
 const getStatus = (i) => {
+  if (i.trackStock === false) return { text: 'Unlimited', cls: 'b-green' };
   if (i.stock === 0) return { text: 'Out of Stock', cls: 'b-red' };
   if (i.stock <= i.minStock) return { text: 'Low Stock', cls: 'b-amber' };
   return { text: 'In Stock', cls: 'b-green' };
@@ -61,10 +62,10 @@ function StockModal({ item, onClose, onSave }) {
     : ['General'];
   const [form, setForm] = useState(() => {
     if (item) {
-      return { ...item, isAlcoholic: !!(item.isAlcoholic || item.isAlcohol) };
+      return { ...item, isAlcoholic: !!(item.isAlcoholic || item.isAlcohol), trackStock: item.trackStock !== false };
     }
     return {
-      name: '', category: categories[0] || 'General', unit: 'Bottles', stock: 0, minStock: 5, price: '', shortcut: '', isAlcoholic: false
+      name: '', category: categories[0] || 'General', unit: 'Bottles', stock: 0, minStock: 5, price: '', shortcut: '', isAlcoholic: false, trackStock: true
     };
   });
   const [error, setError] = useState(null);
@@ -87,11 +88,12 @@ function StockModal({ item, onClose, onSave }) {
     }
     const data = {
       ...form,
-      stock: Number(form.stock) || 0,
-      minStock: Number(form.minStock) || 0,
+      stock: form.trackStock ? (Number(form.stock) || 0) : 0,
+      minStock: form.trackStock ? (Number(form.minStock) || 0) : 0,
       price: Number(form.price) || 0,
       shortcut: (form.shortcut || '').toLowerCase().trim(),
-      isAlcoholic: !!form.isAlcoholic
+      isAlcoholic: !!form.isAlcoholic,
+      trackStock: !!form.trackStock
     };
     setError(null);
     setSaving(true);
@@ -116,16 +118,29 @@ function StockModal({ item, onClose, onSave }) {
           <input value={form.name} onChange={e => set('name', e.target.value)} />
         </div>
 
-        <div className="frow2">
-          <div className="fgroup">
-            <label className="lbl">Stock</label>
-            <input type="number" value={form.stock} onChange={e => set('stock', e.target.value)} />
-          </div>
-          <div className="fgroup">
-            <label className="lbl">Min Stock</label>
-            <input type="number" value={form.minStock} onChange={e => set('minStock', e.target.value)} />
-          </div>
+        <div className="fgroup" style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4, marginBottom: 12 }}>
+          <input 
+            type="checkbox" 
+            id="trackStock"
+            checked={!!form.trackStock} 
+            onChange={e => set('trackStock', e.target.checked)} 
+            style={{ width: 'auto', margin: 0, cursor: 'pointer' }}
+          />
+          <label htmlFor="trackStock" style={{ margin: 0, cursor: 'pointer', fontSize: 13, fontWeight: 'bold' }}>Track Stock Level</label>
         </div>
+
+        {form.trackStock && (
+          <div className="frow2">
+            <div className="fgroup">
+              <label className="lbl">Stock</label>
+              <input type="number" value={form.stock} onChange={e => set('stock', e.target.value)} />
+            </div>
+            <div className="fgroup">
+              <label className="lbl">Min Stock</label>
+              <input type="number" value={form.minStock} onChange={e => set('minStock', e.target.value)} />
+            </div>
+          </div>
+        )}
 
         <div className="frow2">
           <div className="fgroup">
@@ -406,16 +421,20 @@ export default function InventoryPage() {
                               </div>
                             </div>
 
-                            <div className="invRight">
-                              <div className="invStock">{i.stock}</div>
+                             <div className="invRight">
+                              <div className="invStock">{i.trackStock === false ? '—' : i.stock}</div>
                               <span className={`badge ${s.cls}`}>{s.text}</span>
                             </div>
                           </div>
 
                           {isAdmin ? (
                             <div className="invActions">
-                              <button className="btn btn-danger btn-icon-sm" onClick={() => adjust(i._id, -1)}>-</button>
-                              <button className="btn btn-success btn-icon-sm" onClick={() => adjust(i._id, 1)}>+</button>
+                              {i.trackStock !== false && (
+                                <>
+                                  <button className="btn btn-danger btn-icon-sm" onClick={() => adjust(i._id, -1)}>-</button>
+                                  <button className="btn btn-success btn-icon-sm" onClick={() => adjust(i._id, 1)}>+</button>
+                                </>
+                              )}
                               <div style={{ display: 'flex', gap: 4, margin: '0 8px' }}>
                                 <button className="iBtn-round" disabled={index === 0 || !!search} onClick={() => handleShiftItem(index, 'up')} title="Move up" style={{ fontSize: 10, cursor: index === 0 || !!search ? 'not-allowed' : 'pointer', opacity: (index === 0 || !!search) ? 0.3 : 1 }}>▲</button>
                                 <button className="iBtn-round" disabled={index === filtered.length - 1 || !!search} onClick={() => handleShiftItem(index, 'down')} title="Move down" style={{ fontSize: 10, cursor: index === filtered.length - 1 || !!search ? 'not-allowed' : 'pointer', opacity: (index === filtered.length - 1 || !!search) ? 0.3 : 1 }}>▼</button>
@@ -435,7 +454,7 @@ export default function InventoryPage() {
 
                           {open && (
                             <div className="invDetails">
-                              <span>Min: {i.minStock}</span>
+                              <span>Min: {i.trackStock === false ? '—' : i.minStock}</span>
                               <span>₹{i.price}</span>
                             </div>
                           )}
@@ -490,7 +509,7 @@ export default function InventoryPage() {
                               <td>{i.shortcut ? <span className="invShortcut">{i.shortcut}</span> : '—'}</td>
                               <td>{i.category}</td>
                               <td>₹{i.price}</td>
-                              <td>{i.stock}</td>
+                               <td>{i.trackStock === false ? '—' : i.stock}</td>
                               <td>
                                 <span className={`badge ${i.isAlcoholic || i.isAlcohol ? 'b-red' : 'b-green'}`}>
                                   {i.isAlcoholic || i.isAlcohol ? 'Alcoholic' : 'Non-Alcoholic'}
@@ -499,8 +518,12 @@ export default function InventoryPage() {
                               <td><span className={`badge ${s.cls}`}>{s.text}</span></td>
                                {isAdmin && (
                                  <td className="action-cell">
-                                   <button className="btn btn-danger btn-icon-sm" onClick={() => adjust(i._id, -1)}>-</button>
-                                   <button className="btn btn-success btn-icon-sm" onClick={() => adjust(i._id, 1)}>+</button>
+                                   {i.trackStock !== false && (
+                                     <>
+                                       <button className="btn btn-danger btn-icon-sm" onClick={() => adjust(i._id, -1)}>-</button>
+                                       <button className="btn btn-success btn-icon-sm" onClick={() => adjust(i._id, 1)}>+</button>
+                                     </>
+                                   )}
                                    <span style={{ margin: '0 2px', color: 'var(--b1)' }}>|</span>
                                    <button className="btn btn-icon-sm" disabled={index === 0 || !!search} onClick={() => handleShiftItem(index, 'up')} title="Move up" style={{ opacity: (index === 0 || !!search) ? 0.3 : 1 }}>▲</button>
                                    <button className="btn btn-icon-sm" disabled={index === filtered.length - 1 || !!search} onClick={() => handleShiftItem(index, 'down')} title="Move down" style={{ opacity: (index === filtered.length - 1 || !!search) ? 0.3 : 1 }}>▼</button>

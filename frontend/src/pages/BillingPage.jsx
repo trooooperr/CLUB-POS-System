@@ -893,7 +893,7 @@ export default function BillingPage() {
               const stockItem = inventory?.find(inv => inv.name.toLowerCase().trim() === item.name.toLowerCase().trim());
               return (
                 <MenuItem key={item._id} item={item} qty={table.items.find(i => String(i._id) === String(item._id))?.quantity || 0}
-                  stock={stockItem?.stock}
+                  stock={stockItem?.trackStock === false ? undefined : stockItem?.stock}
                   minStock={stockItem?.minStock}
                   add={(id, a) => updateTableItem(activeTableId, id, a)}
                   rem={(id, a) => updateTableItem(activeTableId, id, a)} />

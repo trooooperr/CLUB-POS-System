@@ -224,7 +224,7 @@ export function AppProvider({ children }) {
     setInventory(nextInventory);
     setMenuItems(prev => prev.map(item => {
       const match = nextInventory.find(inv => inv.name?.toLowerCase().trim() === item.name?.toLowerCase().trim());
-      return match ? { ...item, available: match.stock > 0 } : item;
+      return match ? { ...item, available: match.trackStock === false ? true : (match.stock > 0) } : item;
     }));
     localStorage.setItem(INVENTORY_CACHE, JSON.stringify(nextInventory));
   }, []);
@@ -824,7 +824,7 @@ export function AppProvider({ children }) {
       ...i, 
       department: 'bar',
       imageUrl: getImg(i),
-      available: i.stock > 0, 
+      available: i.trackStock === false ? true : (i.stock > 0), 
       isInventory: true 
     }));
 
