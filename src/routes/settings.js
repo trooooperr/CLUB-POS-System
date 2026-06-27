@@ -92,8 +92,8 @@ async function getOrCreateSettings() {
   return Settings.create({ senderEmail: FIXED_SENDER_EMAIL });
 }
 
-// Add Inventory Category (Admin only)
-router.post('/inventory-category', requireRole('admin'), async (req, res) => {
+// Add Inventory Category (Admin/Manager)
+router.post('/inventory-category', requireRole(['admin', 'manager']), async (req, res) => {
   const settings = await getOrCreateSettings();
   const result = addCategory(settings.inventoryCategories, req.body.category);
   if (result.error) return res.status(400).json({ message: result.error });
@@ -104,8 +104,8 @@ router.post('/inventory-category', requireRole('admin'), async (req, res) => {
   res.json(settings.inventoryCategories);
 });
 
-// Remove Inventory Category (Admin only)
-router.delete('/inventory-category', requireRole('admin'), async (req, res) => {
+// Remove Inventory Category (Admin/Manager)
+router.delete('/inventory-category', requireRole(['admin', 'manager']), async (req, res) => {
   const settings = await getOrCreateSettings();
   const result = removeCategory(settings.inventoryCategories, req.body.category);
   if (result.error) return res.status(400).json({ message: result.error });
@@ -117,8 +117,8 @@ router.delete('/inventory-category', requireRole('admin'), async (req, res) => {
 });
 
 
-// Add Menu Category (Admin only)
-router.post('/menu-category', requireRole('admin'), async (req, res) => {
+// Add Menu Category (Admin/Manager)
+router.post('/menu-category', requireRole(['admin', 'manager']), async (req, res) => {
   const settings = await getOrCreateSettings();
   const result = addCategory(settings.menuCategories, req.body.category);
   if (result.error) return res.status(400).json({ message: result.error });
@@ -129,8 +129,8 @@ router.post('/menu-category', requireRole('admin'), async (req, res) => {
   res.json(settings.menuCategories);
 });
 
-// Remove Menu Category (Admin only)
-router.delete('/menu-category', requireRole('admin'), async (req, res) => {
+// Remove Menu Category (Admin/Manager)
+router.delete('/menu-category', requireRole(['admin', 'manager']), async (req, res) => {
   const settings = await getOrCreateSettings();
   const result = removeCategory(settings.menuCategories, req.body.category);
   if (result.error) return res.status(400).json({ message: result.error });
@@ -153,8 +153,8 @@ router.get('/', async (req, res) => {
   res.json(normalized);
 });
 
-// UPDATE settings (Admin only)
-router.put('/', requireRole('admin'), async (req, res) => {
+// UPDATE settings (Admin/Manager)
+router.put('/', requireRole(['admin', 'manager']), async (req, res) => {
   console.log('--- Settings update request received ---');
   console.log('User Role:', req.user?.role);
   console.log('Incoming settings payload:', req.body);
