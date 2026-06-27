@@ -66,20 +66,47 @@ async function warmupCache() {
     const Inventory = require('./src/models/Inventory');
     const Worker    = require('./src/models/Worker');
 
-    const [menuItems, settings, inventory, workers] = await Promise.all([
-      MenuItem.find().sort({ category: 1, name: 1 }),
+    const [rawMenuItems, settings, rawInventory, workers] = await Promise.all([
+      MenuItem.find(),
       (async () => {
         const existing = await Settings.findOne();
         return existing || Settings.create({});
       })(),
-      Inventory.find().sort({ category: 1, name: 1 }),
+      Inventory.find(),
       Worker.find().sort({ name: 1 }),
     ]);
 
+    const menuCategories = settings ? (settings.menuCategories || []) : [];
+    const inventoryCategories = settings ? (settings.inventoryCategories || []) : [];
+
+    rawMenuItems.sort((a, b) => {
+      const catAIndex = menuCategories.indexOf(a.category);
+      const catBIndex = menuCategories.indexOf(b.category);
+      const indexA = catAIndex === -1 ? 999999 : catAIndex;
+      const indexB = catBIndex === -1 ? 999999 : catBIndex;
+      if (indexA !== indexB) return indexA - indexB;
+      const orderA = a.order || 0;
+      const orderB = b.order || 0;
+      if (orderA !== orderB) return orderA - orderB;
+      return a.name.localeCompare(b.name);
+    });
+
+    rawInventory.sort((a, b) => {
+      const catAIndex = inventoryCategories.indexOf(a.category);
+      const catBIndex = inventoryCategories.indexOf(b.category);
+      const indexA = catAIndex === -1 ? 999999 : catAIndex;
+      const indexB = catBIndex === -1 ? 999999 : catBIndex;
+      if (indexA !== indexB) return indexA - indexB;
+      const orderA = a.order || 0;
+      const orderB = b.order || 0;
+      if (orderA !== orderB) return orderA - orderB;
+      return a.name.localeCompare(b.name);
+    });
+
     await Promise.all([
-      setCache('menu:all',          menuItems, 300),
+      setCache('menu:all',          rawMenuItems, 300),
       setCache('settings:current',  settings,  300),
-      setCache('inventory:all',     inventory, 300),
+      setCache('inventory:all',     rawInventory, 300),
       setCache('workers:all',       workers,   300),
     ]);
     console.log('🔥 Cache warmed up');

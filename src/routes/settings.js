@@ -188,12 +188,12 @@ router.put('/', requireRole('admin'), async (req, res) => {
   if (req.body.adminEmail !== undefined) settings.adminEmail = cleanString(req.body.adminEmail).toLowerCase();
 
   const inventoryCategories = cleanCategoryList(req.body.inventoryCategories);
-  if (inventoryCategories && inventoryCategories.length > 0) {
+  if (inventoryCategories !== undefined) {
     settings.inventoryCategories = inventoryCategories;
   }
 
   const menuCategories = cleanCategoryList(req.body.menuCategories);
-  if (menuCategories && menuCategories.length > 0) {
+  if (menuCategories !== undefined) {
     settings.menuCategories = menuCategories;
   }
 

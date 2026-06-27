@@ -1116,6 +1116,54 @@ export function AppProvider({ children }) {
     setInventory(prev => prev.filter(i=>i._id!==id));
   }, []);
 
+  const reorderMenuItems = useCallback(async (orderedIds) => {
+    try {
+      const res = await authFetch(apiUrl('/api/menu/reorder'), {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderedIds })
+      });
+      if (!res.ok) throw new Error('Failed to reorder menu items');
+      setMenuItems(prev => {
+        const next = prev.map(item => {
+          const idx = orderedIds.indexOf(item._id);
+          if (idx !== -1) {
+            return { ...item, order: idx };
+          }
+          return item;
+        });
+        return next;
+      });
+    } catch (err) {
+      console.error(err);
+      showToast('Failed to update order of menu items', 'error');
+    }
+  }, [showToast]);
+
+  const reorderInventoryItems = useCallback(async (orderedIds) => {
+    try {
+      const res = await authFetch(apiUrl('/api/inventory/reorder'), {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderedIds })
+      });
+      if (!res.ok) throw new Error('Failed to reorder inventory items');
+      setInventory(prev => {
+        const next = prev.map(item => {
+          const idx = orderedIds.indexOf(item._id);
+          if (idx !== -1) {
+            return { ...item, order: idx };
+          }
+          return item;
+        });
+        return next;
+      });
+    } catch (err) {
+      console.error(err);
+      showToast('Failed to update order of inventory items', 'error');
+    }
+  }, [showToast]);
+
   // settleOrder removed — payments consolidated in finalizeBill/generateBill flows
 
   // ── KOT Functions ───────────────────────────────────────────────
@@ -1281,6 +1329,7 @@ export function AppProvider({ children }) {
       menuItems, orderHistory, workers,
       inventory, setInventory,
       saveInventoryItem, deleteInventoryItem,
+      reorderMenuItems, reorderInventoryItems,
       loading, error, loadData,
       tableBills, setTableBills, activeTableId, selectTable,
       updateTableItem, clearTable, setTableField, setItemNote,

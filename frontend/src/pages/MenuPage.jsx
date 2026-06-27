@@ -1,8 +1,9 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { Plus, Pencil, Trash2, X, Search, Filter, AlertCircle, Check } from 'lucide-react';
 import TopNavBar from '../components/TopNavBar';
+import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
 
 /* ITEM MODAL */
 function ItemModal({ item, onClose, onSave }) {
@@ -110,26 +111,45 @@ function ItemModal({ item, onClose, onSave }) {
 }
 
 export default function MenuPage() {
-  const { menuItems, saveMenuItem, deleteMenuItem, settings, inventory } = useApp();
+  const { menuItems, saveMenuItem, deleteMenuItem, settings, inventory, reorderMenuItems } = useApp();
   const menuCategories = Array.isArray(settings.menuCategories) && settings.menuCategories.length > 0
     ? settings.menuCategories
     : ['General'];
   const [modal, setModal] = useState(null);
   const [search, setSearch] = useState('');
-  const [catFilter, setCatFilter] = useState('All');
+  const [catFilter, setCatFilter] = useState(() => menuCategories[0] || 'General');
   const [confirmDel, setConfirmDel] = useState(null); // stores ID of item being deleted
+
+  useEffect(() => {
+    if (menuCategories.length > 0 && !menuCategories.includes(catFilter)) {
+      setCatFilter(menuCategories[0]);
+    }
+  }, [menuCategories, catFilter]);
 
   const filtered = useMemo(() => {
     const invNames = new Set((inventory || []).map(inv => (inv.name || '').toLowerCase().trim()));
     return menuItems.filter(i => {
       if (invNames.has((i.name || '').toLowerCase().trim())) return false;
       const ms = i.name.toLowerCase().includes(search.toLowerCase());
-      const mc = catFilter === 'All' || i.category === catFilter;
+      const mc = i.category === catFilter;
       return ms && mc;
     });
   }, [menuItems, inventory, search, catFilter]);
 
-  const cats = ['All', ...menuCategories];
+  const cats = menuCategories;
+
+  const onDragEnd = (result) => {
+    const { source, destination } = result;
+    if (!destination) return;
+    if (source.index === destination.index) return;
+
+    const itemsOfCategory = Array.from(filtered);
+    const [removed] = itemsOfCategory.splice(source.index, 1);
+    itemsOfCategory.splice(destination.index, 0, removed);
+
+    const orderedIds = itemsOfCategory.map(item => item._id);
+    reorderMenuItems(orderedIds);
+  };
 
   return (
     <div className="fi fade-in">
@@ -179,64 +199,86 @@ export default function MenuPage() {
 
       {/* MOBILE CARDS */}
       <div className="mobileView">
-        {filtered.map(item => (
-          <div key={item._id} className={`menu-mobile-card ${confirmDel === item._id ? 'deleting' : ''}`}>
-            {confirmDel === item._id ? (
-              <div className="del-confirm-overlay">
-                <AlertCircle size={18} color="var(--red)" />
-                <span>Delete "{item.name}"?</span>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button className="btn-mini-ghost" onClick={() => setConfirmDel(null)}>No</button>
-                  <button className="btn-mini-red" onClick={() => { deleteMenuItem(item._id); setConfirmDel(null); }}>Yes</button>
-                </div>
+        <DragDropContext onDragEnd={onDragEnd}>
+          <Droppable droppableId="menu-mobile-list">
+            {(provided) => (
+              <div ref={provided.innerRef} {...provided.droppableProps}>
+                {filtered.map((item, index) => (
+                  <Draggable key={item._id} draggableId={item._id} index={index} isDragDisabled={!!search}>
+                    {(provided) => (
+                      <div
+                        ref={provided.innerRef}
+                        {...provided.draggableProps}
+                        {...provided.dragHandleProps}
+                        className={`menu-mobile-card ${confirmDel === item._id ? 'deleting' : ''}`}
+                        style={{
+                          ...provided.draggableProps.style,
+                          cursor: !!search ? 'default' : 'grab'
+                        }}
+                      >
+                        {confirmDel === item._id ? (
+                          <div className="del-confirm-overlay">
+                            <AlertCircle size={18} color="var(--red)" />
+                            <span>Delete "{item.name}"?</span>
+                            <div style={{ display: 'flex', gap: 8 }}>
+                              <button className="btn-mini-ghost" onClick={() => setConfirmDel(null)}>No</button>
+                              <button className="btn-mini-red" onClick={() => { deleteMenuItem(item._id); setConfirmDel(null); }}>Yes</button>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            {!item.available && (
+                              <div className="sold-out-badge">SOLD OUT</div>
+                            )}
+                            <div className="menu-card-top">
+                              <div>
+                                <div className="menu-item-name" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                  {item.department !== 'bar' && (
+                                    <span style={{
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      width: 14,
+                                      height: 14,
+                                      border: `1px solid ${item.isVeg !== false ? '#28a745' : '#dc3545'}`,
+                                      padding: 2,
+                                      flexShrink: 0
+                                    }}>
+                                      <span style={{
+                                        width: 6,
+                                        height: 6,
+                                        borderRadius: '50%',
+                                        backgroundColor: item.isVeg !== false ? '#28a745' : '#dc3545'
+                                      }} />
+                                    </span>
+                                  )}
+                                  <span>{item.name}</span>
+                                </div>
+                                <span className="badge-mini">{item.category}</span>
+                              </div>
+                              <div className="menu-item-price">₹{item.price.toFixed(0)}</div>
+                            </div>
+                            <div className="menu-card-bottom">
+                              <label className="switch mini">
+                                <input type="checkbox" checked={item.available} onChange={e => saveMenuItem({ available: e.target.checked }, item._id)} />
+                                <span className="slider round"></span>
+                              </label>
+                              <div style={{ display: 'flex', gap: 10 }}>
+                                <button className="iBtn-round edit" onClick={() => setModal(item)}><Pencil size={12} /></button>
+                                <button className="iBtn-round del" onClick={() => setConfirmDel(item._id)}><Trash2 size={12} /></button>
+                              </div>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </Draggable>
+                ))}
+                {provided.placeholder}
               </div>
-            ) : (
-              <>
-                {!item.available && (
-                  <div className="sold-out-badge">SOLD OUT</div>
-                )}
-                <div className="menu-card-top">
-                  <div>
-                    <div className="menu-item-name" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      {item.department !== 'bar' && (
-                        <span style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          width: 14,
-                          height: 14,
-                          border: `1px solid ${item.isVeg !== false ? '#28a745' : '#dc3545'}`,
-                          padding: 2,
-                          flexShrink: 0
-                        }}>
-                          <span style={{
-                            width: 6,
-                            height: 6,
-                            borderRadius: '50%',
-                            backgroundColor: item.isVeg !== false ? '#28a745' : '#dc3545'
-                          }} />
-                        </span>
-                      )}
-                      <span>{item.name}</span>
-                    </div>
-                    <span className="badge-mini">{item.category}</span>
-                  </div>
-                  <div className="menu-item-price">₹{item.price.toFixed(0)}</div>
-                </div>
-                <div className="menu-card-bottom">
-                  <label className="switch mini">
-                    <input type="checkbox" checked={item.available} onChange={e => saveMenuItem({ available: e.target.checked }, item._id)} />
-                    <span className="slider round"></span>
-                  </label>
-                  <div style={{ display: 'flex', gap: 10 }}>
-                    <button className="iBtn-round edit" onClick={() => setModal(item)}><Pencil size={12} /></button>
-                    <button className="iBtn-round del" onClick={() => setConfirmDel(item._id)}><Trash2 size={12} /></button>
-                  </div>
-                </div>
-              </>
             )}
-          </div>
-        ))}
+          </Droppable>
+        </DragDropContext>
       </div>
 
       {/* DESKTOP VIEW */}
@@ -246,59 +288,78 @@ export default function MenuPage() {
             <thead>
               <tr><th>Item Name</th><th>Category</th><th style={{ textAlign: 'right' }}>Price</th><th style={{ textAlign: 'center' }}>Shortcut</th><th style={{ textAlign: 'center' }}>Status</th><th style={{ textAlign: 'center' }}>Actions</th></tr>
             </thead>
-            <tbody>
-              {filtered.map(item => (
-                <tr key={item._id}>
-                  <td style={{ fontWeight: 600 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      {item.department !== 'bar' && (
-                        <span style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          width: 14,
-                          height: 14,
-                          border: `1px solid ${item.isVeg !== false ? '#28a745' : '#dc3545'}`,
-                          padding: 2,
-                          flexShrink: 0
-                        }}>
-                          <span style={{
-                            width: 6,
-                            height: 6,
-                            borderRadius: '50%',
-                            backgroundColor: item.isVeg !== false ? '#28a745' : '#dc3545'
-                          }} />
-                        </span>
-                      )}
-                      <span>{item.name}</span>
-                    </div>
-                  </td>
-                  <td><span className="badge">{item.category}</span></td>
-                  <td style={{ textAlign: 'right', fontWeight: 800 }}>₹{item.price.toFixed(2)}</td>
-                  <td style={{ textAlign: 'center' }}><span className="menu-shortcut">{item.shortcut || '—'}</span></td>
-                  <td style={{ textAlign: 'center' }}>
-                    <label className="switch">
-                      <input type="checkbox" checked={item.available} onChange={e => saveMenuItem({ available: e.target.checked }, item._id)} />
-                      <span className="slider round"></span>
-                    </label>
-                    {!item.available && <span style={{ color: 'var(--red)', fontSize: 9, fontWeight: 800, marginLeft: 5 }}>SOLD OUT</span>}
-                  </td>
-                  <td style={{ textAlign: 'center' }}>
-                    {confirmDel === item._id ? (
-                      <div className="row-del-confirm">
-                        <button className="confirm-y" onClick={() => { deleteMenuItem(item._id); setConfirmDel(null); }}>Delete</button>
-                        <button className="confirm-n" onClick={() => setConfirmDel(null)}>Cancel</button>
-                      </div>
-                    ) : (
-                      <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
-                        <button className="iBtn" onClick={() => setModal(item)}><Pencil size={13} /></button>
-                        <button className="iBtn" style={{ color: 'var(--red)' }} onClick={() => setConfirmDel(item._id)}><Trash2 size={13} /></button>
-                      </div>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
+            <DragDropContext onDragEnd={onDragEnd}>
+              <Droppable droppableId="menu-desktop-list">
+                {(provided) => (
+                  <tbody ref={provided.innerRef} {...provided.droppableProps}>
+                    {filtered.map((item, index) => (
+                      <Draggable key={item._id} draggableId={item._id} index={index} isDragDisabled={!!search}>
+                        {(provided) => (
+                          <tr
+                            ref={provided.innerRef}
+                            {...provided.draggableProps}
+                            {...provided.dragHandleProps}
+                            style={{
+                              ...provided.draggableProps.style,
+                              cursor: !!search ? 'default' : 'grab'
+                            }}
+                          >
+                            <td style={{ fontWeight: 600 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                {item.department !== 'bar' && (
+                                  <span style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    width: 14,
+                                    height: 14,
+                                    border: `1px solid ${item.isVeg !== false ? '#28a745' : '#dc3545'}`,
+                                    padding: 2,
+                                    flexShrink: 0
+                                  }}>
+                                    <span style={{
+                                      width: 6,
+                                      height: 6,
+                                      borderRadius: '50%',
+                                      backgroundColor: item.isVeg !== false ? '#28a745' : '#dc3545'
+                                    }} />
+                                  </span>
+                                )}
+                                <span>{item.name}</span>
+                              </div>
+                            </td>
+                            <td><span className="badge">{item.category}</span></td>
+                            <td style={{ textAlign: 'right', fontWeight: 800 }}>₹{item.price.toFixed(2)}</td>
+                            <td style={{ textAlign: 'center' }}><span className="menu-shortcut">{item.shortcut || '—'}</span></td>
+                            <td style={{ textAlign: 'center' }}>
+                              <label className="switch">
+                                <input type="checkbox" checked={item.available} onChange={e => saveMenuItem({ available: e.target.checked }, item._id)} />
+                                <span className="slider round"></span>
+                              </label>
+                              {!item.available && <span style={{ color: 'var(--red)', fontSize: 9, fontWeight: 800, marginLeft: 5 }}>SOLD OUT</span>}
+                            </td>
+                            <td style={{ textAlign: 'center' }}>
+                              {confirmDel === item._id ? (
+                                <div className="row-del-confirm">
+                                  <button className="confirm-y" onClick={() => { deleteMenuItem(item._id); setConfirmDel(null); }}>Delete</button>
+                                  <button className="confirm-n" onClick={() => setConfirmDel(null)}>Cancel</button>
+                                </div>
+                              ) : (
+                                <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+                                  <button className="iBtn" onClick={() => setModal(item)}><Pencil size={13} /></button>
+                                  <button className="iBtn" style={{ color: 'var(--red)' }} onClick={() => setConfirmDel(item._id)}><Trash2 size={13} /></button>
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        )}
+                      </Draggable>
+                    ))}
+                    {provided.placeholder}
+                  </tbody>
+                )}
+              </Droppable>
+            </DragDropContext>
           </table>
         </div>
       </div>

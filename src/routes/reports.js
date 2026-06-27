@@ -172,7 +172,19 @@ async function sendDailyReportInternal(options = {}) {
 
   const { start, end } = getBusinessDayBounds();
   const orders = await Order.find({ date: { $gte: start, $lt: end } });
-  const inventory = await Inventory.find().sort({ category: 1, name: 1 });
+  const inventory = await Inventory.find();
+  const inventoryCategories = resolvedSettings.inventoryCategories || [];
+  inventory.sort((a, b) => {
+    const catAIndex = inventoryCategories.indexOf(a.category);
+    const catBIndex = inventoryCategories.indexOf(b.category);
+    const indexA = catAIndex === -1 ? 999999 : catAIndex;
+    const indexB = catBIndex === -1 ? 999999 : catBIndex;
+    if (indexA !== indexB) return indexA - indexB;
+    const orderA = a.order || 0;
+    const orderB = b.order || 0;
+    if (orderA !== orderB) return orderA - orderB;
+    return a.name.localeCompare(b.name);
+  });
 
   const html = buildReportHTML({ date: start, orders, settings: resolvedSettings, inventory });
   const transporter = await createTransport(resolvedEmailConfig);
@@ -223,7 +235,19 @@ router.get('/daily-html', async (req, res) => {
 
     const { start, end } = getBusinessDayBounds();
     const orders = await Order.find({ date: { $gte: start, $lt: end } });
-    const inventory = await Inventory.find().sort({ category: 1, name: 1 });
+    const inventory = await Inventory.find();
+    const inventoryCategories = resolvedSettings.inventoryCategories || [];
+    inventory.sort((a, b) => {
+      const catAIndex = inventoryCategories.indexOf(a.category);
+      const catBIndex = inventoryCategories.indexOf(b.category);
+      const indexA = catAIndex === -1 ? 999999 : catAIndex;
+      const indexB = catBIndex === -1 ? 999999 : catBIndex;
+      if (indexA !== indexB) return indexA - indexB;
+      const orderA = a.order || 0;
+      const orderB = b.order || 0;
+      if (orderA !== orderB) return orderA - orderB;
+      return a.name.localeCompare(b.name);
+    });
 
     const html = buildReportHTML({ date: start, orders, settings: resolvedSettings, inventory });
     res.send(html);

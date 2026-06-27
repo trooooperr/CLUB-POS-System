@@ -9,6 +9,7 @@ const menuItemSchema = new mongoose.Schema({
   department: { type: String, default: 'kitchen', enum: ['kitchen', 'bar', 'dessert', 'other'] },
   shortcut:  { type: String, default: '', lowercase: true, trim: true },
   isVeg:     { type: Boolean, default: true },
+  order:     { type: Number, default: 0 },
 }, { timestamps: true });
 
 // Create a unique index only for non-empty shortcuts

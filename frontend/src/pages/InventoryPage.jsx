@@ -3,6 +3,7 @@ import { Plus, X, ChevronDown, ChevronUp, Search, Trash2 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { apiUrl, authFetch } from '../lib/api';
 import TopNavBar from '../components/TopNavBar';
+import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
 
 const UNITS = ['Bottles', 'Cans', 'Litre', 'ml', 'Kg', 'Gram', 'Pieces'];
 
@@ -180,7 +181,7 @@ function StockModal({ item, onClose, onSave }) {
 
 /* MAIN */
 export default function InventoryPage() {
-  const { settings, role, can, inventory, setInventory, deleteInventoryItem } = useApp();
+  const { settings, role, can, inventory, setInventory, deleteInventoryItem, reorderInventoryItems } = useApp();
   const isAdmin = role === 'admin' || role === 'manager';
   const categories = Array.isArray(settings.inventoryCategories) && settings.inventoryCategories.length > 0
     ? settings.inventoryCategories
@@ -192,8 +193,14 @@ export default function InventoryPage() {
   const [endDate, setEndDate] = useState('');
   const startInputRef = React.useRef(null);
   const endInputRef = React.useRef(null);
-  const [cat, setCat] = useState('All');
+  const [cat, setCat] = useState(() => categories[0] || 'General');
   const [confirmDelete, setConfirmDelete] = useState(null);
+
+  useEffect(() => {
+    if (categories.length > 0 && !categories.includes(cat)) {
+      setCat(categories[0]);
+    }
+  }, [categories, cat]);
 
   const clearFilters = () => {
     setSearch('');
@@ -280,9 +287,22 @@ export default function InventoryPage() {
 
   const filtered = inventory.filter(i => {
     const nameMatch = i.name && i.name.toLowerCase().includes(search.toLowerCase());
-    const catMatch = (cat === 'All' || i.category === cat);
+    const catMatch = i.category === cat;
     return nameMatch && catMatch;
   });
+
+  const onDragEnd = (result) => {
+    const { source, destination } = result;
+    if (!destination) return;
+    if (source.index === destination.index) return;
+
+    const itemsOfCategory = Array.from(filtered);
+    const [removed] = itemsOfCategory.splice(source.index, 1);
+    itemsOfCategory.splice(destination.index, 0, removed);
+
+    const orderedIds = itemsOfCategory.map(item => item._id);
+    reorderInventoryItems(orderedIds);
+  };
 
   return (
     <div className="fi inventory-page">
@@ -308,7 +328,6 @@ export default function InventoryPage() {
 </div>
           <div className="select-wrapper-unified hide-on-desktop" style={{ width: '110px', flexShrink: 0 }}>
             <select value={cat} onChange={e => setCat(e.target.value)} style={{ paddingLeft: '14px' }}>
-              <option value="All">All</option>
               {categories.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
@@ -327,13 +346,6 @@ export default function InventoryPage() {
 
       {/* CATEGORY */}
       <div className="chipsWrap hide-on-mobile">
-        <button
-          key="All"
-          className={`chip ${cat === 'All' ? 'on' : ''}`}
-          onClick={() => setCat('All')}
-        >
-          All
-        </button>
         {categories.map(c => (
           <button
             key={c}
@@ -347,57 +359,78 @@ export default function InventoryPage() {
 
       {/* MOBILE */}
       <div className="mobileView">
-        {filtered.map(i => {
-          const s = getStatus(i);
-          const open = expanded === i._id;
+        <DragDropContext onDragEnd={onDragEnd}>
+          <Droppable droppableId="inventory-mobile-list">
+            {(provided) => (
+              <div ref={provided.innerRef} {...provided.droppableProps}>
+                {filtered.map((i, index) => {
+                  const s = getStatus(i);
+                  const open = expanded === i._id;
 
-          return (
-            <div key={i._id} className="invCard">
+                  return (
+                    <Draggable key={i._id} draggableId={i._id} index={index} isDragDisabled={!isAdmin || !!search}>
+                      {(provided) => (
+                        <div
+                          ref={provided.innerRef}
+                          {...provided.draggableProps}
+                          {...provided.dragHandleProps}
+                          className="invCard"
+                          style={{
+                            ...provided.draggableProps.style,
+                            cursor: (!isAdmin || !!search) ? 'default' : 'grab'
+                          }}
+                        >
+                          <div className="invTop">
+                            <div>
+                              <div className="invName">{i.name}</div>
+                              {i.shortcut && <div className="invShortcutRow">Shortcut: <span className="invShortcut">{i.shortcut}</span></div>}
+                              <div className="invMeta">{i.category} • ₹{i.price}</div>
+                              <div style={{ marginTop: 4 }}>
+                                <span className={`badge ${i.isAlcoholic || i.isAlcohol ? 'b-red' : 'b-green'}`} style={{ fontSize: 10 }}>
+                                  {i.isAlcoholic || i.isAlcohol ? 'Alcoholic' : 'Non-Alcoholic'}
+                                </span>
+                              </div>
+                            </div>
 
-              <div className="invTop">
-                <div>
-                  <div className="invName">{i.name}</div>
-                  {i.shortcut && <div className="invShortcutRow">Shortcut: <span className="invShortcut">{i.shortcut}</span></div>}
-                  <div className="invMeta">{i.category} • ₹{i.price}</div>
-                  <div style={{ marginTop: 4 }}>
-                    <span className={`badge ${i.isAlcoholic || i.isAlcohol ? 'b-red' : 'b-green'}`} style={{ fontSize: 10 }}>
-                      {i.isAlcoholic || i.isAlcohol ? 'Alcoholic' : 'Non-Alcoholic'}
-                    </span>
-                  </div>
-                </div>
+                            <div className="invRight">
+                              <div className="invStock">{i.stock}</div>
+                              <span className={`badge ${s.cls}`}>{s.text}</span>
+                            </div>
+                          </div>
 
-                <div className="invRight">
-                  <div className="invStock">{i.stock}</div>
-                  <span className={`badge ${s.cls}`}>{s.text}</span>
-                </div>
+                          {isAdmin ? (
+                            <div className="invActions">
+                              <button className="btn btn-danger btn-icon-sm" onClick={() => adjust(i._id, -1)}>-</button>
+                              <button className="btn btn-success btn-icon-sm" onClick={() => adjust(i._id, 1)}>+</button>
+                              <button className="btn btn-blue btn-sm" onClick={() => setModal(i)}>Edit</button>
+                              <button className="btn btn-icon-sm btn-danger" onClick={() => setConfirmDelete(i._id)} title="Delete item"><Trash2 size={14} /></button>
+                            </div>
+                          ) : (
+                            <div className="invActions view-only-label" style={{ padding: '4px 0', fontSize: 11, color: 'var(--t3)', fontStyle: 'italic' }}>
+                              Read-only Access
+                            </div>
+                          )}
+
+                          <div className="expand hide-mobile" onClick={() => setExpanded(open ? null : i._id)}>
+                            {open ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                          </div>
+
+                          {open && (
+                            <div className="invDetails">
+                              <span>Min: {i.minStock}</span>
+                              <span>₹{i.price}</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </Draggable>
+                  );
+                })}
+                {provided.placeholder}
               </div>
-
-              {isAdmin ? (
-                <div className="invActions">
-                  <button className="btn btn-danger btn-icon-sm" onClick={() => adjust(i._id, -1)}>-</button>
-                  <button className="btn btn-success btn-icon-sm" onClick={() => adjust(i._id, 1)}>+</button>
-                  <button className="btn btn-blue btn-sm" onClick={() => setModal(i)}>Edit</button>
-                  <button className="btn btn-icon-sm btn-danger" onClick={() => setConfirmDelete(i._id)} title="Delete item"><Trash2 size={14} /></button>
-                </div>
-              ) : (
-                <div className="invActions view-only-label" style={{ padding: '4px 0', fontSize: 11, color: 'var(--t3)', fontStyle: 'italic' }}>
-                  Read-only Access
-                </div>
-              )}
-
-              <div className="expand hide-mobile" onClick={() => setExpanded(open ? null : i._id)}>
-                {open ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-              </div>
-
-              {open && (
-                <div className="invDetails">
-                  <span>Min: {i.minStock}</span>
-                  <span>₹{i.price}</span>
-                </div>
-              )}
-            </div>
-          );
-        })}
+            )}
+          </Droppable>
+        </DragDropContext>
       </div>
 
       {/* DESKTOP */}
@@ -417,34 +450,53 @@ export default function InventoryPage() {
               </tr>
             </thead>
 
-            <tbody>
-              {filtered.map(i => {
-                const s = getStatus(i);
-                return (
-                  <tr key={i._id}>
-                    <td>{i.name}</td>
-                    <td>{i.shortcut ? <span className="invShortcut">{i.shortcut}</span> : '—'}</td>
-                    <td>{i.category}</td>
-                    <td>₹{i.price}</td>
-                    <td>{i.stock}</td>
-                    <td>
-                      <span className={`badge ${i.isAlcoholic || i.isAlcohol ? 'b-red' : 'b-green'}`}>
-                        {i.isAlcoholic || i.isAlcohol ? 'Alcoholic' : 'Non-Alcoholic'}
-                      </span>
-                    </td>
-                    <td><span className={`badge ${s.cls}`}>{s.text}</span></td>
-                    {isAdmin && (
-                      <td className="action-cell">
-                        <button className="btn btn-danger btn-icon-sm" onClick={() => adjust(i._id, -1)}>-</button>
-                        <button className="btn btn-success btn-icon-sm" onClick={() => adjust(i._id, 1)}>+</button>
-                        <button className="btn btn-blue btn-sm" onClick={() => setModal(i)}>Edit</button>
-                        <button className="btn btn-icon-sm btn-danger" onClick={() => setConfirmDelete(i._id)} title="Delete item"><Trash2 size={14} /></button>
-                      </td>
-                    )}
-                  </tr>
-                );
-              })}
-            </tbody>
+            <DragDropContext onDragEnd={onDragEnd}>
+              <Droppable droppableId="inventory-desktop-list">
+                {(provided) => (
+                  <tbody ref={provided.innerRef} {...provided.droppableProps}>
+                    {filtered.map((i, index) => {
+                      const s = getStatus(i);
+                      return (
+                        <Draggable key={i._id} draggableId={i._id} index={index} isDragDisabled={!isAdmin || !!search}>
+                          {(provided) => (
+                            <tr
+                              ref={provided.innerRef}
+                              {...provided.draggableProps}
+                              {...provided.dragHandleProps}
+                              style={{
+                                ...provided.draggableProps.style,
+                                cursor: (!isAdmin || !!search) ? 'default' : 'grab'
+                              }}
+                            >
+                              <td>{i.name}</td>
+                              <td>{i.shortcut ? <span className="invShortcut">{i.shortcut}</span> : '—'}</td>
+                              <td>{i.category}</td>
+                              <td>₹{i.price}</td>
+                              <td>{i.stock}</td>
+                              <td>
+                                <span className={`badge ${i.isAlcoholic || i.isAlcohol ? 'b-red' : 'b-green'}`}>
+                                  {i.isAlcoholic || i.isAlcohol ? 'Alcoholic' : 'Non-Alcoholic'}
+                                </span>
+                              </td>
+                              <td><span className={`badge ${s.cls}`}>{s.text}</span></td>
+                              {isAdmin && (
+                                <td className="action-cell">
+                                  <button className="btn btn-danger btn-icon-sm" onClick={() => adjust(i._id, -1)}>-</button>
+                                  <button className="btn btn-success btn-icon-sm" onClick={() => adjust(i._id, 1)}>+</button>
+                                  <button className="btn btn-blue btn-sm" onClick={() => setModal(i)}>Edit</button>
+                                  <button className="btn btn-icon-sm btn-danger" onClick={() => setConfirmDelete(i._id)} title="Delete item"><Trash2 size={14} /></button>
+                                </td>
+                              )}
+                            </tr>
+                          )}
+                        </Draggable>
+                      );
+                    })}
+                    {provided.placeholder}
+                  </tbody>
+                )}
+              </Droppable>
+            </DragDropContext>
           </table>
         </div>
       </div>

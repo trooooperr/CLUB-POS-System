@@ -8,10 +8,38 @@ const router = express.Router();
 const MENU_CACHE_KEY = 'menu:all';
 const INVENTORY_CACHE_KEY = 'inventory:all';
 
+const sortMenuItems = async (items) => {
+  const Settings = require('../models/Settings');
+  const settings = await Settings.findOne();
+  const menuCategories = settings ? (settings.menuCategories || []) : [];
+  
+  items.sort((a, b) => {
+    const catAIndex = menuCategories.indexOf(a.category);
+    const catBIndex = menuCategories.indexOf(b.category);
+    
+    const indexA = catAIndex === -1 ? 999999 : catAIndex;
+    const indexB = catBIndex === -1 ? 999999 : catBIndex;
+    
+    if (indexA !== indexB) {
+      return indexA - indexB;
+    }
+    
+    const orderA = a.order || 0;
+    const orderB = b.order || 0;
+    if (orderA !== orderB) {
+      return orderA - orderB;
+    }
+    
+    return a.name.localeCompare(b.name);
+  });
+  return items;
+};
+
 // Get all menu items (Staff and above can view menu)
 router.get('/', async (req, res) => {
   try {
-    const items = await MenuItem.find().sort({ category: 1, name: 1 });
+    const rawItems = await MenuItem.find();
+    const items = await sortMenuItems(rawItems);
     await setCache(MENU_CACHE_KEY, items, 300);
     res.json(items);
   } catch (err) { res.status(500).json({ message: err.message }); }
@@ -39,6 +67,32 @@ router.get('/shortcut/:code', async (req, res) => {
     if (!item) return res.status(404).json({ message: 'Shortcut not found' });
     res.json(item);
   } catch (err) { res.status(500).json({ message: err.message }); }
+});
+
+// Reorder menu items (Admin/Manager only)
+router.put('/reorder', requireRole(['admin', 'manager']), async (req, res) => {
+  try {
+    const { orderedIds } = req.body;
+    if (!Array.isArray(orderedIds)) {
+      return res.status(400).json({ message: 'orderedIds array is required' });
+    }
+    const bulkOps = orderedIds.map((id, index) => ({
+      updateOne: {
+        filter: { _id: id },
+        update: { $set: { order: index } }
+      }
+    }));
+    if (bulkOps.length > 0) {
+      await MenuItem.bulkWrite(bulkOps);
+    }
+    await deleteCache(MENU_CACHE_KEY);
+    if (req.app.locals.io) {
+      req.app.locals.io.emit('REFRESH_MENU');
+    }
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
 });
 
 // Sync menu from inventory (Admin/Manager only)

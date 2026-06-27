@@ -41,7 +41,31 @@ async function updateMenuAvailability(names) {
 }
 
 async function getInventorySnapshot() {
-  return Inventory.find().sort({ category: 1, name: 1 });
+  const items = await Inventory.find();
+  const Settings = require('../models/Settings');
+  const settings = await Settings.findOne();
+  const inventoryCategories = settings ? (settings.inventoryCategories || []) : [];
+  
+  items.sort((a, b) => {
+    const catAIndex = inventoryCategories.indexOf(a.category);
+    const catBIndex = inventoryCategories.indexOf(b.category);
+    
+    const indexA = catAIndex === -1 ? 999999 : catAIndex;
+    const indexB = catBIndex === -1 ? 999999 : catBIndex;
+    
+    if (indexA !== indexB) {
+      return indexA - indexB;
+    }
+    
+    const orderA = a.order || 0;
+    const orderB = b.order || 0;
+    if (orderA !== orderB) {
+      return orderA - orderB;
+    }
+    
+    return a.name.localeCompare(b.name);
+  });
+  return items;
 }
 
 async function deductInventoryForItems(items = []) {

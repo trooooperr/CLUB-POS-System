@@ -8,10 +8,38 @@ const router = express.Router();
 const INVENTORY_CACHE_KEY = 'inventory:all';
 const MENU_CACHE_KEY = 'menu:all';
 
+const sortInventoryItems = async (items) => {
+  const Settings = require('../models/Settings');
+  const settings = await Settings.findOne();
+  const inventoryCategories = settings ? (settings.inventoryCategories || []) : [];
+  
+  items.sort((a, b) => {
+    const catAIndex = inventoryCategories.indexOf(a.category);
+    const catBIndex = inventoryCategories.indexOf(b.category);
+    
+    const indexA = catAIndex === -1 ? 999999 : catAIndex;
+    const indexB = catBIndex === -1 ? 999999 : catBIndex;
+    
+    if (indexA !== indexB) {
+      return indexA - indexB;
+    }
+    
+    const orderA = a.order || 0;
+    const orderB = b.order || 0;
+    if (orderA !== orderB) {
+      return orderA - orderB;
+    }
+    
+    return a.name.localeCompare(b.name);
+  });
+  return items;
+};
+
 // GET ALL INVENTORY ITEMS (Allowed for all authenticated staff)
 router.get('/', async (req, res) => {
   try {
-    const items = await Inventory.find().sort({ category: 1, name: 1 });
+    const rawItems = await Inventory.find();
+    const items = await sortInventoryItems(rawItems);
     await setCache(INVENTORY_CACHE_KEY, items, 300);
     res.json(items);
   } catch (err) {
@@ -70,7 +98,8 @@ router.post(
       await deleteCache([INVENTORY_CACHE_KEY, MENU_CACHE_KEY]);
       if (req.app.locals.io) {
         req.app.locals.io.emit('REFRESH_MENU');
-        const allInv = await Inventory.find().sort({ category: 1, name: 1 });
+        const allInvRaw = await Inventory.find();
+        const allInv = await sortInventoryItems(allInvRaw);
         req.app.locals.io.emit('INVENTORY_UPDATED', { inventory: allInv, timestamp: new Date() });
       }
       res.status(201).json(savedInv);
@@ -120,7 +149,8 @@ router.put(
       await deleteCache([INVENTORY_CACHE_KEY, MENU_CACHE_KEY]);
       if (req.app.locals.io) {
         req.app.locals.io.emit('REFRESH_MENU');
-        const allInv = await Inventory.find().sort({ category: 1, name: 1 });
+        const allInvRaw = await Inventory.find();
+        const allInv = await sortInventoryItems(allInvRaw);
         req.app.locals.io.emit('INVENTORY_UPDATED', { inventory: allInv, timestamp: new Date() });
       }
       res.json(updated);
@@ -147,7 +177,8 @@ router.patch('/:id/stock', requireRole(['admin', 'manager']), async (req, res) =
     await deleteCache([INVENTORY_CACHE_KEY, MENU_CACHE_KEY]);
     if (req.app.locals.io) {
       req.app.locals.io.emit('REFRESH_MENU');
-      const allInv = await Inventory.find().sort({ category: 1, name: 1 });
+      const allInvRaw = await Inventory.find();
+      const allInv = await sortInventoryItems(allInvRaw);
       req.app.locals.io.emit('INVENTORY_UPDATED', { inventory: allInv, timestamp: new Date() });
     }
     res.json(updated);
@@ -165,10 +196,39 @@ router.delete('/:id', requireRole(['admin', 'manager']), async (req, res) => {
     await deleteCache([INVENTORY_CACHE_KEY, MENU_CACHE_KEY]);
     if (req.app.locals.io) {
       req.app.locals.io.emit('REFRESH_MENU');
-      const allInv = await Inventory.find().sort({ category: 1, name: 1 });
+      const allInvRaw = await Inventory.find();
+      const allInv = await sortInventoryItems(allInvRaw);
       req.app.locals.io.emit('INVENTORY_UPDATED', { inventory: allInv, timestamp: new Date() });
     }
     res.json({ message: 'Item deleted successfully' });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// Reorder inventory items (Admin/Manager only)
+router.put('/reorder', requireRole(['admin', 'manager']), async (req, res) => {
+  try {
+    const { orderedIds } = req.body;
+    if (!Array.isArray(orderedIds)) {
+      return res.status(400).json({ message: 'orderedIds array is required' });
+    }
+    const bulkOps = orderedIds.map((id, index) => ({
+      updateOne: {
+        filter: { _id: id },
+        update: { $set: { order: index } }
+      }
+    }));
+    if (bulkOps.length > 0) {
+      await Inventory.bulkWrite(bulkOps);
+    }
+    await deleteCache(INVENTORY_CACHE_KEY);
+    if (req.app.locals.io) {
+      const allInvRaw = await Inventory.find();
+      const allInv = await sortInventoryItems(allInvRaw);
+      req.app.locals.io.emit('INVENTORY_UPDATED', { inventory: allInv, timestamp: new Date() });
+    }
+    res.json({ success: true });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
