@@ -38,13 +38,25 @@ function DateField({ value, onChange, inputRef, label }) {
 }
 
 export default function OrdersPage() {
-  const { orderHistory, setInvoiceOrder, invoiceOrder, settings } = useApp();
+  const { orderHistory, setInvoiceOrder, invoiceOrder, settings, deleteOrder, role, showToast } = useApp();
   const [search, setSearch] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const c = settings.currency;
   const startInputRef = React.useRef(null);
   const endInputRef = React.useRef(null);
+
+  const handleDeleteOrder = async (id, billNo) => {
+    const displayBillNo = billNo ? `HTB-${billNo.split('-').pop()}` : 'this order';
+    if (window.confirm(`Are you sure you want to delete order ${displayBillNo}?`)) {
+      try {
+        await deleteOrder(id);
+        showToast('Order deleted successfully', 'success');
+      } catch (err) {
+        showToast(err.message || 'Failed to delete order', 'error');
+      }
+    }
+  };
 
   const filtered = useMemo(() => {
     return (Array.isArray(orderHistory) ? orderHistory : []).filter(o => {
@@ -158,13 +170,24 @@ export default function OrdersPage() {
               </div>
               <div className="card-footer-info">
                 <span className="cust-name-card">{o.customerName || 'Walk-in Customer'}</span>
-                <button
-                  className="btn btn-primary btn-sm"
-                  style={{ padding: '2px 8px', fontSize: '11px', height: '24px' }}
-                  onClick={(e) => { e.stopPropagation(); setInvoiceOrder(o); }}
-                >
-                  View Bill
-                </button>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button
+                    className="btn btn-primary btn-sm"
+                    style={{ padding: '2px 8px', fontSize: '11px', height: '24px' }}
+                    onClick={(e) => { e.stopPropagation(); setInvoiceOrder(o); }}
+                  >
+                    View Bill
+                  </button>
+                  {role === 'admin' && (
+                    <button
+                      className="btn btn-danger btn-sm"
+                      style={{ padding: '2px 8px', fontSize: '11px', height: '24px' }}
+                      onClick={(e) => { e.stopPropagation(); handleDeleteOrder(o._id, o.billNo); }}
+                    >
+                      Delete
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           ))
@@ -195,6 +218,9 @@ export default function OrdersPage() {
                   <td style={{ textAlign: 'center' }}>
                     <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
                       <button className="btn btn-primary btn-sm" onClick={() => setInvoiceOrder(o)}>View Bill</button>
+                      {role === 'admin' && (
+                        <button className="btn btn-danger btn-sm" onClick={() => handleDeleteOrder(o._id, o.billNo)}>Delete</button>
+                      )}
                     </div>
                   </td>
                 </tr>

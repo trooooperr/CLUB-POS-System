@@ -117,12 +117,12 @@ export default function MenuPage() {
     : ['General'];
   const [modal, setModal] = useState(null);
   const [search, setSearch] = useState('');
-  const [catFilter, setCatFilter] = useState(() => menuCategories[0] || 'General');
+  const [catFilter, setCatFilter] = useState('All');
   const [confirmDel, setConfirmDel] = useState(null); // stores ID of item being deleted
 
   useEffect(() => {
-    if (menuCategories.length > 0 && !menuCategories.includes(catFilter)) {
-      setCatFilter(menuCategories[0]);
+    if (catFilter !== 'All' && menuCategories.length > 0 && !menuCategories.includes(catFilter)) {
+      setCatFilter('All');
     }
   }, [menuCategories, catFilter]);
 
@@ -131,12 +131,12 @@ export default function MenuPage() {
     return menuItems.filter(i => {
       if (invNames.has((i.name || '').toLowerCase().trim())) return false;
       const ms = i.name.toLowerCase().includes(search.toLowerCase());
-      const mc = i.category === catFilter;
+      const mc = catFilter === 'All' || i.category === catFilter;
       return ms && mc;
     });
   }, [menuItems, inventory, search, catFilter]);
 
-  const cats = menuCategories;
+  const cats = ['All', ...menuCategories];
 
   const onDragEnd = (result) => {
     const { source, destination } = result;
@@ -218,7 +218,7 @@ export default function MenuPage() {
             {(provided) => (
               <div ref={provided.innerRef} {...provided.droppableProps}>
                 {filtered.map((item, index) => (
-                  <Draggable key={item._id} draggableId={item._id} index={index} isDragDisabled={!!search}>
+                  <Draggable key={item._id} draggableId={item._id} index={index} isDragDisabled={!!search || catFilter === 'All'}>
                     {(provided) => (
                       <div
                         ref={provided.innerRef}
@@ -227,7 +227,7 @@ export default function MenuPage() {
                         className={`menu-mobile-card ${confirmDel === item._id ? 'deleting' : ''}`}
                         style={{
                           ...provided.draggableProps.style,
-                          cursor: !!search ? 'default' : 'grab'
+                          cursor: (!!search || catFilter === 'All') ? 'default' : 'grab'
                         }}
                       >
                         {confirmDel === item._id ? (
@@ -278,8 +278,8 @@ export default function MenuPage() {
                                 <span className="slider round"></span>
                               </label>
                               <div style={{ display: 'flex', gap: 4, marginLeft: 12 }}>
-                                <button className="iBtn-round" disabled={index === 0 || !!search} onClick={() => handleShiftItem(index, 'up')} title="Move up" style={{ fontSize: 10, cursor: index === 0 || !!search ? 'not-allowed' : 'pointer', opacity: (index === 0 || !!search) ? 0.3 : 1 }}>▲</button>
-                                <button className="iBtn-round" disabled={index === filtered.length - 1 || !!search} onClick={() => handleShiftItem(index, 'down')} title="Move down" style={{ fontSize: 10, cursor: index === filtered.length - 1 || !!search ? 'not-allowed' : 'pointer', opacity: (index === filtered.length - 1 || !!search) ? 0.3 : 1 }}>▼</button>
+                                <button className="iBtn-round" disabled={index === 0 || !!search || catFilter === 'All'} onClick={() => handleShiftItem(index, 'up')} title="Move up" style={{ fontSize: 10, cursor: index === 0 || !!search || catFilter === 'All' ? 'not-allowed' : 'pointer', opacity: (index === 0 || !!search || catFilter === 'All') ? 0.3 : 1 }}>▲</button>
+                                <button className="iBtn-round" disabled={index === filtered.length - 1 || !!search || catFilter === 'All'} onClick={() => handleShiftItem(index, 'down')} title="Move down" style={{ fontSize: 10, cursor: index === filtered.length - 1 || !!search || catFilter === 'All' ? 'not-allowed' : 'pointer', opacity: (index === filtered.length - 1 || !!search || catFilter === 'All') ? 0.3 : 1 }}>▼</button>
                               </div>
                               <div style={{ display: 'flex', gap: 10, marginLeft: 'auto' }}>
                                 <button className="iBtn-round edit" onClick={() => setModal(item)}><Pencil size={12} /></button>
@@ -311,7 +311,7 @@ export default function MenuPage() {
                 {(provided) => (
                   <tbody ref={provided.innerRef} {...provided.droppableProps}>
                     {filtered.map((item, index) => (
-                      <Draggable key={item._id} draggableId={item._id} index={index} isDragDisabled={!!search}>
+                      <Draggable key={item._id} draggableId={item._id} index={index} isDragDisabled={!!search || catFilter === 'All'}>
                         {(provided) => (
                           <tr
                             ref={provided.innerRef}
@@ -319,7 +319,7 @@ export default function MenuPage() {
                             {...provided.dragHandleProps}
                             style={{
                               ...provided.draggableProps.style,
-                              cursor: !!search ? 'default' : 'grab'
+                              cursor: (!!search || catFilter === 'All') ? 'default' : 'grab'
                             }}
                           >
                             <td style={{ fontWeight: 600 }}>
@@ -363,10 +363,10 @@ export default function MenuPage() {
                                   <button className="confirm-n" onClick={() => setConfirmDel(null)}>Cancel</button>
                                 </div>
                               ) : (
-                                <div style={{ display: 'flex', gap: 8, justifyContent: 'center', alignItems: 'center' }}>
-                                  <button className="iBtn" disabled={index === 0 || !!search} onClick={() => handleShiftItem(index, 'up')} title="Move up" style={{ opacity: (index === 0 || !!search) ? 0.3 : 1 }}>▲</button>
-                                  <button className="iBtn" disabled={index === filtered.length - 1 || !!search} onClick={() => handleShiftItem(index, 'down')} title="Move down" style={{ opacity: (index === filtered.length - 1 || !!search) ? 0.3 : 1 }}>▼</button>
-                                  <span style={{ color: 'var(--b1)', margin: '0 2px' }}>|</span>
+                                  <div style={{ display: 'flex', gap: 8, justifyContent: 'center', alignItems: 'center' }}>
+                                    <button className="iBtn" disabled={index === 0 || !!search || catFilter === 'All'} onClick={() => handleShiftItem(index, 'up')} title="Move up" style={{ opacity: (index === 0 || !!search || catFilter === 'All') ? 0.3 : 1 }}>▲</button>
+                                    <button className="iBtn" disabled={index === filtered.length - 1 || !!search || catFilter === 'All'} onClick={() => handleShiftItem(index, 'down')} title="Move down" style={{ opacity: (index === filtered.length - 1 || !!search || catFilter === 'All') ? 0.3 : 1 }}>▼</button>
+                                    <span style={{ color: 'var(--b1)', margin: '0 2px' }}>|</span>
                                   <button className="iBtn" onClick={() => setModal(item)}><Pencil size={13} /></button>
                                   <button className="iBtn" style={{ color: 'var(--red)' }} onClick={() => setConfirmDel(item._id)}><Trash2 size={13} /></button>
                                 </div>

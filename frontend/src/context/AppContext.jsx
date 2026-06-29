@@ -1074,6 +1074,13 @@ export function AppProvider({ children }) {
     setMenuItems(prev => prev.filter(i=>i._id!==id));
   }, []);
 
+  const deleteOrder = useCallback(async (id) => {
+    const res = await authFetch(apiUrl(`/api/orders/${id}`), { method:'DELETE' });
+    if (!res.ok) throw new Error('Failed to delete order');
+    setOrderHistory(prev => prev.filter(o => o._id !== id));
+  }, []);
+
+
   // ── Worker CRUD ──────────────────────────────────────────────────────
   const saveWorker = useCallback(async (data, id) => {
     const method = id ? 'PUT' : 'POST';
@@ -1339,7 +1346,7 @@ export function AppProvider({ children }) {
       getTableStatus, generateBill,
       activeSessions, getTableInfo,
       invoiceOrder, setInvoiceOrder,
-      saveMenuItem, deleteMenuItem,
+      saveMenuItem, deleteMenuItem, deleteOrder,
       saveWorker, deleteWorker, updateWorkerStatus,
       toast, showToast,
       NUM_TABLES,
