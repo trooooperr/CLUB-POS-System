@@ -1243,6 +1243,49 @@ export function AppProvider({ children }) {
     }
   }, [socket]);
 
+  const removeKOTItem = useCallback(async (orderId, name, quantityToRemove) => {
+    try {
+      const res = await authFetch(apiUrl('/api/kots/remove-item'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId, name, quantityToRemove })
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || 'Failed to remove KOT item');
+      }
+      const data = await res.json();
+      if (data.inventory) applyInventoryUpdate(data.inventory);
+      
+      // Force reload active session to update UI state
+      if (socket) socket.emit('kot-updated');
+      return data;
+    } catch (err) {
+      console.error('Remove KOT item error:', err);
+      throw err;
+    }
+  }, [socket, applyInventoryUpdate]);
+
+  const deleteKOT = useCallback(async (kotId, tableNo) => {
+    try {
+      const res = await authFetch(apiUrl(`/api/kots/${kotId}`), {
+        method: 'DELETE'
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || 'Failed to delete KOT');
+      }
+      const data = await res.json();
+      if (data.inventory) applyInventoryUpdate(data.inventory);
+      setKots(prev => prev.filter(k => k._id !== kotId));
+      if (socket) socket.emit('kot-updated');
+      return data;
+    } catch (err) {
+      console.error('Delete KOT error:', err);
+      throw err;
+    }
+  }, [socket, applyInventoryUpdate]);
+
   const finalizeBill = useCallback(async (orderId, items, subtotal, sgst, cgst, discount, roundOff, grandTotal, waiterName = '', orderType = 'dine-in', customerName = '', customerPhone = '') => {
     try {
       const res = await authFetch(apiUrl(`/api/orders/${orderId}/finalize-bill`), {
@@ -1330,7 +1373,7 @@ export function AppProvider({ children }) {
       // Socket.IO & KOT functions
       socket,
       kotSessions, currentSession, kots,
-      openTableSession, syncTableSession, createKOT, updateKOTStatus, finalizeBill, completeOrder,
+      openTableSession, syncTableSession, createKOT, updateKOTStatus, removeKOTItem, deleteKOT, finalizeBill, completeOrder,
       printKOTDocument, printBillDocument,
     }}>
       {children}

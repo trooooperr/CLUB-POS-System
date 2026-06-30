@@ -191,7 +191,8 @@ export default function BillingPage() {
     billTotals, filteredMenu, categories, categoryFilter, setCategoryFilter,
     menuSearch, setMenuSearch, inventory, workers, getTableStatus, getTableInfo, settings, NUM_TABLES,
     openTableSession, createKOT, finalizeBill, completeOrder, socket, syncTableSession,
-    setSidebarOpen, showToast, printKOTDocument, printBillDocument
+    setSidebarOpen, showToast, printKOTDocument, printBillDocument,
+    removeKOTItem, deleteKOT, role
   } = useApp();
 
   const [pm, setPm] = useState('cash');
@@ -967,13 +968,38 @@ export default function BillingPage() {
                 <div style={{ color: 'var(--t2)', fontSize: 12, textAlign: 'center', paddingTop: 12 }}>No items added yet</div>
               )}
 
-              {/* Sent (KOT-printed) items — read-only, shown first */}
+              {/* Sent (KOT-printed) items — shown first with custom remove/reduce control */}
               {combinedItems.sent.map((item, idx) => (
                 <div key={item._id || idx} className="b-item-entry">
                   <div className="b-item-row">
-                    <span className="b-item-name">{item.name}</span>
+                    <span className="b-item-name" style={{ color: 'var(--t1)' }}>{item.name} <span style={{ fontSize: 9, color: 'var(--t3)' }}>(Sent)</span></span>
                     <div className="b-item-ctrl">
-                      <span style={{ minWidth: 20, textAlign: 'center', fontWeight: 700, fontSize: 13 }}>{item.quantity}×</span>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (busy) return;
+                          const activeOrderId = activeOrder?._id || activeOrder;
+                          if (!activeOrderId) return;
+                          
+                          if (confirm(`Are you sure you want to remove 1x "${item.name}" from KOT? This will refund inventory stock.`)) {
+                            setBusy(true);
+                            try {
+                              await removeKOTItem(activeOrderId, item.name, 1);
+                              showToast(`Removed 1x "${item.name}" successfully`, 'success');
+                              await loadTableSession(); // Refresh table state
+                            } catch (err) {
+                              showToast(err.message || 'Failed to remove item', 'error');
+                            } finally {
+                              setBusy(false);
+                            }
+                          }
+                        }}
+                        style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.2)', cursor: 'pointer', borderRadius: '4px', width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0', fontSize: '14px', fontWeight: 'bold' }}
+                        title="Remove 1x from KOT (refunds stock)"
+                      >
+                        −
+                      </button>
+                      <span style={{ minWidth: 20, textAlign: 'center', fontWeight: 700, fontSize: 13, color: 'var(--t0)' }}>{item.quantity}</span>
                     </div>
                     <span className="b-item-price">{c}{(item.price * item.quantity).toFixed(0)}</span>
                   </div>
@@ -1060,19 +1086,69 @@ export default function BillingPage() {
 
             {/* KOT History */}
             {kots.length > 0 && (
-  <div className="kot-history">
-    <div style={{ fontSize: 12, fontWeight: 'bold', marginBottom: 4, color: 'var(--t1)' }}>
-      KOT History ({kots.length})
-    </div>
-    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-      {kots.map((k, i) => (
-        <div key={i} style={{ fontSize: 11, background: 'var(--s1)', border: '1px solid var(--b1)', padding: '3px 6px', borderRadius: 4, color: 'var(--t0)', fontWeight: 600 }}>
-          {k.kotNo || `KOT-${i + 1}`} · {new Date(k.createdAt || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })}
-        </div>
-      ))}
-    </div>
-  </div>
-)}
+              <div className="kot-history">
+                <div style={{ fontSize: 12, fontWeight: 'bold', marginBottom: 4, color: 'var(--t1)' }}>
+                  KOT History ({kots.length})
+                </div>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {kots.map((k, i) => (
+                    <div 
+                      key={i} 
+                      style={{ 
+                        fontSize: 11, 
+                        background: 'var(--s1)', 
+                        border: '1px solid var(--b1)', 
+                        padding: '3px 8px', 
+                        borderRadius: 6, 
+                        color: 'var(--t0)', 
+                        fontWeight: 600,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}
+                    >
+                      <span>{k.kotNo || `KOT-${i + 1}`} · {new Date(k.createdAt || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })}</span>
+                      {(role === 'admin' || role === 'manager') && (
+                        <button
+                          type="button"
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            if (busy) return;
+                            if (confirm(`⚠️ WARNING: Are you sure you want to DELETE entire "${k.kotNo || 'KOT'}"? All items in this KOT will be deleted and their stock will be refunded.`)) {
+                              setBusy(true);
+                              try {
+                                await deleteKOT(k._id, k.tableNo);
+                                showToast(`Deleted ${k.kotNo || 'KOT'} and refunded stock successfully`, 'success');
+                                await loadTableSession(); // Refresh table state
+                              } catch (err) {
+                                showToast(err.message || 'Failed to delete KOT', 'error');
+                              } finally {
+                                setBusy(false);
+                              }
+                            }
+                          }}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: '#ff4d4d',
+                            cursor: 'pointer',
+                            fontSize: '12px',
+                            fontWeight: 'bold',
+                            padding: '0 2px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            opacity: 0.85
+                          }}
+                          title="Delete KOT (Admin Only)"
+                        >
+                          ×
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

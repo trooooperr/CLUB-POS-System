@@ -165,11 +165,69 @@ function broadcastInventoryUpdate(req, inventory, extra = {}) {
   });
 }
 
+async function refundInventoryForItems(items = []) {
+  const quantities = aggregateQuantities(items);
+  const names = [...quantities.keys()];
+  if (!names.length) return getInventorySnapshot();
+
+  const directInvItems = await Inventory.find({ name: { $in: names } });
+  
+  const parentIds = directInvItems
+    .filter(i => i.linkInventoryId)
+    .map(i => i.linkInventoryId);
+
+  const allMatching = await Inventory.find({
+    $or: [
+      { name: { $in: names } },
+      { _id: { $in: parentIds } }
+    ]
+  });
+
+  const inventoryById = new Map(allMatching.map(i => [i._id.toString(), i]));
+  const inventoryByName = new Map(allMatching.map(i => [i.name.trim().toLowerCase(), i]));
+
+  const ops = [];
+  for (const [name, quantity] of quantities.entries()) {
+    const directInv = inventoryByName.get(name.trim().toLowerCase());
+    if (!directInv) continue;
+
+    if (directInv.linkInventoryId) {
+      const parentInv = inventoryById.get(directInv.linkInventoryId.toString());
+      if (parentInv && parentInv.trackStock !== false) {
+        const refundQty = quantity * (directInv.stockDeductionQty || 1);
+        ops.push({
+          updateOne: {
+            filter: { _id: parentInv._id },
+            update: { $inc: { stock: refundQty } }
+          }
+        });
+      }
+    } else {
+      if (directInv.trackStock !== false) {
+        ops.push({
+          updateOne: {
+            filter: { _id: directInv._id },
+            update: { $inc: { stock: quantity } }
+          }
+        });
+      }
+    }
+  }
+
+  if (ops.length) {
+    await Inventory.bulkWrite(ops, { ordered: false });
+  }
+  await updateMenuAvailability();
+  await deleteCache([INVENTORY_CACHE_KEY, MENU_CACHE_KEY]);
+  return getInventorySnapshot();
+}
+
 module.exports = {
   aggregateQuantities,
   buildInventoryDelta,
   broadcastInventoryUpdate,
   deductInventoryForItems,
+  refundInventoryForItems,
   getInventorySnapshot,
   updateMenuAvailability,
 };

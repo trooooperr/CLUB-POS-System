@@ -9,6 +9,7 @@ const { getCache, setCache, deleteCache } = require('../lib/redis');
 const {
   broadcastInventoryUpdate,
   deductInventoryForItems,
+  refundInventoryForItems,
 } = require('../lib/inventoryStock');
 
 // ── GENERATE KOT NUMBER ─────────────────────────────────────────
@@ -253,6 +254,158 @@ router.get('/kitchen/display', async (req, res) => {
     
     res.json(kots);
   } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// ── DELETE KOT (Admin/Manager only, refunds stock) ─────────────────
+const { requireRole } = require('../middleware/auth');
+router.delete('/:id', requireRole(['admin', 'manager']), async (req, res) => {
+  try {
+    const kot = await KOT.findById(req.params.id);
+    if (!kot) return res.status(404).json({ message: 'KOT not found' });
+
+    // 1. Refund the inventory stock for the items in the KOT
+    let updatedInventory = null;
+    if (kot.items && kot.items.length > 0) {
+      updatedInventory = await refundInventoryForItems(kot.items);
+    }
+
+    // 2. Remove this KOT ID from the associated Order
+    await Order.findByIdAndUpdate(kot.orderId, {
+      $pull: { kotIds: kot._id }
+    });
+
+    // 3. Remove this KOT ID from the TableSession
+    const session = await TableSession.findOneAndUpdate(
+      { tableNo: kot.tableNo, status: { $ne: 'COMPLETED' } },
+      { $pull: { kotIds: kot._id } },
+      { new: true }
+    ).populate('activeOrderId').populate('kotIds');
+
+    // 4. Delete the KOT document
+    await KOT.findByIdAndDelete(kot._id);
+
+    // Invalidate cache
+    await deleteCache([`kots:table:${kot.tableNo}`, `order:${kot.orderId}`]);
+
+    // Broadcast changes via Socket.IO
+    if (req.app.locals.io) {
+      req.app.locals.io.emit('REFRESH_MENU');
+      if (session) {
+        req.app.locals.io.emit('TABLE_SESSION_UPDATED', {
+          tableNo: kot.tableNo,
+          session,
+          timestamp: new Date()
+        });
+      }
+      if (updatedInventory) {
+        broadcastInventoryUpdate(req, updatedInventory, {
+          orderId: kot.orderId,
+          kotId: kot._id,
+          source: 'KOT_DELETED'
+        });
+      }
+    }
+
+    res.json({ message: 'KOT deleted and stock refunded successfully', inventory: updatedInventory });
+  } catch (err) {
+    console.error('DELETE KOT Error:', err);
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// ── REMOVE/REDUCE ITEM FROM ACTIVE KOTS (Refunds stock) ──────────────
+router.post('/remove-item', async (req, res) => {
+  try {
+    const { orderId, name, quantityToRemove } = req.body;
+    if (!orderId || !name || !quantityToRemove || quantityToRemove <= 0) {
+      return res.status(400).json({ message: 'OrderId, item name, and valid quantity to remove are required' });
+    }
+
+    // Find all active/non-completed KOTs linked to this order
+    const kots = await KOT.find({ orderId }).sort({ createdAt: -1 }); // Newest first
+    
+    let remainingToRemove = quantityToRemove;
+    let actualRefundedQty = 0;
+    let updatedInventory = null;
+    
+    const modifiedKotIds = [];
+
+    for (const kot of kots) {
+      if (remainingToRemove <= 0) break;
+
+      const itemIndex = kot.items.findIndex(i => i.name.trim().toLowerCase() === name.trim().toLowerCase());
+      if (itemIndex === -1) continue;
+
+      const item = kot.items[itemIndex];
+      const qtyInKot = item.quantity;
+      
+      if (qtyInKot <= remainingToRemove) {
+        // Remove item from KOT
+        actualRefundedQty += qtyInKot;
+        remainingToRemove -= qtyInKot;
+        kot.items.splice(itemIndex, 1);
+      } else {
+        // Reduce item quantity in KOT
+        actualRefundedQty += remainingToRemove;
+        item.quantity -= remainingToRemove;
+        remainingToRemove = 0;
+      }
+
+      modifiedKotIds.push(kot._id);
+
+      if (kot.items.length === 0) {
+        // If KOT has no items left, delete it!
+        await KOT.findByIdAndDelete(kot._id);
+        await Order.findByIdAndUpdate(orderId, { $pull: { kotIds: kot._id } });
+        await TableSession.findOneAndUpdate(
+          { activeOrderId: orderId },
+          { $pull: { kotIds: kot._id } }
+        );
+      } else {
+        // Save updated KOT
+        await kot.save();
+      }
+    }
+
+    if (actualRefundedQty > 0) {
+      // Refund inventory stock for this item
+      updatedInventory = await refundInventoryForItems([{ name, quantity: actualRefundedQty }]);
+    }
+
+    // Invalidate cache
+    const order = await Order.findById(orderId);
+    if (order) {
+      await deleteCache([`kots:table:${order.tableNo}`, `order:${orderId}`]);
+      
+      // Fetch updated session to broadcast
+      const session = await TableSession.findOne({ tableNo: order.tableNo, status: { $ne: 'COMPLETED' } })
+        .populate('activeOrderId')
+        .populate('kotIds');
+
+      if (req.app.locals.io) {
+        req.app.locals.io.emit('REFRESH_MENU');
+        if (session) {
+          req.app.locals.io.emit('TABLE_SESSION_UPDATED', {
+            tableNo: order.tableNo,
+            session,
+            timestamp: new Date()
+          });
+        }
+        if (updatedInventory) {
+          broadcastInventoryUpdate(req, updatedInventory, {
+            orderId,
+            source: 'KOT_ITEM_REMOVED'
+          });
+        }
+      }
+      res.json({ message: `Successfully removed ${actualRefundedQty}x ${name}`, inventory: updatedInventory });
+    } else {
+      res.status(404).json({ message: 'Order not found' });
+    }
+  } catch (err) {
+    console.error('Remove KOT Item Error:', err);
     res.status(500).json({ message: err.message });
   }
 });
