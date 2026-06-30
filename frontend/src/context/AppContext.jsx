@@ -1256,6 +1256,10 @@ export function AppProvider({ children }) {
       }
       const data = await res.json();
       if (data.inventory) applyInventoryUpdate(data.inventory);
+      if (data.order) {
+        setOrderHistory(prev => prev.map(o => o._id === data.order._id ? data.order : o));
+        setInvoiceOrder(prev => prev && prev._id === data.order._id ? data.order : prev);
+      }
       
       // Force reload active session to update UI state
       if (socket) socket.emit('kot-updated');
@@ -1264,7 +1268,7 @@ export function AppProvider({ children }) {
       console.error('Remove KOT item error:', err);
       throw err;
     }
-  }, [socket, applyInventoryUpdate]);
+  }, [socket, applyInventoryUpdate, setOrderHistory, setInvoiceOrder]);
 
   const deleteKOT = useCallback(async (kotId, tableNo) => {
     try {
@@ -1277,6 +1281,10 @@ export function AppProvider({ children }) {
       }
       const data = await res.json();
       if (data.inventory) applyInventoryUpdate(data.inventory);
+      if (data.order) {
+        setOrderHistory(prev => prev.map(o => o._id === data.order._id ? data.order : o));
+        setInvoiceOrder(prev => prev && prev._id === data.order._id ? data.order : prev);
+      }
       setKots(prev => prev.filter(k => k._id !== kotId));
       if (socket) socket.emit('kot-updated');
       return data;
@@ -1284,7 +1292,7 @@ export function AppProvider({ children }) {
       console.error('Delete KOT error:', err);
       throw err;
     }
-  }, [socket, applyInventoryUpdate]);
+  }, [socket, applyInventoryUpdate, setOrderHistory, setInvoiceOrder]);
 
   const finalizeBill = useCallback(async (orderId, items, subtotal, sgst, cgst, discount, roundOff, grandTotal, waiterName = '', orderType = 'dine-in', customerName = '', customerPhone = '') => {
     try {

@@ -12,6 +12,60 @@ const {
   refundInventoryForItems,
 } = require('../lib/inventoryStock');
 
+// ── RECALCULATE ORDER TOTALS (For Completed Orders) ─────────────────
+async function recalculateOrderTotals(order) {
+  const kots = await KOT.find({ orderId: order._id });
+  const itemMap = new Map();
+  for (const kot of kots) {
+    for (const item of kot.items) {
+      const name = item.name;
+      const key = name.trim().toLowerCase();
+      if (itemMap.has(key)) {
+        const existing = itemMap.get(key);
+        existing.quantity += item.quantity;
+      } else {
+        itemMap.set(key, {
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price,
+          notes: item.notes || ''
+        });
+      }
+    }
+  }
+  const updatedItems = [...itemMap.values()];
+  const subtotal = updatedItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+
+  const Settings = require('../models/Settings');
+  const settings = await Settings.findOne();
+  const sgstRate = settings ? settings.sgstRate : 2.5;
+  const cgstRate = settings ? settings.cgstRate : 2.5;
+
+  const sgst = (subtotal * sgstRate) / 100;
+  const cgst = (subtotal * cgstRate) / 100;
+
+  const discount = Math.min(order.discount || 0, subtotal);
+  const rawTotal = subtotal + sgst + cgst - discount;
+  const grandTotal = Math.round(rawTotal);
+  const roundOff = grandTotal - rawTotal;
+
+  order.items = updatedItems;
+  order.subtotal = subtotal;
+  order.sgst = sgst;
+  order.cgst = cgst;
+  order.discount = discount;
+  order.roundOff = roundOff;
+  order.grandTotal = grandTotal;
+
+  if (order.dueAmount === 0) {
+    order.paidAmount = grandTotal;
+  } else {
+    order.dueAmount = Math.max(0, grandTotal - (order.paidAmount || 0));
+  }
+
+  await order.save();
+}
+
 // ── GENERATE KOT NUMBER ─────────────────────────────────────────
 async function generateKOTNo() {
   const redis = require('../lib/redis');
@@ -272,9 +326,14 @@ router.delete('/:id', requireRole(['admin', 'manager']), async (req, res) => {
     }
 
     // 2. Remove this KOT ID from the associated Order
-    await Order.findByIdAndUpdate(kot.orderId, {
+    const order = await Order.findByIdAndUpdate(kot.orderId, {
       $pull: { kotIds: kot._id }
-    });
+    }, { new: true });
+
+    // If this is a historical/completed order, recalculate its totals
+    if (order && !order.isActive) {
+      await recalculateOrderTotals(order);
+    }
 
     // 3. Remove this KOT ID from the TableSession
     const session = await TableSession.findOneAndUpdate(
@@ -308,7 +367,13 @@ router.delete('/:id', requireRole(['admin', 'manager']), async (req, res) => {
       }
     }
 
-    res.json({ message: 'KOT deleted and stock refunded successfully', inventory: updatedInventory });
+    const updatedOrder = await Order.findById(kot.orderId).populate('kotIds');
+
+    res.json({
+      message: 'KOT deleted and stock refunded successfully',
+      inventory: updatedInventory,
+      order: updatedOrder
+    });
   } catch (err) {
     console.error('DELETE KOT Error:', err);
     res.status(500).json({ message: err.message });
@@ -377,6 +442,11 @@ router.post('/remove-item', async (req, res) => {
     // Invalidate cache
     const order = await Order.findById(orderId);
     if (order) {
+      // If this is a completed order, recalculate its totals
+      if (!order.isActive) {
+        await recalculateOrderTotals(order);
+      }
+
       await deleteCache([`kots:table:${order.tableNo}`, `order:${orderId}`]);
       
       // Fetch updated session to broadcast
@@ -400,7 +470,14 @@ router.post('/remove-item', async (req, res) => {
           });
         }
       }
-      res.json({ message: `Successfully removed ${actualRefundedQty}x ${name}`, inventory: updatedInventory });
+
+      const updatedOrder = await Order.findById(orderId).populate('kotIds');
+
+      res.json({ 
+        message: `Successfully removed ${actualRefundedQty}x ${name}`, 
+        inventory: updatedInventory,
+        order: updatedOrder
+      });
     } else {
       res.status(404).json({ message: 'Order not found' });
     }

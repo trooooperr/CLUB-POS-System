@@ -24,7 +24,9 @@ describe('KOT Management & Deletion API', () => {
     // Seed Settings
     await Settings.create({
       restaurantName: 'HumTum POS',
-      currency: '₹'
+      currency: '₹',
+      sgstRate: 2.5,
+      cgstRate: 2.5
     });
 
     // Create Admin User
@@ -196,5 +198,55 @@ describe('KOT Management & Deletion API', () => {
     // Verify KOT ID is pulled from Order
     const order = await Order.findById(activeOrder._id);
     expect(order.kotIds.length).toBe(0);
+  });
+
+  it('should recalculate historical/completed order totals when KOT items are modified', async () => {
+    // 1. Set the order to completed (isActive: false)
+    activeOrder.isActive = false;
+    activeOrder.orderStatus = 'COMPLETED';
+    await activeOrder.save();
+
+    // 2. Create a KOT under this completed order
+    const kotRes = await request(app)
+      .post('/api/kots')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        orderId: activeOrder._id,
+        tableNo: 5,
+        items: [
+          { name: 'Corona Beer', quantity: 4, price: 200, department: 'bar' },
+          { name: 'French Fries', quantity: 2, price: 150, department: 'kitchen' }
+        ]
+      });
+
+    const kotId = kotRes.body._id;
+
+    // 3. Remove 1x Corona Beer from the KOT
+    const removeRes = await request(app)
+      .post('/api/kots/remove-item')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        orderId: activeOrder._id,
+        name: 'Corona Beer',
+        quantityToRemove: 1
+      });
+
+    expect(removeRes.statusCode).toBe(200);
+
+    // Verify order items and totals are recalculated
+    // Corona Beer: 3 left (qty = 3, price = 200) -> 600
+    // French Fries: 2 left (qty = 2, price = 150) -> 300
+    // Subtotal = 900
+    // SGST (2.5%) = 22.5
+    // CGST (2.5%) = 22.5
+    // Total = 945
+    const updatedOrder = await Order.findById(activeOrder._id);
+    expect(updatedOrder.items.length).toBe(2);
+    expect(updatedOrder.subtotal).toBe(900);
+    expect(updatedOrder.grandTotal).toBe(945);
+
+    // Verify inventory stock is correct
+    const beer = await Inventory.findOne({ name: 'Corona Beer' });
+    expect(beer.stock).toBe(97); // 100 - 4 + 1 = 97
   });
 });
