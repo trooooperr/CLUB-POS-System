@@ -201,6 +201,11 @@ export default function BillingPage() {
   const [mobileBillOpen, setMobileBillOpen] = useState(false);
   const [activeOrder, setActiveOrder] = useState(null); // Current order for this table
   const [kots, setKots] = useState([]); // KOTs for current order
+  const [confirmDialog, setConfirmDialog] = useState(null); // { title, message, confirmText, danger, onConfirm, onCancel }
+
+  const showConfirm = (message, onConfirm, isDanger = false, confirmText = 'Confirm', title = 'Confirm Action', onCancel = null) => {
+    setConfirmDialog({ title, message, confirmText, danger: isDanger, onConfirm, onCancel });
+  };
   
   // Wrap state setters and actions to track user edit timestamps
   const lastEditRef = useRef({}); // { tableId: timestamp }
@@ -976,23 +981,29 @@ export default function BillingPage() {
                     <div className="b-item-ctrl">
                       <button
                         type="button"
-                        onClick={async () => {
+                        onClick={() => {
                           if (busy) return;
                           const activeOrderId = activeOrder?._id || activeOrder;
                           if (!activeOrderId) return;
                           
-                          if (confirm(`Are you sure you want to remove 1x "${item.name}" from KOT? This will refund inventory stock.`)) {
-                            setBusy(true);
-                            try {
-                              await removeKOTItem(activeOrderId, item.name, 1);
-                              showToast(`Removed 1x "${item.name}" successfully`, 'success');
-                              await loadTableSession(); // Refresh table state
-                            } catch (err) {
-                              showToast(err.message || 'Failed to remove item', 'error');
-                            } finally {
-                              setBusy(false);
-                            }
-                          }
+                          showConfirm(
+                            `Are you sure you want to remove 1x "${item.name}" from KOT? This will refund inventory stock.`,
+                            async () => {
+                              setBusy(true);
+                              try {
+                                await removeKOTItem(activeOrderId, item.name, 1);
+                                showToast(`Removed 1x "${item.name}" successfully`, 'success');
+                                await loadTableSession(); // Refresh table state
+                              } catch (err) {
+                                showToast(err.message || 'Failed to remove item', 'error');
+                              } finally {
+                                setBusy(false);
+                              }
+                            },
+                            true, // isDanger
+                            'Remove Item',
+                            'Remove KOT Item'
+                          );
                         }}
                         style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.2)', cursor: 'pointer', borderRadius: '4px', width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0', fontSize: '14px', fontWeight: 'bold' }}
                         title="Remove 1x from KOT (refunds stock)"
@@ -1111,22 +1122,28 @@ export default function BillingPage() {
                       {(role === 'admin' || role === 'manager') && (
                         <button
                           type="button"
-                          onClick={async (e) => {
-                            e.stopPropagation();
-                            if (busy) return;
-                            if (confirm(`⚠️ WARNING: Are you sure you want to DELETE entire "${k.kotNo || 'KOT'}"? All items in this KOT will be deleted and their stock will be refunded.`)) {
-                              setBusy(true);
-                              try {
-                                await deleteKOT(k._id, k.tableNo);
-                                showToast(`Deleted ${k.kotNo || 'KOT'} and refunded stock successfully`, 'success');
-                                await loadTableSession(); // Refresh table state
-                              } catch (err) {
-                                showToast(err.message || 'Failed to delete KOT', 'error');
-                              } finally {
-                                setBusy(false);
-                              }
-                            }
-                          }}
+                          onClick={(e) => {
+                             e.stopPropagation();
+                             if (busy) return;
+                             showConfirm(
+                               `⚠️ WARNING: Are you sure you want to DELETE entire "${k.kotNo || 'KOT'}"? All items in this KOT will be deleted and their stock will be refunded.`,
+                               async () => {
+                                 setBusy(true);
+                                 try {
+                                   await deleteKOT(k._id, k.tableNo);
+                                   showToast(`Deleted ${k.kotNo || 'KOT'} and refunded stock successfully`, 'success');
+                                   await loadTableSession(); // Refresh table state
+                                 } catch (err) {
+                                   showToast(err.message || 'Failed to delete KOT', 'error');
+                                 } finally {
+                                    setBusy(false);
+                                 }
+                               },
+                               true, // isDanger
+                               'Delete KOT',
+                               'Delete KOT'
+                             );
+                           }}
                           style={{
                             background: 'none',
                             border: 'none',
@@ -1151,6 +1168,70 @@ export default function BillingPage() {
             )}
           </div>
         </div>
+        {confirmDialog && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.8)',
+            backdropFilter: 'blur(8px)',
+            WebkitBackdropFilter: 'blur(8px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 99999,
+            padding: '16px',
+          }}>
+            <div style={{
+              background: 'var(--s1)',
+              border: '1px solid var(--b1)',
+              borderRadius: 'var(--r)',
+              padding: '24px',
+              maxWidth: '420px',
+              width: '100%',
+              boxShadow: 'var(--sh)',
+              color: 'var(--t0)'
+            }}>
+              <h3 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '12px' }}>
+                {confirmDialog.title || 'Confirm Action'}
+              </h3>
+              <p style={{ color: 'var(--t1)', fontSize: '14px', lineHeight: '1.5', marginBottom: '24px' }}>
+                {confirmDialog.message}
+              </p>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (confirmDialog.onCancel) confirmDialog.onCancel();
+                    setConfirmDialog(null);
+                  }}
+                  className="btn btn-ghost"
+                  style={{ padding: '8px 16px', fontSize: '13px', minHeight: 'unset' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (confirmDialog.onConfirm) confirmDialog.onConfirm();
+                    setConfirmDialog(null);
+                  }}
+                  className={`btn ${confirmDialog.danger ? 'btn-danger' : 'btn-primary'}`}
+                  style={{
+                    padding: '8px 16px',
+                    fontSize: '13px',
+                    minHeight: 'unset',
+                    ...(confirmDialog.danger ? { background: '#EF4444', borderColor: '#EF4444', color: '#fff' } : {})
+                  }}
+                >
+                  {confirmDialog.confirmText || 'Confirm'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
