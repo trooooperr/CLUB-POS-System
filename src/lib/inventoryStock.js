@@ -27,38 +27,29 @@ function itemsFromQuantityMap(quantities) {
 }
 
 async function updateMenuAvailability() {
-  const menuItems = await MenuItem.find();
   const inventoryItems = await Inventory.find();
-  
   const inventoryById = new Map(inventoryItems.map(i => [i._id.toString(), i]));
-  const inventoryByName = new Map(inventoryItems.map(i => [i.name.trim().toLowerCase(), i]));
 
   const ops = [];
-  for (const menuItem of menuItems) {
+  for (const item of inventoryItems) {
     let isAvailable = true;
-
-    if (menuItem.trackStock && menuItem.inventoryId) {
-      const inv = inventoryById.get(menuItem.inventoryId.toString());
-      if (inv && inv.trackStock !== false) {
-        isAvailable = inv.stock >= (menuItem.stockDeductionQty || 1);
+    if (item.linkInventoryId) {
+      const parent = inventoryById.get(item.linkInventoryId.toString());
+      if (parent && parent.trackStock !== false) {
+        isAvailable = parent.stock >= (item.stockDeductionQty || 1);
       }
     } else {
-      const inv = inventoryByName.get(menuItem.name.trim().toLowerCase());
-      if (inv && inv.trackStock !== false) {
-        isAvailable = inv.stock > 0;
+      if (item.trackStock !== false) {
+        isAvailable = item.stock > 0;
       }
     }
-
-    if (menuItem.available !== isAvailable) {
-      ops.push({
-        updateOne: {
-          filter: { _id: menuItem._id },
-          update: { $set: { available: isAvailable } }
-        }
-      });
-    }
+    ops.push({
+      updateOne: {
+        filter: { name: item.name },
+        update: { $set: { available: isAvailable } }
+      }
+    });
   }
-
   if (ops.length) {
     await MenuItem.bulkWrite(ops, { ordered: false });
   }
@@ -97,39 +88,34 @@ async function deductInventoryForItems(items = []) {
   const names = [...quantities.keys()];
   if (!names.length) return getInventorySnapshot();
 
-  const menuItems = await MenuItem.find({ name: { $in: names } });
-  const menuItemMap = new Map(menuItems.map(m => [m.name.trim().toLowerCase(), m]));
+  const directInvItems = await Inventory.find({ name: { $in: names } });
+  
+  const parentIds = directInvItems
+    .filter(i => i.linkInventoryId)
+    .map(i => i.linkInventoryId);
 
-  const linkedInvIds = menuItems
-    .filter(m => m.trackStock && m.inventoryId)
-    .map(m => m.inventoryId);
-
-  const inventoryItems = await Inventory.find({
+  const allMatching = await Inventory.find({
     $or: [
       { name: { $in: names } },
-      { _id: { $in: linkedInvIds } }
+      { _id: { $in: parentIds } }
     ]
   });
 
-  const inventoryById = new Map();
-  const inventoryByName = new Map();
-  for (const inv of inventoryItems) {
-    inventoryById.set(inv._id.toString(), inv);
-    inventoryByName.set(inv.name.trim().toLowerCase(), inv);
-  }
+  const inventoryById = new Map(allMatching.map(i => [i._id.toString(), i]));
+  const inventoryByName = new Map(allMatching.map(i => [i.name.trim().toLowerCase(), i]));
 
   const ops = [];
   for (const [name, quantity] of quantities.entries()) {
-    const menuItem = menuItemMap.get(name.trim().toLowerCase());
-    
-    if (menuItem && menuItem.trackStock && menuItem.inventoryId) {
-      const invIdStr = menuItem.inventoryId.toString();
-      const inv = inventoryById.get(invIdStr);
-      if (inv && inv.trackStock !== false) {
-        const deductQty = quantity * (menuItem.stockDeductionQty || 1);
+    const directInv = inventoryByName.get(name.trim().toLowerCase());
+    if (!directInv) continue;
+
+    if (directInv.linkInventoryId) {
+      const parentInv = inventoryById.get(directInv.linkInventoryId.toString());
+      if (parentInv && parentInv.trackStock !== false) {
+        const deductQty = quantity * (directInv.stockDeductionQty || 1);
         ops.push({
           updateOne: {
-            filter: { _id: inv._id },
+            filter: { _id: parentInv._id },
             update: [
               { $set: { stock: { $max: [0, { $subtract: ['$stock', deductQty] }] } } }
             ]
@@ -137,11 +123,10 @@ async function deductInventoryForItems(items = []) {
         });
       }
     } else {
-      const inv = inventoryByName.get(name.trim().toLowerCase());
-      if (inv && inv.trackStock !== false) {
+      if (directInv.trackStock !== false) {
         ops.push({
           updateOne: {
-            filter: { _id: inv._id },
+            filter: { _id: directInv._id },
             update: [
               { $set: { stock: { $max: [0, { $subtract: ['$stock', quantity] }] } } }
             ]

@@ -56,16 +56,23 @@ function CalendarDownIcon() {
 
 
 function StockModal({ item, onClose, onSave }) {
-  const { settings } = useApp();
+  const { settings, inventory } = useApp();
   const categories = Array.isArray(settings.inventoryCategories) && settings.inventoryCategories.length > 0
     ? settings.inventoryCategories
     : ['General'];
   const [form, setForm] = useState(() => {
     if (item) {
-      return { ...item, isAlcoholic: !!(item.isAlcoholic || item.isAlcohol), trackStock: item.trackStock !== false };
+      return { 
+        ...item, 
+        isAlcoholic: !!(item.isAlcoholic || item.isAlcohol), 
+        trackStock: item.trackStock !== false,
+        linkInventoryId: item.linkInventoryId?._id || item.linkInventoryId || '',
+        stockDeductionQty: item.stockDeductionQty || 1,
+        linkStock: !!(item.linkInventoryId)
+      };
     }
     return {
-      name: '', category: categories[0] || 'General', unit: 'Bottles', stock: 0, minStock: 5, price: '', shortcut: '', isAlcoholic: false, trackStock: true
+      name: '', category: categories[0] || 'General', unit: 'Bottles', stock: 0, minStock: 5, price: '', shortcut: '', isAlcoholic: false, trackStock: true, linkInventoryId: '', stockDeductionQty: 1, linkStock: false
     };
   });
   const [error, setError] = useState(null);
@@ -80,12 +87,62 @@ function StockModal({ item, onClose, onSave }) {
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
+  const selectableInventory = (inventory || []).filter(inv => inv.trackStock !== false && inv._id !== item?._id);
+
   const handleSave = async () => {
     if (saving) return;
     if (!form.name || !form.category || !form.unit) {
       setError('Name, category, and unit are required.');
       return;
     }
+
+    let linkInventoryId = null;
+    let stockDeductionQty = 1;
+
+    if (form.linkStock) {
+      if (!form.linkInventoryId) {
+        setError('Please select a parent inventory item.');
+        return;
+      }
+      
+      const parsedVal = form.stockDeductionQty;
+      let finalQty = 1;
+      if (typeof parsedVal === 'number') {
+        finalQty = parsedVal;
+      } else {
+        const str = String(parsedVal || '').trim();
+        if (str.includes('/')) {
+          const parts = str.split('/');
+          if (parts.length === 2) {
+            const num = parseFloat(parts[0]);
+            const den = parseFloat(parts[1]);
+            if (isNaN(num) || isNaN(den) || den === 0) {
+              setError('Invalid fraction format (e.g. 30/750).');
+              return;
+            }
+            finalQty = num / den;
+          } else {
+            setError('Invalid deduction quantity.');
+            return;
+          }
+        } else {
+          finalQty = parseFloat(str);
+          if (isNaN(finalQty)) {
+            setError('Deduction quantity must be a valid number.');
+            return;
+          }
+        }
+      }
+      
+      if (finalQty <= 0) {
+        setError('Deduction quantity must be greater than 0.');
+        return;
+      }
+      
+      linkInventoryId = form.linkInventoryId;
+      stockDeductionQty = finalQty;
+    }
+
     const data = {
       ...form,
       stock: form.trackStock ? (Number(form.stock) || 0) : 0,
@@ -93,7 +150,9 @@ function StockModal({ item, onClose, onSave }) {
       price: Number(form.price) || 0,
       shortcut: (form.shortcut || '').toLowerCase().trim(),
       isAlcoholic: !!form.isAlcoholic,
-      trackStock: !!form.trackStock
+      trackStock: !!form.trackStock,
+      linkInventoryId,
+      stockDeductionQty
     };
     setError(null);
     setSaving(true);
@@ -176,14 +235,57 @@ function StockModal({ item, onClose, onSave }) {
 
         <div className="fgroup">
           <label className="lbl">Shortcut</label>
-          <input value={form.shortcut} onChange={e => set('shortcut', e.target.value.toLowerCase().trim())}
+          <input value={form.shortcut || ''} onChange={e => set('shortcut', e.target.value.toLowerCase().trim())}
             placeholder="e.g. cp, pn, ff" maxLength={10} />
           <span className="modal-hint" style={{ fontSize: 10, color: 'var(--t2)', marginTop: 4, display: 'block' }}>Short code to quickly add this item</span>
         </div>
 
-        {error && <div style={{ color: 'red', marginBottom: 8 }}>{error}</div>}
+        <div style={{ borderTop: '1px solid var(--b1)', paddingTop: '12px', marginTop: '12px' }}>
+          <div className="fgroup" style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4, marginBottom: 8 }}>
+            <input 
+              type="checkbox" 
+              id="linkStock"
+              checked={!!form.linkStock} 
+              onChange={e => set('linkStock', e.target.checked)} 
+              style={{ width: 'auto', margin: 0, cursor: 'pointer' }}
+            />
+            <label htmlFor="linkStock" style={{ margin: 0, cursor: 'pointer', fontSize: 13, fontWeight: 'bold' }}>Deduct Stock from another Inventory Item</label>
+          </div>
 
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+          {form.linkStock && (
+            <div className="frow2" style={{ marginTop: '8px', gap: '12px' }}>
+              <div className="fgroup" style={{ flex: 1 }}>
+                <label className="lbl">Parent Inventory Item</label>
+                <select 
+                  value={form.linkInventoryId} 
+                  onChange={e => set('linkInventoryId', e.target.value)}
+                  style={{ width: '100%', padding: '6px 10px', background: 'var(--s2)', color: 'var(--t0)' }}
+                >
+                  <option value="">-- Select Inventory Item --</option>
+                  {selectableInventory.map(inv => (
+                    <option key={inv._id} value={inv._id}>
+                      {inv.name} ({inv.unit})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="fgroup" style={{ flex: 1 }}>
+                <label className="lbl">Deduction Qty (e.g. 5 or 30/750)</label>
+                <input 
+                  type="text" 
+                  value={form.stockDeductionQty} 
+                  onChange={e => set('stockDeductionQty', e.target.value)}
+                  placeholder="e.g. 1, 5, or 30/750"
+                  style={{ padding: '6px 10px' }}
+                />
+              </div>
+            </div>
+          )}
+        </div>
+
+        {error && <div style={{ color: 'red', marginBottom: 8, marginTop: 8 }}>{error}</div>}
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
           <button className="btn btn-ghost" disabled={saving} onClick={onClose}>Cancel</button>
           <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
             {saving ? 'Saving...' : item ? 'Update' : 'Save'}
@@ -411,8 +513,21 @@ export default function InventoryPage() {
                         >
                           <div className="invTop">
                             <div>
-                              <div className="invName">{i.name}</div>
-                              {i.shortcut && <div className="invShortcutRow">Shortcut: <span className="invShortcut">{i.shortcut}</span></div>}
+                               <div className="invName">{i.name}</div>
+                               {i.linkInventoryId && (
+                                 <div style={{ fontSize: '9px', color: 'var(--accent)', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                   <span>📦 Links to: {
+                                     typeof i.linkInventoryId === 'object' 
+                                       ? i.linkInventoryId.name 
+                                       : (inventory?.find(inv => inv._id === i.linkInventoryId)?.name || 'Loading...')
+                                   } ({
+                                     Number(i.stockDeductionQty) < 1 
+                                       ? Number(i.stockDeductionQty).toFixed(3).replace(/\.?0+$/, '') 
+                                       : i.stockDeductionQty
+                                   })</span>
+                                 </div>
+                               )}
+                               {i.shortcut && <div className="invShortcutRow">Shortcut: <span className="invShortcut">{i.shortcut}</span></div>}
                               <div className="invMeta">{i.category} • ₹{i.price}</div>
                               <div style={{ marginTop: 4 }}>
                                 <span className={`badge ${i.isAlcoholic || i.isAlcohol ? 'b-red' : 'b-green'}`} style={{ fontSize: 10 }}>
@@ -505,7 +620,26 @@ export default function InventoryPage() {
                                 cursor: (!isAdmin || !!search) ? 'default' : 'grab'
                               }}
                             >
-                              <td>{i.name}</td>
+                              <td>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                  <span>{i.name}</span>
+                                  {i.linkInventoryId && (
+                                    <span style={{ fontSize: '10px', color: '#8b949e', display: 'flex', alignItems: 'center', gap: '3px', marginTop: '2px', fontWeight: 'normal' }}>
+                                      <span>Deductions parent:</span>
+                                      <span style={{ color: 'var(--accent)', fontWeight: 'bold' }}>
+                                        {typeof i.linkInventoryId === 'object' 
+                                          ? i.linkInventoryId.name 
+                                          : (inventory?.find(inv => inv._id === i.linkInventoryId)?.name || 'Loading...')}
+                                      </span>
+                                      <span>({
+                                        Number(i.stockDeductionQty) < 1 
+                                          ? Number(i.stockDeductionQty).toFixed(3).replace(/\.?0+$/, '') 
+                                          : i.stockDeductionQty
+                                      })</span>
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
                               <td>{i.shortcut ? <span className="invShortcut">{i.shortcut}</span> : '—'}</td>
                               <td>{i.category}</td>
                               <td>₹{i.price}</td>

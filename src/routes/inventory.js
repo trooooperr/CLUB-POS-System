@@ -40,7 +40,7 @@ const sortInventoryItems = async (items) => {
 // GET ALL INVENTORY ITEMS (Allowed for all authenticated staff)
 router.get('/', async (req, res) => {
   try {
-    const rawItems = await Inventory.find();
+    const rawItems = await Inventory.find().populate('linkInventoryId');
     const items = await sortInventoryItems(rawItems);
     await setCache(INVENTORY_CACHE_KEY, items, 300);
     res.json(items);
@@ -53,7 +53,7 @@ router.get('/', async (req, res) => {
 // GET SINGLE INVENTORY ITEM (Allowed for all authenticated staff)
 router.get('/:id', async (req, res) => {
   try {
-    const item = await Inventory.findById(req.params.id);
+    const item = await Inventory.findById(req.params.id).populate('linkInventoryId');
     if (!item) return res.status(404).json({ message: 'Item not found' });
     res.json(item);
   } catch (err) {
@@ -101,11 +101,12 @@ router.post(
       await deleteCache([INVENTORY_CACHE_KEY, MENU_CACHE_KEY]);
       if (req.app.locals.io) {
         req.app.locals.io.emit('REFRESH_MENU');
-        const allInvRaw = await Inventory.find();
+        const allInvRaw = await Inventory.find().populate('linkInventoryId');
         const allInv = await sortInventoryItems(allInvRaw);
         req.app.locals.io.emit('INVENTORY_UPDATED', { inventory: allInv, timestamp: new Date() });
       }
-      res.status(201).json(savedInv);
+      const populated = await Inventory.findById(savedInv._id).populate('linkInventoryId');
+      res.status(201).json(populated);
     } catch (err) {
       console.error('INVENTORY CREATE ERROR:', err.message);
       res.status(400).json({ message: err.message });
@@ -133,7 +134,7 @@ router.put('/reorder', requireRole(['admin', 'manager']), async (req, res) => {
     }
     await deleteCache(INVENTORY_CACHE_KEY);
     if (req.app.locals.io) {
-      const allInvRaw = await Inventory.find();
+      const allInvRaw = await Inventory.find().populate('linkInventoryId');
       const allInv = await sortInventoryItems(allInvRaw);
       req.app.locals.io.emit('INVENTORY_UPDATED', { inventory: allInv, timestamp: new Date() });
     }
@@ -182,11 +183,12 @@ router.put(
       await deleteCache([INVENTORY_CACHE_KEY, MENU_CACHE_KEY]);
       if (req.app.locals.io) {
         req.app.locals.io.emit('REFRESH_MENU');
-        const allInvRaw = await Inventory.find();
+        const allInvRaw = await Inventory.find().populate('linkInventoryId');
         const allInv = await sortInventoryItems(allInvRaw);
         req.app.locals.io.emit('INVENTORY_UPDATED', { inventory: allInv, timestamp: new Date() });
       }
-      res.json(updated);
+      const populated = await Inventory.findById(updated._id).populate('linkInventoryId');
+      res.json(populated);
     } catch (err) {
       console.error('INVENTORY UPDATE ERROR:', err.message);
       res.status(400).json({ message: err.message });
@@ -207,7 +209,7 @@ router.patch('/:id/stock', requireRole(['admin', 'manager']), async (req, res) =
     await deleteCache([INVENTORY_CACHE_KEY, MENU_CACHE_KEY]);
     if (req.app.locals.io) {
       req.app.locals.io.emit('REFRESH_MENU');
-      const allInvRaw = await Inventory.find();
+      const allInvRaw = await Inventory.find().populate('linkInventoryId');
       const allInv = await sortInventoryItems(allInvRaw);
       req.app.locals.io.emit('INVENTORY_UPDATED', { inventory: allInv, timestamp: new Date() });
     }
@@ -226,7 +228,7 @@ router.delete('/:id', requireRole(['admin', 'manager']), async (req, res) => {
     await deleteCache([INVENTORY_CACHE_KEY, MENU_CACHE_KEY]);
     if (req.app.locals.io) {
       req.app.locals.io.emit('REFRESH_MENU');
-      const allInvRaw = await Inventory.find();
+      const allInvRaw = await Inventory.find().populate('linkInventoryId');
       const allInv = await sortInventoryItems(allInvRaw);
       req.app.locals.io.emit('INVENTORY_UPDATED', { inventory: allInv, timestamp: new Date() });
     }

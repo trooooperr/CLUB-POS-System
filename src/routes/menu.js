@@ -40,7 +40,7 @@ const sortMenuItems = async (items) => {
 // Get all menu items (Staff and above can view menu)
 router.get('/', async (req, res) => {
   try {
-    const rawItems = await MenuItem.find().populate('inventoryId');
+    const rawItems = await MenuItem.find();
     const items = await sortMenuItems(rawItems);
     await setCache(MENU_CACHE_KEY, items, 300);
     res.json(items);
@@ -146,7 +146,7 @@ router.post('/', requireRole(['admin', 'manager']), async (req, res) => {
     const item = new MenuItem(data);
     await item.save();
     await updateMenuAvailability();
-    const saved = await MenuItem.findById(item._id).populate('inventoryId');
+    const saved = await MenuItem.findById(item._id);
     await deleteCache(MENU_CACHE_KEY);
     if (req.app.locals.io) {
       req.app.locals.io.emit('REFRESH_MENU');
@@ -163,7 +163,7 @@ router.put('/:id', requireRole(['admin', 'manager']), async (req, res) => {
     const updated = await MenuItem.findByIdAndUpdate(req.params.id, data, { new: true, runValidators: true });
     if (!updated) return res.status(404).json({ message: 'Item not found' });
     await updateMenuAvailability();
-    const freshUpdated = await MenuItem.findById(req.params.id).populate('inventoryId');
+    const freshUpdated = await MenuItem.findById(req.params.id);
     await deleteCache(MENU_CACHE_KEY);
     if (req.app.locals.io) {
       req.app.locals.io.emit('REFRESH_MENU');
