@@ -68,11 +68,10 @@ function StockModal({ item, onClose, onSave }) {
         trackStock: item.trackStock !== false,
         linkInventoryId: item.linkInventoryId?._id || item.linkInventoryId || '',
         stockDeductionQty: item.stockDeductionQty || 1,
-        linkStock: !!(item.linkInventoryId)
       };
     }
     return {
-      name: '', category: categories[0] || 'General', unit: 'Bottles', stock: 0, minStock: 5, price: '', shortcut: '', isAlcoholic: false, trackStock: true, linkInventoryId: '', stockDeductionQty: 1, linkStock: false
+      name: '', category: categories[0] || 'General', unit: 'Bottles', stock: 0, minStock: 5, price: '', shortcut: '', isAlcoholic: false, trackStock: true, linkInventoryId: '', stockDeductionQty: 1
     };
   });
   const [error, setError] = useState(null);
@@ -99,47 +98,46 @@ function StockModal({ item, onClose, onSave }) {
     let linkInventoryId = null;
     let stockDeductionQty = 1;
 
-    if (form.linkStock) {
-      if (!form.linkInventoryId) {
-        setError('Please select a parent inventory item.');
-        return;
-      }
-      
+    if (form.trackStock && form.linkInventoryId) {
+      linkInventoryId = form.linkInventoryId;
       const parsedVal = form.stockDeductionQty;
       let finalQty = 1;
-      if (typeof parsedVal === 'number') {
-        finalQty = parsedVal;
-      } else {
-        const str = String(parsedVal || '').trim();
-        if (str.includes('/')) {
-          const parts = str.split('/');
-          if (parts.length === 2) {
-            const num = parseFloat(parts[0]);
-            const den = parseFloat(parts[1]);
-            if (isNaN(num) || isNaN(den) || den === 0) {
-              setError('Invalid fraction format (e.g. 30/750).');
+      
+      if (parsedVal !== undefined && parsedVal !== null && String(parsedVal).trim() !== '') {
+        if (typeof parsedVal === 'number') {
+          finalQty = parsedVal;
+        } else {
+          const str = String(parsedVal).trim();
+          if (str.includes('/')) {
+            const parts = str.split('/');
+            if (parts.length === 2) {
+              const num = parseFloat(parts[0]);
+              const den = parseFloat(parts[1]);
+              if (isNaN(num) || isNaN(den) || den === 0) {
+                setError('Invalid fraction format (e.g. 30/750).');
+                return;
+              }
+              finalQty = num / den;
+            } else {
+              setError('Invalid deduction quantity.');
               return;
             }
-            finalQty = num / den;
           } else {
-            setError('Invalid deduction quantity.');
-            return;
-          }
-        } else {
-          finalQty = parseFloat(str);
-          if (isNaN(finalQty)) {
-            setError('Deduction quantity must be a valid number.');
-            return;
+            finalQty = parseFloat(str);
+            if (isNaN(finalQty)) {
+              setError('Deduction quantity must be a valid number.');
+              return;
+            }
           }
         }
+      } else {
+        finalQty = 1;
       }
       
       if (finalQty <= 0) {
         setError('Deduction quantity must be greater than 0.');
         return;
       }
-      
-      linkInventoryId = form.linkInventoryId;
       stockDeductionQty = finalQty;
     }
 
@@ -189,14 +187,44 @@ function StockModal({ item, onClose, onSave }) {
         </div>
 
         {form.trackStock && (
-          <div className="frow2">
-            <div className="fgroup">
-              <label className="lbl">Stock</label>
-              <input type="number" value={form.stock} onChange={e => set('stock', e.target.value)} />
+          <div style={{ background: 'rgba(255,255,255,0.015)', padding: '10px', borderRadius: '8px', border: '1px solid var(--b1)', marginBottom: '12px' }}>
+            <div className="frow2">
+              <div className="fgroup">
+                <label className="lbl">Stock</label>
+                <input type="number" value={form.stock} onChange={e => set('stock', e.target.value)} />
+              </div>
+              <div className="fgroup">
+                <label className="lbl">Min Stock</label>
+                <input type="number" value={form.minStock} onChange={e => set('minStock', e.target.value)} />
+              </div>
             </div>
-            <div className="fgroup">
-              <label className="lbl">Min Stock</label>
-              <input type="number" value={form.minStock} onChange={e => set('minStock', e.target.value)} />
+
+            <div className="frow2" style={{ marginTop: '10px', gap: '12px' }}>
+              <div className="fgroup" style={{ flex: 1 }}>
+                <label className="lbl">Link Parent (Optional)</label>
+                <select 
+                  value={form.linkInventoryId} 
+                  onChange={e => set('linkInventoryId', e.target.value)}
+                  style={{ width: '100%', padding: '6px 10px', background: 'var(--s2)', color: 'var(--t0)' }}
+                >
+                  <option value="">-- No Link (Tracks itself) --</option>
+                  {selectableInventory.map(inv => (
+                    <option key={inv._id} value={inv._id}>
+                      {inv.name} ({inv.unit})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="fgroup" style={{ flex: 1 }}>
+                <label className="lbl">Deduction Qty (default 1)</label>
+                <input 
+                  type="text" 
+                  value={form.stockDeductionQty} 
+                  onChange={e => set('stockDeductionQty', e.target.value)}
+                  placeholder="e.g. 1, 5, or 30/750"
+                  style={{ padding: '6px 10px' }}
+                />
+              </div>
             </div>
           </div>
         )}
@@ -238,49 +266,6 @@ function StockModal({ item, onClose, onSave }) {
           <input value={form.shortcut || ''} onChange={e => set('shortcut', e.target.value.toLowerCase().trim())}
             placeholder="e.g. cp, pn, ff" maxLength={10} />
           <span className="modal-hint" style={{ fontSize: 10, color: 'var(--t2)', marginTop: 4, display: 'block' }}>Short code to quickly add this item</span>
-        </div>
-
-        <div style={{ borderTop: '1px solid var(--b1)', paddingTop: '12px', marginTop: '12px' }}>
-          <div className="fgroup" style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4, marginBottom: 8 }}>
-            <input 
-              type="checkbox" 
-              id="linkStock"
-              checked={!!form.linkStock} 
-              onChange={e => set('linkStock', e.target.checked)} 
-              style={{ width: 'auto', margin: 0, cursor: 'pointer' }}
-            />
-            <label htmlFor="linkStock" style={{ margin: 0, cursor: 'pointer', fontSize: 13, fontWeight: 'bold' }}>Deduct Stock from another Inventory Item</label>
-          </div>
-
-          {form.linkStock && (
-            <div className="frow2" style={{ marginTop: '8px', gap: '12px' }}>
-              <div className="fgroup" style={{ flex: 1 }}>
-                <label className="lbl">Parent Inventory Item</label>
-                <select 
-                  value={form.linkInventoryId} 
-                  onChange={e => set('linkInventoryId', e.target.value)}
-                  style={{ width: '100%', padding: '6px 10px', background: 'var(--s2)', color: 'var(--t0)' }}
-                >
-                  <option value="">-- Select Inventory Item --</option>
-                  {selectableInventory.map(inv => (
-                    <option key={inv._id} value={inv._id}>
-                      {inv.name} ({inv.unit})
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="fgroup" style={{ flex: 1 }}>
-                <label className="lbl">Deduction Qty (e.g. 5 or 30/750)</label>
-                <input 
-                  type="text" 
-                  value={form.stockDeductionQty} 
-                  onChange={e => set('stockDeductionQty', e.target.value)}
-                  placeholder="e.g. 1, 5, or 30/750"
-                  style={{ padding: '6px 10px' }}
-                />
-              </div>
-            </div>
-          )}
         </div>
 
         {error && <div style={{ color: 'red', marginBottom: 8, marginTop: 8 }}>{error}</div>}
