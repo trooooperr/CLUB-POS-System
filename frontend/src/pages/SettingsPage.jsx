@@ -4,8 +4,8 @@ import { Save, Check, Send, KeyRound, ShieldAlert, Users, Trash2, RefreshCw, Gri
 import { apiUrl, authFetch } from '../lib/api';
 import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
 export default function SettingsPage() {
-  const { settings, setSettings, saveSettings, currentUser, orderHistory, workers, loadData, qzConnected, qzPrinters, fetchQzPrinters } = useApp();
-  const [form, setForm] = useState({ ...settings });
+  const { settings, setSettings, saveSettings, currentUser, orderHistory, workers, loadData, agentConnected, agentPrinters, fetchAgentPrinters } = useApp();
+  const [form, setForm] = useState({ ...settings, billingPrinterName: settings.billingPrinterName || '' });
   const [saved, setSaved] = useState(false);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
@@ -15,18 +15,66 @@ export default function SettingsPage() {
   const [sendResult, setSendResult] = useState(null);
   const { showToast } = useApp();
   const [fetchingPrinters, setFetchingPrinters] = useState(false);
-
+  const [testingPrinter, setTestingPrinter] = useState(null);
+  
   const handleDetectPrinters = async () => {
     setFetchingPrinters(true);
     try {
-      await fetchQzPrinters();
-      showToast('Printers detected successfully', 'success');
+      if (form.printAgentEnabled) {
+        const printers = await fetchAgentPrinters();
+        if (printers && printers.length > 0) {
+          set('detectedPrinters', printers);
+          showToast(`Detected ${printers.length} printer(s) from Print Agent`, 'success');
+        } else {
+          showToast('No printers detected. Ensure print agent is running and configured correctly.', 'warning');
+        }
+      }
     } catch {
       showToast('Failed to detect printers', 'error');
     } finally {
       setFetchingPrinters(false);
     }
   };
+
+  const handleTestPrint = async (printerName, typeLabel) => {
+    if (!printerName) {
+      showToast(`Please select a printer for ${typeLabel} first`, 'error');
+      return;
+    }
+    setTestingPrinter(printerName);
+    try {
+      const port = form.printAgentPort || 5001;
+      const token = form.printAgentToken || '';
+      const res = await fetch(`http://localhost:${port}/test-print`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ printerName })
+      });
+      if (res.ok) {
+        showToast(`Sent test print to ${printerName}`, 'success');
+      } else {
+        const err = await res.json().catch(() => ({}));
+        showToast(err.error || 'Test print rejected by Agent', 'error');
+      }
+    } catch (err) {
+      console.error(err);
+      showToast('Failed to reach local Print Agent', 'error');
+    } finally {
+      setTestingPrinter(null);
+    }
+  };
+
+  const printerOptions = useMemo(() => {
+    const list = agentPrinters.length > 0 ? agentPrinters : (form.detectedPrinters || []);
+    const unique = new Set(list);
+    if (form.kitchenPrinterName) unique.add(form.kitchenPrinterName);
+    if (form.barPrinterName) unique.add(form.barPrinterName);
+    if (form.billingPrinterName) unique.add(form.billingPrinterName);
+    return Array.from(unique);
+  }, [agentPrinters, form.detectedPrinters, form.kitchenPrinterName, form.barPrinterName, form.billingPrinterName]);
 
   // Sync form states with loaded settings
   useEffect(() => {
@@ -340,75 +388,164 @@ export default function SettingsPage() {
         <section className="settings-card settings-full">
           <div className="settings-card-head">
             <div>
-              <h2>Printing</h2>
-              <p>Configure local receipt and KOT routing via QZ Tray.</p>
+              <h2>Printing Services</h2>
+              <p>Configure local silent receipt and KOT routing via Print Agent.</p>
             </div>
-            {form.qzTrayEnabled && (
-              <div className={`qz-status-badge ${qzConnected ? 'connected' : 'disconnected'}`}>
-                <div className="qz-status-dot" />
-                <span>{qzConnected ? 'QZ Connected' : 'QZ Disconnected'}</span>
+            {form.printAgentEnabled && (
+              <div className={`qz-status-badge ${agentConnected ? 'connected' : 'disconnected'}`}>
+                <div className="qz-status-dot" style={{ backgroundColor: agentConnected ? '#2ea043' : '#8b949e' }} />
+                <span>{agentConnected ? 'Print Agent Connected' : 'Print Agent Disconnected'}</span>
               </div>
             )}
           </div>
+          
           <div className="settings-printing-row" style={{ marginTop: '14px' }}>
             <label className="settings-toggle" style={{ margin: 0 }}>
-              <input type="checkbox" checked={!!form.qzTrayEnabled} onChange={e => {
-                const checked = e.target.checked;
-                set('qzTrayEnabled', checked);
-                set('directPrinting', checked);
+              <input type="checkbox" checked={!!form.printAgentEnabled} onChange={e => {
+                set('printAgentEnabled', e.target.checked);
               }} />
-              <span>Use QZ Tray for Local Printing</span>
+              <span>Use Local Print Agent (Silent Printing)</span>
             </label>
           </div>
 
-          {form.qzTrayEnabled && (
-            <div style={{ marginTop: '12px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  onClick={handleDetectPrinters}
-                  disabled={fetchingPrinters}
-                  style={{ fontSize: '12px', padding: '6px 14px', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '4px' }}
-                >
-                  <RefreshCw size={13} style={{ animation: fetchingPrinters ? 'spin 1s linear infinite' : 'none' }} />
-                  {fetchingPrinters ? 'Detecting...' : 'Detect Printers'}
-                </button>
-                {qzPrinters.length > 0 && (
-                  <span style={{ fontSize: '11px', color: '#8b949e' }}>{qzPrinters.length} printer(s) found</span>
-                )}
+          {form.printAgentEnabled && (
+            <div style={{ marginTop: '16px' }}>
+              <div style={{ background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '12px', border: '1px solid var(--b1)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
+                  <h3 style={{ fontSize: '14px', fontWeight: '600', margin: 0 }}>Print Agent Configuration</h3>
+                  <a 
+                    href="/print-agent.zip" 
+                    download="print-agent.zip" 
+                    className="btn btn-secondary" 
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '12px', padding: '6px 14px', borderRadius: '8px', textDecoration: 'none', color: 'var(--t0)' }}
+                  >
+                    <Send size={13} />
+                    Download Print Agent (.zip)
+                  </a>
+                </div>
+                <div className="settings-printing-row" style={{ gap: '16px', marginBottom: '16px' }}>
+                  <div className="settings-field" style={{ flex: 1, minWidth: '150px' }}>
+                    <label>Agent Port</label>
+                    <input 
+                      type="number" 
+                      value={form.printAgentPort || 5001} 
+                      onChange={e => set('printAgentPort', parseInt(e.target.value) || 5001)} 
+                    />
+                  </div>
+                  <div className="settings-field" style={{ flex: 2, minWidth: '250px' }}>
+                    <label>Authorization Token (Paste into config.json)</label>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <input 
+                        type="text" 
+                        readOnly 
+                        value={form.printAgentToken || ''} 
+                        style={{ fontFamily: 'monospace', fontSize: '12px', background: 'var(--b3)' }} 
+                      />
+                      <button 
+                        type="button" 
+                        className="btn btn-secondary" 
+                        onClick={() => {
+                          navigator.clipboard.writeText(form.printAgentToken || '');
+                          showToast('Token copied to clipboard', 'success');
+                        }}
+                        style={{ padding: '8px 12px', fontSize: '12px' }}
+                      >
+                        Copy
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
 
-              <div className="settings-printing-row">
-                <div className="settings-field" style={{ flex: 1, minWidth: '200px' }}>
-                  <label>Kitchen Printer</label>
-                  {qzPrinters.length > 0 ? (
-                    <select
-                      value={form.kitchenPrinterName || ''}
-                      onChange={e => set('kitchenPrinterName', e.target.value)}
-                      style={{ padding: '8px', borderRadius: '8px', border: '1px solid var(--b1)', background: 'var(--s2)', color: 'var(--t0)' }}
-                    >
-                      <option value="">-- Select Printer --</option>
-                      {qzPrinters.map(p => <option key={p} value={p}>{p}</option>)}
-                    </select>
-                  ) : (
-                    <input value={form.kitchenPrinterName || ''} onChange={e => set('kitchenPrinterName', e.target.value)} placeholder="e.g. KITCHEN_PRINTER" />
+              <div style={{ marginTop: '24px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={handleDetectPrinters}
+                    disabled={fetchingPrinters}
+                    style={{ fontSize: '12px', padding: '6px 14px', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '4px' }}
+                  >
+                    <RefreshCw size={13} style={{ animation: fetchingPrinters ? 'spin 1s linear infinite' : 'none' }} />
+                    {fetchingPrinters ? 'Detecting...' : 'Detect Printers'}
+                  </button>
+                  {agentPrinters.length > 0 && (
+                    <span style={{ fontSize: '11px', color: '#8b949e' }}>{agentPrinters.length} printer(s) detected</span>
                   )}
                 </div>
-                <div className="settings-field" style={{ flex: 1, minWidth: '200px' }}>
-                  <label>Bar & Bill Printer</label>
-                  {qzPrinters.length > 0 ? (
-                    <select
-                      value={form.barPrinterName || ''}
-                      onChange={e => set('barPrinterName', e.target.value)}
-                      style={{ padding: '8px', borderRadius: '8px', border: '1px solid var(--b1)', background: 'var(--s2)', color: 'var(--t0)' }}
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  {/* Kitchen Printer */}
+                  <div style={{ display: 'flex', alignItems: 'flex-end', gap: '12px', flexWrap: 'wrap' }}>
+                    <div className="settings-field" style={{ flex: 1, minWidth: '250px', margin: 0 }}>
+                      <label>Kitchen Printer</label>
+                      <select
+                        value={form.kitchenPrinterName || ''}
+                        onChange={e => set('kitchenPrinterName', e.target.value)}
+                        style={{ padding: '8px', borderRadius: '8px', border: '1px solid var(--b1)', background: 'var(--s2)', color: 'var(--t0)' }}
+                      >
+                        <option value="">-- Select Printer --</option>
+                        {printerOptions.map(p => <option key={p} value={p}>{p}</option>)}
+                      </select>
+                    </div>
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={() => handleTestPrint(form.kitchenPrinterName, 'Kitchen Printer')}
+                      disabled={!form.kitchenPrinterName || testingPrinter !== null}
+                      style={{ height: '36px', padding: '0 16px', borderRadius: '8px', fontSize: '12px' }}
                     >
-                      <option value="">-- Select Printer --</option>
-                      {qzPrinters.map(p => <option key={p} value={p}>{p}</option>)}
-                    </select>
-                  ) : (
-                    <input value={form.barPrinterName || ''} onChange={e => set('barPrinterName', e.target.value)} placeholder="e.g. BAR_PRINTER" />
-                  )}
+                      {testingPrinter === form.kitchenPrinterName ? 'Testing...' : 'Test Print'}
+                    </button>
+                  </div>
+
+                  {/* Bar Printer */}
+                  <div style={{ display: 'flex', alignItems: 'flex-end', gap: '12px', flexWrap: 'wrap' }}>
+                    <div className="settings-field" style={{ flex: 1, minWidth: '250px', margin: 0 }}>
+                      <label>Bar Printer</label>
+                      <select
+                        value={form.barPrinterName || ''}
+                        onChange={e => set('barPrinterName', e.target.value)}
+                        style={{ padding: '8px', borderRadius: '8px', border: '1px solid var(--b1)', background: 'var(--s2)', color: 'var(--t0)' }}
+                      >
+                        <option value="">-- Select Printer --</option>
+                        {printerOptions.map(p => <option key={p} value={p}>{p}</option>)}
+                      </select>
+                    </div>
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={() => handleTestPrint(form.barPrinterName, 'Bar Printer')}
+                      disabled={!form.barPrinterName || testingPrinter !== null}
+                      style={{ height: '36px', padding: '0 16px', borderRadius: '8px', fontSize: '12px' }}
+                    >
+                      {testingPrinter === form.barPrinterName ? 'Testing...' : 'Test Print'}
+                    </button>
+                  </div>
+
+                  {/* Billing Printer */}
+                  <div style={{ display: 'flex', alignItems: 'flex-end', gap: '12px', flexWrap: 'wrap' }}>
+                    <div className="settings-field" style={{ flex: 1, minWidth: '250px', margin: 0 }}>
+                      <label>Billing Printer</label>
+                      <select
+                        value={form.billingPrinterName || ''}
+                        onChange={e => set('billingPrinterName', e.target.value)}
+                        style={{ padding: '8px', borderRadius: '8px', border: '1px solid var(--b1)', background: 'var(--s2)', color: 'var(--t0)' }}
+                      >
+                        <option value="">-- Select Printer --</option>
+                        {printerOptions.map(p => <option key={p} value={p}>{p}</option>)}
+                      </select>
+                    </div>
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={() => handleTestPrint(form.billingPrinterName, 'Billing Printer')}
+                      disabled={!form.billingPrinterName || testingPrinter !== null}
+                      style={{ height: '36px', padding: '0 16px', borderRadius: '8px', fontSize: '12px' }}
+                    >
+                      {testingPrinter === form.billingPrinterName ? 'Testing...' : 'Test Print'}
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>

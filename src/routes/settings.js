@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const crypto = require('crypto');
 const Settings = require('../models/Settings');
 const { getCache, setCache, deleteCache } = require('../lib/redis');
 const { requireRole } = require('../middleware/auth');
@@ -66,10 +67,13 @@ function normalizeSettings(data) {
     currency: data.currency || '₹',
     thankYouMsg: data.thankYouMsg || '',
     darkMode: data.darkMode !== false,
-    directPrinting: !!data.directPrinting,
-    qzTrayEnabled: !!data.qzTrayEnabled,
+    printAgentEnabled: !!data.printAgentEnabled,
+    printAgentPort: Number(data.printAgentPort) || 5001,
+    printAgentToken: data.printAgentToken || '',
     kitchenPrinterName: data.kitchenPrinterName || '',
     barPrinterName: data.barPrinterName || '',
+    billingPrinterName: data.billingPrinterName || '',
+    detectedPrinters: cleanCategoryList(data.detectedPrinters) || [],
     upiId: data.upiId || '',
     includeUpiAmount: data.includeUpiAmount !== false,
     inventoryCategories: cleanCategoryList(data.inventoryCategories) || [],
@@ -80,16 +84,27 @@ function normalizeSettings(data) {
 }
 
 async function getOrCreateSettings() {
-  const existing = await Settings.findOne();
+  let existing = await Settings.findOne();
   if (existing) {
+    let changed = false;
     if (existing.senderEmail !== FIXED_SENDER_EMAIL) {
       existing.senderEmail = FIXED_SENDER_EMAIL;
+      changed = true;
+    }
+    if (!existing.printAgentToken) {
+      existing.printAgentToken = crypto.randomBytes(24).toString('hex');
+      changed = true;
+    }
+    if (changed) {
       await existing.save();
     }
     return existing;
   }
 
-  return Settings.create({ senderEmail: FIXED_SENDER_EMAIL });
+  return Settings.create({
+    senderEmail: FIXED_SENDER_EMAIL,
+    printAgentToken: crypto.randomBytes(24).toString('hex')
+  });
 }
 
 // Add Inventory Category (Admin/Manager)
@@ -171,18 +186,14 @@ router.put('/', requireRole(['admin', 'manager']), async (req, res) => {
   if (req.body.currency !== undefined) settings.currency = cleanString(req.body.currency, '₹').slice(0, 4) || '₹';
   if (req.body.thankYouMsg !== undefined) settings.thankYouMsg = cleanString(req.body.thankYouMsg);
   if (req.body.darkMode !== undefined) settings.darkMode = !!req.body.darkMode;
-  if (req.body.qzTrayEnabled !== undefined) {
-    settings.qzTrayEnabled = !!req.body.qzTrayEnabled;
-    if (settings.qzTrayEnabled) {
-      settings.directPrinting = true;
-    } else {
-      settings.directPrinting = false;
-    }
-  } else if (req.body.directPrinting !== undefined) {
-    settings.directPrinting = !!req.body.directPrinting;
-  }
+  if (req.body.printAgentEnabled !== undefined) settings.printAgentEnabled = !!req.body.printAgentEnabled;
+  if (req.body.printAgentPort !== undefined) settings.printAgentPort = cleanNumber(req.body.printAgentPort, 5001);
+  if (req.body.printAgentToken !== undefined) settings.printAgentToken = cleanString(req.body.printAgentToken);
   if (req.body.kitchenPrinterName !== undefined) settings.kitchenPrinterName = cleanString(req.body.kitchenPrinterName);
   if (req.body.barPrinterName !== undefined) settings.barPrinterName = cleanString(req.body.barPrinterName);
+  if (req.body.billingPrinterName !== undefined) settings.billingPrinterName = cleanString(req.body.billingPrinterName);
+  const detectedPrinters = cleanCategoryList(req.body.detectedPrinters);
+  if (detectedPrinters !== undefined) settings.detectedPrinters = detectedPrinters;
   if (req.body.upiId !== undefined) settings.upiId = cleanString(req.body.upiId);
   if (req.body.includeUpiAmount !== undefined) settings.includeUpiAmount = !!req.body.includeUpiAmount;
   if (req.body.adminEmail !== undefined) settings.adminEmail = cleanString(req.body.adminEmail).toLowerCase();

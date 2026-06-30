@@ -11,3 +11,7 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .idea/
+print-agent/build/
+print-agent/SumatraPDF.exe
+print-agent/print-agent.log
+print-agent/bin/

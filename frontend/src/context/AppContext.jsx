@@ -2,7 +2,6 @@ import React, { createContext, useContext, useState, useMemo, useCallback, useEf
 import { API_BASE, apiUrl, authFetch } from '../lib/api';
 import io from 'socket.io-client';
 
-const qz = typeof window !== 'undefined' ? window.qz : null;
 
 const playAlarmChime = () => {
   try {
@@ -80,6 +79,11 @@ const DEFAULT_SETTINGS = {
   thankYouMsg:     'Thank you for visiting!',
   darkMode:        true,
   directPrinting:  false,
+  printAgentEnabled: false,
+  printAgentPort: 5001,
+  printAgentToken: '',
+  billingPrinterName: '',
+  detectedPrinters: [],
   adminEmail:      '',
   senderEmail:     '',
 };
@@ -244,9 +248,10 @@ export function AppProvider({ children }) {
   const [menuSearch,      setMenuSearch]      = useState('');
   const [invoiceOrder,    setInvoiceOrder]    = useState(null);
   
-  // ── QZ Tray State ───────────────────────────────────────────────
-  const [qzConnected, setQzConnected] = useState(false);
-  const [qzPrinters, setQzPrinters] = useState([]);
+
+  // ── Print Agent State ───────────────────────────────────────────
+  const [agentConnected, setAgentConnected] = useState(false);
+  const [agentPrinters, setAgentPrinters] = useState([]);
 
   // ── Notifications ───────────────────────────────────────────────
   const [toast, setToast] = useState(null); // { msg, type }
@@ -297,44 +302,35 @@ export function AppProvider({ children }) {
       }
     };
 
-    const isQzActive = qz && (settings.qzTrayEnabled || qz.websocket.isActive());
-    if (isQzActive) {
+    // ── Local Print Agent Check ───────────────────────────────────────
+    if (settings.printAgentEnabled) {
+      const port = settings.printAgentPort || 5001;
+      const token = settings.printAgentToken || '';
+      const targetPrinter = printerName || '';
+      
       try {
-        // Configure digital certificate for secure silent printing
-        qz.security.setCertificatePromise(() => {
-          return authFetch(apiUrl('/api/qz/certificate'))
-            .then(res => res.text());
+        const res = await fetch(`http://localhost:${port}/print`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            html,
+            printerName: targetPrinter
+          })
         });
 
-        // Configure digital signature backend handler
-        qz.security.setSignaturePromise((toSign) => {
-          return new Promise((resolve, reject) => {
-            authFetch(apiUrl('/api/qz/sign'), {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ toSign })
-            })
-              .then(res => res.text())
-              .then(resolve)
-              .catch(reject);
-          });
-        });
-
-        if (!qz.websocket.isActive()) {
-          await qz.websocket.connect({ retries: 2, delay: 1 });
+        if (res.ok) {
+          showToast(`Print sent to ${targetPrinter || 'default'} via Print Agent`, 'success');
+          return;
+        } else {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.error || 'Print agent rejected print job');
         }
-        const targetPrinter = printerName || null;
-        const config = qz.configs.create(targetPrinter);
-        const printData = [{
-          type: 'html',
-          format: 'plain',
-          data: html
-        }];
-        await qz.print(config, printData);
-        showToast(`Print sent to ${targetPrinter || 'default'} via QZ Tray`, 'success');
-        return;
       } catch (err) {
-        showToast('QZ Tray disconnected, falling back to browser print...', 'error');
+        console.warn('⚠️ Local Print Agent failed:', err.message);
+        showToast('Print Agent failed or unreachable. Falling back to browser print...', 'error');
         runBrowserPrint();
         return;
       }
@@ -514,7 +510,7 @@ export function AppProvider({ children }) {
         </body>
       </html>
     `;
-    firePrint(html, 'document', settings.barPrinterName || '');
+    firePrint(html, 'document', settings.billingPrinterName || settings.barPrinterName || '');
   }, [settings, firePrint]);
 
   // Socket.IO relocated below loadData definition
@@ -623,87 +619,66 @@ export function AppProvider({ children }) {
     }
   }, [setMenuItems, setWorkers, setInventory, setSettings]);
 
-  // ── QZ Tray Auto Connect ──────────────────────────────────────────
-  const fetchQzPrinters = useCallback(async () => {
-    if (!qz) return [];
+
+  // ── Print Agent Auto Connect ─────────────────────────────────────────
+  const fetchAgentPrinters = useCallback(async () => {
+    const port = settings.printAgentPort || 5001;
+    const token = settings.printAgentToken || '';
     try {
-      if (!qz.websocket.isActive()) {
-        // Configure security before connecting
-        qz.security.setCertificatePromise(() => {
-          return authFetch(apiUrl('/api/qz/certificate'))
-            .then(res => res.text());
-        });
-        qz.security.setSignaturePromise((toSign) => {
-          return new Promise((resolve, reject) => {
-            authFetch(apiUrl('/api/qz/sign'), {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ toSign })
-            })
-              .then(res => res.text())
-              .then(resolve)
-              .catch(reject);
-          });
-        });
-        await qz.websocket.connect({ retries: 2, delay: 1 });
+      const res = await fetch(`http://localhost:${port}/printers`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setAgentPrinters(data.printers || []);
+        setAgentConnected(true);
+        return data.printers || [];
+      } else {
+        setAgentConnected(false);
+        setAgentPrinters([]);
+        return [];
       }
-      const printers = await qz.printers.find();
-      setQzPrinters(Array.isArray(printers) ? printers : []);
-      setQzConnected(true);
-      return printers;
     } catch (err) {
-      console.warn('⚠️ Failed to fetch printers:', err.message);
-      setQzConnected(false);
-      setQzPrinters([]);
+      setAgentConnected(false);
+      setAgentPrinters([]);
       return [];
     }
-  }, []);
+  }, [settings.printAgentPort, settings.printAgentToken]);
+
+  const pingPrintAgent = useCallback(async () => {
+    const port = settings.printAgentPort || 5001;
+    try {
+      const res = await fetch(`http://localhost:${port}/health`);
+      if (res.ok) {
+        setAgentConnected(true);
+        return true;
+      } else {
+        setAgentConnected(false);
+        return false;
+      }
+    } catch (err) {
+      setAgentConnected(false);
+      return false;
+    }
+  }, [settings.printAgentPort]);
 
   useEffect(() => {
-    if (qz && currentUser && settings.qzTrayEnabled) {
-      // Configure digital certificate and signature globally on load
-      qz.security.setCertificatePromise(() => {
-        return authFetch(apiUrl('/api/qz/certificate'))
-          .then(res => res.text());
-      });
-
-      qz.security.setSignaturePromise((toSign) => {
-        return new Promise((resolve, reject) => {
-          authFetch(apiUrl('/api/qz/sign'), {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ toSign })
-          })
-            .then(res => res.text())
-            .then(resolve)
-            .catch(reject);
-        });
-      });
-
-      const connectQz = async () => {
-        try {
-          if (!qz.websocket.isActive()) {
-            await qz.websocket.connect({ retries: 3, delay: 1 });
-          }
-          console.log('✅ Connected to QZ Tray');
-          setQzConnected(true);
-          // Auto-fetch printers on successful connect
-          try {
-            const printers = await qz.printers.find();
-            setQzPrinters(Array.isArray(printers) ? printers : []);
-          } catch (e) {
-            console.warn('Could not list printers:', e.message);
-          }
-        } catch (err) {
-          console.warn('⚠️ QZ Tray not running or unable to connect:', err.message);
-          setQzConnected(false);
+    if (settings.printAgentEnabled && currentUser) {
+      pingPrintAgent().then((connected) => {
+        if (connected) {
+          fetchAgentPrinters();
         }
-      };
-      connectQz();
+      });
+      const timer = setInterval(() => {
+        pingPrintAgent();
+      }, 30000);
+      return () => clearInterval(timer);
     } else {
-      setQzConnected(false);
+      setAgentConnected(false);
     }
-  }, [currentUser, settings.qzTrayEnabled]);
+  }, [currentUser, settings.printAgentEnabled, pingPrintAgent, fetchAgentPrinters]);
 
   // ── Socket.IO ────────────────────────────────────────────────────
   useEffect(() => {
@@ -1350,8 +1325,8 @@ export function AppProvider({ children }) {
       saveWorker, deleteWorker, updateWorkerStatus,
       toast, showToast,
       NUM_TABLES,
-      // QZ Tray
-      qzConnected, qzPrinters, fetchQzPrinters,
+      // Print Agent
+      agentConnected, agentPrinters, fetchAgentPrinters, pingPrintAgent,
       // Socket.IO & KOT functions
       socket,
       kotSessions, currentSession, kots,

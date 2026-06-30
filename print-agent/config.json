@@ -1,0 +1,5 @@
+{
+  "port": 5001,
+  "authToken": "b1d91b4dd5d89766fffab7b82b06f729432ede3515a97a2b",
+  "allowedOrigin": "*"
+}
