@@ -296,30 +296,45 @@ function executePrintJob(job) {
         return reject(new Error(`Failed to convert HTML to PDF: ${edgeErr.message}`));
       }
       
-      if (!fs.existsSync(tempPdfFile)) {
-        cleanupFiles(tempHtmlFile, tempPdfFile);
-        return reject(new Error('PDF conversion succeeded but target file was not generated'));
-      }
-      
-      log(`PDF generated. Sending to printer: "${job.printerName}" via SumatraPDF...`);
-      
-      // Step 2: Send PDF to printer using SumatraPDF
-      // fit: fits page to printable area, noprompt: prints silently without popup
-      const sumatraArgs = [
-        '-print-to', job.printerName,
-        '-print-settings', 'noscale,noprompt',
-        tempPdfFile
-      ];
-      
-      execFile(sumatraPath, sumatraArgs, (sumatraErr) => {
-        cleanupFiles(tempHtmlFile, tempPdfFile);
+      // Wait up to 1.5 seconds for the PDF file to be completely written to disk
+      let checks = 0;
+      const checkInterval = setInterval(() => {
+        checks++;
         
-        if (sumatraErr) {
-          return reject(new Error(`SumatraPDF failed to print: ${sumatraErr.message}`));
+        let fileExists = false;
+        try {
+          if (fs.existsSync(tempPdfFile)) {
+            const stats = fs.statSync(tempPdfFile);
+            if (stats.size > 0) {
+              fileExists = true;
+            }
+          }
+        } catch (e) {}
+
+        if (fileExists) {
+          clearInterval(checkInterval);
+          log(`PDF generated. Sending to printer: "${job.printerName}" via SumatraPDF...`);
+          
+          // Step 2: Send PDF to printer using SumatraPDF
+          const sumatraArgs = [
+            '-print-to', job.printerName,
+            '-print-settings', 'noscale,noprompt',
+            tempPdfFile
+          ];
+          
+          execFile(sumatraPath, sumatraArgs, (sumatraErr) => {
+            cleanupFiles(tempHtmlFile, tempPdfFile);
+            if (sumatraErr) {
+              return reject(new Error(`SumatraPDF failed to print: ${sumatraErr.message}`));
+            }
+            resolve();
+          });
+        } else if (checks >= 15) { // 1.5 seconds timeout
+          clearInterval(checkInterval);
+          cleanupFiles(tempHtmlFile, tempPdfFile);
+          return reject(new Error('PDF conversion succeeded but target file was not generated or was empty'));
         }
-        
-        resolve();
-      });
+      }, 100);
     });
   });
 }
