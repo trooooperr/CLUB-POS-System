@@ -162,30 +162,61 @@ app.get('/health', (req, res) => {
 
 app.get('/printers', authMiddleware, (req, res) => {
   log('Fetching Windows printer list...');
+  
+  // Try Get-CimInstance
   exec('powershell -Command "Get-CimInstance Win32_Printer | Select-Object Name | ConvertTo-Json"', (err, stdout, stderr) => {
-    if (err) {
-      log(`Error listing printers: ${err.message}`);
-      return res.status(500).json({ error: 'Failed to retrieve printers list', details: err.message });
-    }
-    
-    let printers = [];
-    try {
-      if (stdout.trim()) {
+    if (!err && stdout.trim()) {
+      try {
         const parsed = JSON.parse(stdout);
+        let printers = [];
         if (Array.isArray(parsed)) {
           printers = parsed.map(p => p.Name).filter(Boolean);
         } else if (parsed && parsed.Name) {
           printers = [parsed.Name];
         }
-      }
-      log(`Successfully found ${printers.length} printer(s)`);
-      res.json({ printers });
-    } catch (parseErr) {
-      log(`Error parsing printer JSON: ${parseErr.message}`);
-      // Fallback: parse lines manually
-      const lines = stdout.split('\n').map(l => l.trim()).filter(l => l && l !== '[' && l !== ']' && l !== '{' && l !== '}');
-      res.json({ printers: lines });
+        if (printers.length > 0) {
+          log(`Successfully found ${printers.length} printer(s) via Get-CimInstance`);
+          return res.json({ printers });
+        }
+      } catch (parseErr) {}
     }
+
+    log('CimInstance failed or empty. Trying Get-WmiObject...');
+    // Fallback 1: Get-WmiObject
+    exec('powershell -Command "Get-WmiObject Win32_Printer | Select-Object Name | ConvertTo-Json"', (wmiErr, wmiStdout, wmiStderr) => {
+      if (!wmiErr && wmiStdout.trim()) {
+        try {
+          const parsed = JSON.parse(wmiStdout);
+          let printers = [];
+          if (Array.isArray(parsed)) {
+            printers = parsed.map(p => p.Name).filter(Boolean);
+          } else if (parsed && parsed.Name) {
+            printers = [parsed.Name];
+          }
+          if (printers.length > 0) {
+            log(`Successfully found ${printers.length} printer(s) via Get-WmiObject`);
+            return res.json({ printers });
+          }
+        } catch (parseErr) {}
+      }
+
+      log('Get-WmiObject failed or empty. Trying wmic...');
+      // Fallback 2: wmic
+      exec('wmic printer get name', (wmicErr, wmicStdout, wmicStderr) => {
+        if (!wmicErr && wmicStdout.trim()) {
+          const lines = wmicStdout.split('\r\n')
+            .map(l => l.trim())
+            .filter(l => l && l.toLowerCase() !== 'name');
+          if (lines.length > 0) {
+            log(`Successfully found ${lines.length} printer(s) via wmic`);
+            return res.json({ printers: lines });
+          }
+        }
+
+        log('All printer detection commands failed or returned 0 printers.');
+        return res.json({ printers: [] });
+      });
+    });
   });
 });
 
@@ -276,7 +307,7 @@ function executePrintJob(job) {
       // fit: fits page to printable area, noprompt: prints silently without popup
       const sumatraArgs = [
         '-print-to', job.printerName,
-        '-print-settings', 'fit,noprompt',
+        '-print-settings', 'noscale,noprompt',
         tempPdfFile
       ];
       
