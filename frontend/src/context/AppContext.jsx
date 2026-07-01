@@ -350,8 +350,8 @@ export function AppProvider({ children }) {
       <head>
         <title>${printerLabel}</title>
         <style>
-          @page { size: 80mm auto; margin: 2mm; }
-          body { font-family: monospace; width: 72mm; margin: 0; padding: 0; font-size: 12px; }
+          @page { size: 80mm auto; margin: 0; }
+          body { font-family: monospace; width: 70mm; margin: 0; padding: 0; font-size: 12px; }
           .header { text-align: center; font-weight: bold; margin-bottom: 6px; font-size: 11px; }
           .sub { text-align: center; font-size: 11px; margin-bottom: 4px; }
           .divider { border-top: 1px dashed #000; margin: 5px 0; }
@@ -449,8 +449,8 @@ export function AppProvider({ children }) {
         <head>
           <title>${settings.barPrinterName || 'BAR'} BILL</title>
           <style>
-            @page { size: 80mm auto; margin: 2mm; }
-            body { font-family: 'Courier New', Courier, monospace; width: 74mm; margin: 0; padding: 0; font-size: 13px; color: #000; line-height: 1.2; }
+            @page { size: 80mm auto; margin: 0; }
+            body { font-family: 'Courier New', Courier, monospace; width: 70mm; margin: 0; padding: 0; font-size: 13px; color: #000; line-height: 1.2; }
             .center { text-align: center; }
             .brand { font-size: 18px; font-weight: 900; margin-bottom: 2px; text-transform: uppercase; }
             .address { font-size: 12px; margin-bottom: 6px; line-height: 1.2; }
