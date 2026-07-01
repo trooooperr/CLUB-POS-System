@@ -306,10 +306,8 @@ export default function BillingPage() {
     const subtotal = combinedItems.all.reduce((s, i) => s + (i.price || 0) * (i.quantity || 0), 0);
     const sgst = subtotal * (settings.sgstRate / 100);
     const cgst = subtotal * (settings.cgstRate / 100);
-    const dv = (table.discount || '').trim();
-    const discountAmount = Math.round(dv.endsWith('%')
-      ? subtotal * (parseFloat(dv) / 100) || 0
-      : parseFloat(dv) || 0);
+    const discountVal = parseFloat((table.discount || '').replace(/[^0-9.]/g, '')) || 0;
+    const discountAmount = Math.round(subtotal * (discountVal / 100));
     const rawTotal = subtotal + sgst + cgst - discountAmount;
     const grandTotal = Math.max(0, Math.round(rawTotal));
     const roundOff = grandTotal - rawTotal;
@@ -1040,13 +1038,13 @@ export default function BillingPage() {
                   </div>
                 )}
                 <div className="s-row">
-                  <span>Discount</span>
+                  <span>Discount (%)</span>
                   <input
                     className="mini-input"
-                    style={{ width: 80, textAlign: 'right' }}
+                    style={{ width: 60, textAlign: 'right' }}
                     value={table.discount || ''}
-                    onChange={e => setTableField(activeTableId, 'discount', e.target.value)}
-                    placeholder="0 or 10%"
+                    onChange={e => setTableField(activeTableId, 'discount', e.target.value.replace(/[^0-9.]/g, ''))}
+                    placeholder="0"
                   />
                 </div>
                 <div className="s-row total-big"><span>Total</span><span>{c}{grandTotal.toFixed(0)}</span></div>

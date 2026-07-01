@@ -16,6 +16,16 @@ const {
 } = require('../lib/inventoryStock');
 
 
+// Shift date to the previous business day if time is before 5 AM
+function getBusinessDate(originalDate = new Date()) {
+  const d = new Date(originalDate);
+  const hour = d.getHours();
+  if (hour < 5) {
+    d.setDate(d.getDate() - 1);
+  }
+  return d;
+}
+
 // Generate new Bill No based on boundary
 async function generateNextBillNo() {
   const boundary = getBusinessDayBoundary();
@@ -103,7 +113,7 @@ router.post('/table/:tableNo/open', async (req, res) => {
       paymentMode: 'cash',
       orderStatus: 'OPEN',
       isActive: true,
-      date: new Date(),
+      date: getBusinessDate(),
       waiterName: waiterName || '',
       orderType: orderType || 'dine-in'
     });
@@ -229,6 +239,7 @@ router.post('/', async (req, res) => {
     // New KOT workflow: don't deduct inventory yet, only create order if items empty
     const order = new Order({
       ...orderData,
+      date: getBusinessDate(orderData.date ? new Date(orderData.date) : new Date()),
       orderStatus: orderData.orderStatus || (isDirectOrder ? (orderData.dueAmount === 0 ? 'COMPLETED' : 'OPEN') : 'OPEN'),
       isActive: true,
       items: orderData.items || [],
