@@ -308,6 +308,8 @@ export function AppProvider({ children }) {
       const token = settings.printAgentToken || '';
       const targetPrinter = printerName || '';
       
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 2000);
       try {
         const res = await fetch(`http://localhost:${port}/print`, {
           method: 'POST',
@@ -315,11 +317,13 @@ export function AppProvider({ children }) {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`
           },
+          signal: controller.signal,
           body: JSON.stringify({
             html,
             printerName: targetPrinter
           })
         });
+        clearTimeout(timeoutId);
 
         if (res.ok) {
           showToast(`Print sent to ${targetPrinter || 'default'} via Print Agent`, 'success');
@@ -329,6 +333,7 @@ export function AppProvider({ children }) {
           throw new Error(errData.error || 'Print agent rejected print job');
         }
       } catch (err) {
+        clearTimeout(timeoutId);
         console.warn('⚠️ Local Print Agent failed:', err.message);
         showToast('Print Agent failed or unreachable. Falling back to browser print...', 'error');
         runBrowserPrint();
@@ -624,12 +629,16 @@ export function AppProvider({ children }) {
   const fetchAgentPrinters = useCallback(async () => {
     const port = settings.printAgentPort || 5001;
     const token = settings.printAgentToken || '';
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 1000);
     try {
       const res = await fetch(`http://localhost:${port}/printers`, {
         headers: {
           'Authorization': `Bearer ${token}`
-        }
+        },
+        signal: controller.signal
       });
+      clearTimeout(timeoutId);
       if (res.ok) {
         const data = await res.json();
         setAgentPrinters(data.printers || []);
@@ -641,6 +650,7 @@ export function AppProvider({ children }) {
         return [];
       }
     } catch (err) {
+      clearTimeout(timeoutId);
       setAgentConnected(false);
       setAgentPrinters([]);
       return [];
@@ -649,8 +659,13 @@ export function AppProvider({ children }) {
 
   const pingPrintAgent = useCallback(async () => {
     const port = settings.printAgentPort || 5001;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 1000);
     try {
-      const res = await fetch(`http://localhost:${port}/health`);
+      const res = await fetch(`http://localhost:${port}/health`, {
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
       if (res.ok) {
         setAgentConnected(true);
         return true;
@@ -659,6 +674,7 @@ export function AppProvider({ children }) {
         return false;
       }
     } catch (err) {
+      clearTimeout(timeoutId);
       setAgentConnected(false);
       return false;
     }
