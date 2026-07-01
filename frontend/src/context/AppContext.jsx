@@ -345,12 +345,15 @@ export function AppProvider({ children }) {
     runBrowserPrint();
   }, [settings, showToast]);
 
-  const buildKOTHtml = useCallback((kot, tableNo, items, printerLabel) => `
+  const buildKOTHtml = useCallback((kot, tableNo, items, printerLabel) => {
+    const itemCount = items.length;
+    const pageHeight = 70 + (itemCount * 9);
+    return `
     <html>
       <head>
         <title>${printerLabel}</title>
         <style>
-          @page { size: 80mm auto; margin: 0; }
+          @page { size: 80mm ${pageHeight}mm; margin: 0; }
           body { font-family: monospace; width: 70mm; margin: 0; padding: 0; font-size: 12px; font-weight: bold; }
           .header { text-align: center; font-weight: bold; margin-bottom: 6px; font-size: 11px; }
           .sub { text-align: center; font-size: 11px; margin-bottom: 4px; }
@@ -372,7 +375,8 @@ export function AppProvider({ children }) {
         <div class="divider"></div>
       </body>
     </html>
-  `, []);
+  `;
+  }, []);
 
   const printKOTDocument = useCallback((kot, tableNo) => {
     // Separate items by department explicitly
@@ -444,12 +448,17 @@ export function AppProvider({ children }) {
     const grandTotal = Math.max(0, Math.round(rawTotal));
     const roundOff = grandTotal - rawTotal;
 
+    const itemCount = table.items.length;
+    const hasQr = grandTotal > 0 && settings.upiId;
+    const hasTipQr = !!waiterTipQrUrl;
+    const pageHeight = 120 + (itemCount * 9) + (hasQr ? 55 : 0) + (hasTipQr ? 45 : 0);
+
     const html = `
       <html>
         <head>
           <title>${settings.barPrinterName || 'BAR'} BILL</title>
           <style>
-            @page { size: 80mm auto; margin: 0; }
+            @page { size: 80mm ${pageHeight}mm; margin: 0; }
             body { font-family: 'Courier New', Courier, monospace; width: 70mm; margin: 0; padding: 0; font-size: 13px; color: #000; line-height: 1.2; font-weight: bold; }
             .center { text-align: center; }
             .brand { font-size: 18px; font-weight: 900; margin-bottom: 2px; text-transform: uppercase; }
