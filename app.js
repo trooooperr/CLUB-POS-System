@@ -22,7 +22,7 @@ app.use(helmet({
       styleSrc:    ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
       fontSrc:     ["'self'", 'https://fonts.gstatic.com'],
       imgSrc:      ["'self'", 'data:', 'https:', 'blob:'], // allow Unsplash, placeholders
-      connectSrc:  ["'self'", 'wss:', 'ws:', 'https://cdn.jsdelivr.net'],               // allow Socket.IO WebSocket and CDN sourcemaps
+      connectSrc:  ["'self'", 'wss:', 'ws:', 'https://cdn.jsdelivr.net', 'http://localhost:*', 'http://127.0.0.1:*'],               // allow Socket.IO WebSocket, CDN sourcemaps, and local hardware agents
       objectSrc:   ["'none'"],
       frameSrc:    ["'none'"],
     },
