@@ -4,6 +4,7 @@ const path = require('path');
 const os = require('os');
 const { exec, execFile } = require('child_process');
 const https = require('https');
+const http = require('http');
 
 // Initialize paths
 const execDir = path.dirname(process.execPath);
@@ -75,29 +76,40 @@ function ensureSumatraPDF() {
     }
     
     log(`SumatraPDF.exe not found. Attempting auto-download from: ${SUMATRA_URL}`);
-    const file = fs.createWriteStream(sumatraPath);
     
-    https.get(SUMATRA_URL, (response) => {
-      if (response.statusCode !== 200) {
-        file.close();
-        fs.unlinkSync(sumatraPath);
-        return reject(new Error(`Download failed with status code ${response.statusCode}`));
-      }
-      
-      response.pipe(file);
-      file.on('finish', () => {
-        file.close();
-        log('SumatraPDF downloaded successfully.');
-        resolve();
+    function download(url) {
+      const client = url.startsWith('https') ? https : http;
+      client.get(url, (response) => {
+        // Handle HTTP redirect (e.g. status code 301, 302, 307, 308)
+        if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
+          const redirectUrl = new URL(response.headers.location, url).toString();
+          log(`Redirected to: ${redirectUrl}`);
+          return download(redirectUrl);
+        }
+
+        if (response.statusCode !== 200) {
+          return reject(new Error(`Download failed with status code ${response.statusCode}`));
+        }
+
+        const file = fs.createWriteStream(sumatraPath);
+        response.pipe(file);
+        file.on('finish', () => {
+          file.close();
+          log('SumatraPDF downloaded successfully.');
+          resolve();
+        });
+        file.on('error', (err) => {
+          file.close();
+          try { fs.unlinkSync(sumatraPath); } catch (e) {}
+          reject(err);
+        });
+      }).on('error', (err) => {
+        log(`SumatraPDF download error: ${err.message}`);
+        reject(err);
       });
-    }).on('error', (err) => {
-      file.close();
-      try {
-        fs.unlinkSync(sumatraPath);
-      } catch (e) {}
-      log(`SumatraPDF download error: ${err.message}`);
-      reject(err);
-    });
+    }
+
+    download(SUMATRA_URL);
   });
 }
 
