@@ -642,6 +642,16 @@ export default function BillingPage() {
 
       // Print bill
       await printBillDocument(tableNo, { items: combinedItems.all }, grandTotal, selectedWaiterObj?.name || '', finalizedOrder?.billNo, selectedWaiterObj);
+
+      // Auto-send WhatsApp review message if customer phone is filled
+      if (table.customerPhone && table.customerPhone.trim().length >= 10) {
+        const phone = table.customerPhone.trim();
+        const googleLink = settings.googleReviewLink || 'https://g.page/r/.../review';
+        const message = `*${settings.restaurantName || 'HUMTUM'}*\n\nThank you for dining with us! 🙏\nWe hope you had a wonderful experience.\n\nPlease share your valuable feedback and review us on Google: ${googleLink}`;
+        const encoded = encodeURIComponent(message);
+        window.open(`https://wa.me/91${phone}?text=${encoded}`, '_blank');
+      }
+
       clearTable(activeTableId);
       setKots([]);
       setActiveOrder(null);

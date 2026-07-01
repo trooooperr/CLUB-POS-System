@@ -201,6 +201,7 @@ router.put('/', requireRole(['admin', 'manager']), async (req, res) => {
   if (req.body.upiId !== undefined) settings.upiId = cleanString(req.body.upiId);
   if (req.body.includeUpiAmount !== undefined) settings.includeUpiAmount = !!req.body.includeUpiAmount;
   if (req.body.adminEmail !== undefined) settings.adminEmail = cleanString(req.body.adminEmail).toLowerCase();
+  if (req.body.googleReviewLink !== undefined) settings.googleReviewLink = cleanString(req.body.googleReviewLink);
 
   const inventoryCategories = cleanCategoryList(req.body.inventoryCategories);
   if (inventoryCategories !== undefined) {

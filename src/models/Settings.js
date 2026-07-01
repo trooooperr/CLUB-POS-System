@@ -26,6 +26,7 @@ const settingsSchema = new mongoose.Schema({
   senderPassword: { type: String, default: '' },
   inventoryCategories: { type: [String], default: ['Spirits','Beer','Wine','Food','Mixers'] },
   menuCategories:      { type: [String], default: ['Spirits','Beer','Wine','Food','Mixers'] },
+  googleReviewLink:    { type: String, default: '' },
 }, { timestamps: true });
 
 module.exports = mongoose.model('Settings', settingsSchema);
