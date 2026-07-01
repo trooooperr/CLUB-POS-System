@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { X, Printer, Phone, Send, Check, Download, Share2 } from 'lucide-react';
 import { apiUrl, authFetch } from '../lib/api';
+import QRCode from 'qrcode';
 const qz = typeof window !== 'undefined' ? window.qz : null;
 
 export default function InvoiceModal() {
@@ -14,18 +15,37 @@ export default function InvoiceModal() {
   const o = invoiceOrder;
   const s = settings;
 
-  // Calculate QR urls for both screen preview and print
-  const roundedGrandTotal = Math.round(o.grandTotal);
-  const upiId = s.upiId || 'dummy@upi';
-  const merchantName = s.restaurantName || 'HUMTUM';
-  const includeAmount = s.includeUpiAmount !== false;
-  const upiUrl = `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(merchantName)}${includeAmount ? `&am=${roundedGrandTotal}` : ''}&cu=INR`;
-  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(upiUrl)}`;
-
   const waiterObj = (workers || []).find(w => w.name?.toLowerCase().trim() === o.waiterName?.toLowerCase().trim()) || null;
-  const waiterTipQrUrl = waiterObj?.upiId
-    ? `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(`upi://pay?pa=${encodeURIComponent(waiterObj.upiId)}&pn=${encodeURIComponent(waiterObj.name)}&cu=INR`)}`
-    : '';
+
+  const [qrCodeUrl, setQrCodeUrl] = useState('');
+  const [waiterTipQrUrl, setWaiterTipQrUrl] = useState('');
+
+  React.useEffect(() => {
+    if (!o) return;
+    const generateQRs = async () => {
+      try {
+        const roundedGrandTotal = Math.round(o.grandTotal);
+        const upiId = s.upiId || 'dummy@upi';
+        const merchantName = s.restaurantName || 'HUMTUM';
+        const includeAmount = s.includeUpiAmount !== false;
+        const upiUrl = `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(merchantName)}${includeAmount ? `&am=${roundedGrandTotal}` : ''}&cu=INR`;
+        
+        const qr = await QRCode.toDataURL(upiUrl, { margin: 1, width: 250 });
+        setQrCodeUrl(qr);
+
+        if (waiterObj?.upiId) {
+          const waiterUpiUrl = `upi://pay?pa=${encodeURIComponent(waiterObj.upiId)}&pn=${encodeURIComponent(waiterObj.name)}&cu=INR`;
+          const tipQr = await QRCode.toDataURL(waiterUpiUrl, { margin: 1, width: 200 });
+          setWaiterTipQrUrl(tipQr);
+        } else {
+          setWaiterTipQrUrl('');
+        }
+      } catch (err) {
+        console.error('Failed to generate local QRs:', err);
+      }
+    };
+    generateQRs();
+  }, [o, s, waiterObj]);
 
   const handlePrint = async () => {
     const html = `
@@ -167,7 +187,7 @@ export default function InvoiceModal() {
         setTimeout(() => {
           iframe.contentWindow.focus();
           iframe.contentWindow.print();
-        }, 500);
+        }, 50);
       } catch (printErr) {
         console.error('Browser print failed:', printErr);
         showToast('Browser printing failed', 'error');

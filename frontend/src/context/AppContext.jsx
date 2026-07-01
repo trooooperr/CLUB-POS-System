@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useMemo, useCallback, useEffect } from 'react';
 import { API_BASE, apiUrl, authFetch } from '../lib/api';
 import io from 'socket.io-client';
+import QRCode from 'qrcode';
 
 
 const playAlarmChime = () => {
@@ -295,7 +296,7 @@ export function AppProvider({ children }) {
           } catch (err) {
             console.error('Focus/print failed:', err);
           }
-        }, 1000);
+        }, 50);
       } catch (printErr) {
         console.error('Browser print failed:', printErr);
         showToast('Browser printing failed', 'error');
@@ -407,18 +408,30 @@ export function AppProvider({ children }) {
     }
   }, [settings, firePrint, buildKOTHtml]);
 
-  const printBillDocument = useCallback((tableNo, table, total, waiterName = '', billNoOverride = '', waiterObj = null) => {
+  const printBillDocument = useCallback(async (tableNo, table, total, waiterName = '', billNoOverride = '', waiterObj = null) => {
     const tempBillNo = billNoOverride ? `HTB-${billNoOverride.split('-').pop()}` : ('HTB-' + String(Date.now()).slice(-5));
     
     const upiId = settings.upiId || 'dummy@upi';
     const merchantName = settings.restaurantName || 'HUMTUM';
     const includeAmount = settings.includeUpiAmount !== false;
     const upiUrl = `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(merchantName)}${includeAmount ? `&am=${total.toFixed(0)}` : ''}&cu=INR`;
-    const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(upiUrl)}`;
+    
+    let qrCodeUrl = '';
+    try {
+      qrCodeUrl = await QRCode.toDataURL(upiUrl, { margin: 1, width: 250 });
+    } catch (err) {
+      console.error('Failed to generate local QR Code:', err);
+    }
 
-    const waiterTipQrUrl = waiterObj?.upiId
-      ? `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(`upi://pay?pa=${encodeURIComponent(waiterObj.upiId)}&pn=${encodeURIComponent(waiterObj.name)}&cu=INR`)}`
-      : '';
+    let waiterTipQrUrl = '';
+    if (waiterObj?.upiId) {
+      try {
+        const waiterUpiUrl = `upi://pay?pa=${encodeURIComponent(waiterObj.upiId)}&pn=${encodeURIComponent(waiterObj.name)}&cu=INR`;
+        waiterTipQrUrl = await QRCode.toDataURL(waiterUpiUrl, { margin: 1, width: 200 });
+      } catch (err) {
+        console.error('Failed to generate local Waiter Tip QR Code:', err);
+      }
+    }
 
     const subtotal = table.items.reduce((s, i) => s + (i.price || 0) * (i.quantity || 0), 0);
     const sgst = subtotal * (settings.sgstRate / 100);

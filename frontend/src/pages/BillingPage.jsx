@@ -334,29 +334,7 @@ export default function BillingPage() {
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
-  // Pre-load dynamic UPI QR code image in the background whenever totals change to prevent latency during printing
-  useEffect(() => {
-    if (!activeTableId || !grandTotal) return;
-    try {
-      const upiId = settings.upiId || 'dummy@upi';
-      const merchantName = settings.restaurantName || 'HUMTUM';
-      const includeAmount = settings.includeUpiAmount !== false;
-      const upiUrl = `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(merchantName)}${includeAmount ? `&am=${grandTotal.toFixed(0)}` : ''}&cu=INR`;
-      const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(upiUrl)}`;
-      const img = new Image();
-      img.src = qrCodeUrl;
 
-      // Pre-load waiter tip QR code if assigned and has UPI ID
-      if (selectedWaiterObj?.upiId) {
-        const waiterUpiUrl = `upi://pay?pa=${encodeURIComponent(selectedWaiterObj.upiId)}&pn=${encodeURIComponent(selectedWaiterObj.name)}&cu=INR`;
-        const waiterTipQrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(waiterUpiUrl)}`;
-        const img2 = new Image();
-        img2.src = waiterTipQrUrl;
-      }
-    } catch (e) {
-      console.error('Background QR pre-load error:', e);
-    }
-  }, [activeTableId, grandTotal, settings.upiId, settings.restaurantName, settings.includeUpiAmount, selectedWaiterObj]);
 
   useEffect(() => {
     if (!isResizing) return;
@@ -663,7 +641,7 @@ export default function BillingPage() {
       );
 
       // Print bill
-      printBillDocument(tableNo, { items: combinedItems.all }, grandTotal, selectedWaiterObj?.name || '', finalizedOrder?.billNo, selectedWaiterObj);
+      await printBillDocument(tableNo, { items: combinedItems.all }, grandTotal, selectedWaiterObj?.name || '', finalizedOrder?.billNo, selectedWaiterObj);
       clearTable(activeTableId);
       setKots([]);
       setActiveOrder(null);

@@ -178,7 +178,7 @@ async function sendDailyReportInternal(options = {}) {
   };
 
   const { start, end } = getBusinessDayBounds();
-  const orders = await Order.find({ date: { $gte: start, $lt: end } });
+  const orders = await Order.find({ date: { $gte: start, $lt: end }, grandTotal: { $gt: 0 } });
   const inventory = await Inventory.find();
   const inventoryCategories = resolvedSettings.inventoryCategories || [];
   inventory.sort((a, b) => {
@@ -241,7 +241,7 @@ router.get('/daily-html', async (req, res) => {
     };
 
     const { start, end } = getBusinessDayBounds();
-    const orders = await Order.find({ date: { $gte: start, $lt: end } });
+    const orders = await Order.find({ date: { $gte: start, $lt: end }, grandTotal: { $gt: 0 } });
     const inventory = await Inventory.find();
     const inventoryCategories = resolvedSettings.inventoryCategories || [];
     inventory.sort((a, b) => {
@@ -270,7 +270,7 @@ router.get('/daily-summary', requireRole(['admin', 'manager']), async (req, res)
     if (cached) return res.json(cached);
 
     const { start, end } = getBusinessDayBounds();
-    const orders = await Order.find({ date: { $gte: start, $lt: end } });
+    const orders = await Order.find({ date: { $gte: start, $lt: end }, grandTotal: { $gt: 0 } });
     const total    = orders.reduce((s,o)=>s+o.grandTotal,0);
     const due      = orders.reduce((s,o)=>s+(o.dueAmount||0),0);
     const pmMap    = {};
@@ -293,7 +293,7 @@ router.get('/analytics', requireRole(['admin', 'manager']), async (req, res) => 
     const end = new Date(endDate);
     end.setHours(23,59,59,999);
 
-    const match = { date: { $gte: start, $lte: end } };
+    const match = { date: { $gte: start, $lte: end }, grandTotal: { $gt: 0 } };
 
     // 1. Basic Stats
     const statsResult = await Order.aggregate([
