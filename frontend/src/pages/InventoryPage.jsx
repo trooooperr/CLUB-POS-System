@@ -535,10 +535,10 @@ export default function InventoryPage() {
                                   <button className="btn btn-success btn-icon-sm" onClick={() => adjust(i._id, 1)}>+</button>
                                 </>
                               )}
-                              <div style={{ display: 'flex', gap: 4, margin: '0 8px' }}>
+                              {/* <div style={{ display: 'flex', gap: 4, margin: '0 8px' }}>
                                 <button className="iBtn-round" disabled={index === 0 || !!search} onClick={() => handleShiftItem(index, 'up')} title="Move up" style={{ fontSize: 10, cursor: index === 0 || !!search ? 'not-allowed' : 'pointer', opacity: (index === 0 || !!search) ? 0.3 : 1 }}>▲</button>
                                 <button className="iBtn-round" disabled={index === filtered.length - 1 || !!search} onClick={() => handleShiftItem(index, 'down')} title="Move down" style={{ fontSize: 10, cursor: index === filtered.length - 1 || !!search ? 'not-allowed' : 'pointer', opacity: (index === filtered.length - 1 || !!search) ? 0.3 : 1 }}>▼</button>
-                              </div>
+                              </div> */}
                               <button className="btn btn-blue btn-sm" onClick={() => setModal(i)}>Edit</button>
                               <button className="btn btn-icon-sm btn-danger" onClick={() => setConfirmDelete(i._id)} title="Delete item"><Trash2 size={14} /></button>
                             </div>
@@ -643,10 +643,9 @@ export default function InventoryPage() {
                                        <button className="btn btn-success btn-icon-sm" onClick={() => adjust(i._id, 1)}>+</button>
                                      </>
                                    )}
-                                   <span style={{ margin: '0 2px', color: 'var(--b1)' }}>|</span>
+                                   {/* <span style={{ margin: '0 2px', color: 'var(--b1)' }}>|</span>
                                    <button className="btn btn-icon-sm" disabled={index === 0 || !!search} onClick={() => handleShiftItem(index, 'up')} title="Move up" style={{ opacity: (index === 0 || !!search) ? 0.3 : 1 }}>▲</button>
-                                   <button className="btn btn-icon-sm" disabled={index === filtered.length - 1 || !!search} onClick={() => handleShiftItem(index, 'down')} title="Move down" style={{ opacity: (index === filtered.length - 1 || !!search) ? 0.3 : 1 }}>▼</button>
-                                   <span style={{ margin: '0 2px', color: 'var(--b1)' }}>|</span>
+                                   <button className="btn btn-icon-sm" disabled={index === filtered.length - 1 || !!search} onClick={() => handleShiftItem(index, 'down')} title="Move down" style={{ opacity: (index === filtered.length - 1 || !!search) ? 0.3 : 1 }}>▼</button> */}
                                    <button className="btn btn-blue btn-sm" onClick={() => setModal(i)}>Edit</button>
                                    <button className="btn btn-icon-sm btn-danger" onClick={() => setConfirmDelete(i._id)} title="Delete item"><Trash2 size={14} /></button>
                                  </td>
