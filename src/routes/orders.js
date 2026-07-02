@@ -292,6 +292,28 @@ router.patch('/:id/finalize-bill', async (req, res) => {
     const order = await Order.findById(req.params.id);
     if (!order) return res.status(404).json({ message: 'Order not found' });
 
+    // Server-side safeguard for CLR item
+    const hasClrItem = Array.isArray(items) && items.some(i => i.name && i.name.toUpperCase() === 'CLR');
+    if (hasClrItem) {
+      await KOT.deleteMany({ orderId: req.params.id });
+      await TableSession.findOneAndDelete({ activeOrderId: req.params.id });
+      const tableNo = order.tableNo;
+      await Order.findByIdAndDelete(req.params.id);
+
+      await deleteCache([ORDERS_CACHE_KEY, REPORT_SUMMARY_CACHE_KEY]);
+      return res.json({
+        success: true,
+        cleared: true,
+        order: {
+          _id: req.params.id,
+          tableNo,
+          items: [],
+          grandTotal: 0,
+          isActive: false
+        }
+      });
+    }
+
     // Update order with final calculations (combine all KOT items)
     order.items = items;
     order.subtotal = subtotal;
@@ -410,6 +432,16 @@ router.patch('/:id/complete', async (req, res) => {
   try {
     const order = await Order.findById(req.params.id);
     if (!order) return res.status(404).json({ message: 'Order not found' });
+
+    // Server-side safeguard for CLR item
+    const hasClrItem = Array.isArray(order.items) && order.items.some(i => i.name && i.name.toUpperCase() === 'CLR');
+    if (hasClrItem) {
+      await KOT.deleteMany({ orderId: order._id });
+      await TableSession.findOneAndDelete({ activeOrderId: order._id });
+      await Order.findByIdAndDelete(order._id);
+      await deleteCache([ORDERS_CACHE_KEY, REPORT_SUMMARY_CACHE_KEY]);
+      return res.json({ success: true, cleared: true, _id: order._id, tableNo: order.tableNo });
+    }
 
     // Mark order as completed
     order.orderStatus = 'COMPLETED';

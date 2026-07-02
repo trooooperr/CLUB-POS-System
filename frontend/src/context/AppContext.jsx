@@ -1391,6 +1391,21 @@ export function AppProvider({ children }) {
       const orderResponse = await res.json();
       const { inventory: nextInventory, ...order } = orderResponse;
       if (nextInventory) applyInventoryUpdate(nextInventory);
+
+      if (orderResponse.cleared) {
+        // Remove from local order history if it exists (e.g. from state update mismatch)
+        setOrderHistory(prev => {
+          const historyArray = Array.isArray(prev) ? prev : [];
+          return historyArray.filter(o => o._id !== orderId);
+        });
+        setActiveSessions(prev => prev.filter(session => {
+          const sessionOrderId = session.activeOrderId?._id || session.activeOrderId;
+          return String(sessionOrderId) !== String(orderId);
+        }));
+        if (socket && order.tableNo) socket.emit('order-completed', { tableNo: order.tableNo, orderId });
+        return order;
+      }
+
       setOrderHistory(prev => {
         const historyArray = Array.isArray(prev) ? prev : [];
         const exists = historyArray.some(o => o._id === orderId);
@@ -1420,6 +1435,16 @@ export function AppProvider({ children }) {
       });
       if (!res.ok) throw new Error('Failed to complete order');
       const order = await res.json();
+
+      if (order.cleared) {
+        setOrderHistory(prev => {
+          const historyArray = Array.isArray(prev) ? prev : [];
+          return historyArray.filter(o => o._id !== orderId);
+        });
+        if (socket && order.tableNo) socket.emit('order-completed', { tableNo: order.tableNo, orderId });
+        return order;
+      }
+
       setOrderHistory(prev => {
         const historyArray = Array.isArray(prev) ? prev : [];
         const exists = historyArray.some(o => o._id === orderId);
