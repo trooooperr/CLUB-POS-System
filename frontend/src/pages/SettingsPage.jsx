@@ -347,10 +347,12 @@ export default function SettingsPage() {
               <label>Phone</label>
               <input value={form.phone || ''} onChange={e => set('phone', e.target.value)} placeholder="Phone number" />
             </div>
+            {/* 
             <div className="settings-field settings-wide">
               <label>Google Review Link</label>
               <input value={form.googleReviewLink || ''} onChange={e => set('googleReviewLink', e.target.value)} placeholder="https://g.page/r/.../review" />
             </div>
+            */}
           </div>
         </section>
 
