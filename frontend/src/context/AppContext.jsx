@@ -1199,7 +1199,26 @@ export function AppProvider({ children }) {
     }
   }, [showToast]);
 
-  // settleOrder removed — payments consolidated in finalizeBill/generateBill flows
+  // ── Update order payment mode (from Orders page) ────────────────
+  const updateOrderPayment = useCallback(async (orderId, paymentMode, cashAmount = 0, upiAmount = 0) => {
+    try {
+      const res = await authFetch(apiUrl(`/api/orders/${orderId}/settle`), {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ paymentMode, cashAmount, upiAmount })
+      });
+      if (!res.ok) throw new Error('Failed to update payment mode');
+      const updated = await res.json();
+      setOrderHistory(prev => {
+        const arr = Array.isArray(prev) ? prev : [];
+        return arr.map(o => o._id === orderId ? { ...o, paymentMode: updated.paymentMode, cashAmount: updated.cashAmount, upiAmount: updated.upiAmount } : o);
+      });
+      return updated;
+    } catch (err) {
+      console.error('Update payment error:', err);
+      throw err;
+    }
+  }, []);
 
   // ── KOT Functions ───────────────────────────────────────────────
   const openTableSession = useCallback(async (tableNo, waiterName = '', orderType = 'dine-in') => {
@@ -1425,7 +1444,7 @@ export function AppProvider({ children }) {
       getTableStatus, generateBill,
       activeSessions, getTableInfo,
       invoiceOrder, setInvoiceOrder,
-      saveMenuItem, deleteMenuItem, deleteOrder,
+      saveMenuItem, deleteMenuItem, deleteOrder, updateOrderPayment,
       saveWorker, deleteWorker, updateWorkerStatus,
       toast, showToast,
       NUM_TABLES,

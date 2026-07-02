@@ -327,21 +327,26 @@ router.get('/analytics', requireRole(['admin', 'manager']), async (req, res) => 
       return { name: `${day} ${month}`, sales: d.sales };
     });
 
-    // 3. Top Items
-    const topItemsResult = await Order.aggregate([
-      { $match: match },
-      { $unwind: "$items" },
-      { $group: { _id: "$items.name", qty: { $sum: "$items.quantity" } } },
-      { $sort: { qty: -1 } },
-      { $limit: 10 }
-    ]);
-    const topItems = topItemsResult.map(item => ({ name: item._id, qty: item.qty }));
+    // 3. Payment Breakdown (Cash vs UPI, with split allocation)
+    const orders = await Order.find(match).select('paymentMode grandTotal cashAmount upiAmount').lean();
+    let cashTotal = 0, upiTotal = 0;
+    orders.forEach(o => {
+      if (o.paymentMode === 'split') {
+        cashTotal += (o.cashAmount || 0);
+        upiTotal  += (o.upiAmount  || 0);
+      } else if (o.paymentMode === 'upi') {
+        upiTotal += o.grandTotal;
+      } else {
+        // cash, card, or any other mode goes to cash
+        cashTotal += o.grandTotal;
+      }
+    });
 
     res.json({
       revenue: stats.revenue || 0,
       count: stats.count || 0,
       dailyData,
-      topItems
+      paymentBreakdown: { cash: cashTotal, upi: upiTotal }
     });
   } catch (err) {
     res.status(500).json({ error: err.message });

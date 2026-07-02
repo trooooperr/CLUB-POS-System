@@ -1,30 +1,12 @@
 import React, { useMemo, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import {
-  AreaChart, Area, BarChart, Bar,
+  AreaChart, Area, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer
+  ResponsiveContainer, Legend
 } from 'recharts';
 import { apiUrl, authFetch } from '../lib/api';
-import { TrendingUp, Zap, ArrowRight, CalendarDays } from 'lucide-react';
-
-const WrappedTick = ({ x, y, payload }) => {
-  const words = payload.value.split(' ');
-  const lineHeight = 12;
-
-  return (
-    <g transform={`translate(${x},${y})`}>
-      <text x={0} y={0} dy={4} textAnchor="end" fill="var(--t1)" fontSize={10}>
-        {words.map((word, index) => (
-          <tspan key={index} x={0} dy={index === 0 ? 0 : lineHeight}>
-            {word}
-          </tspan>
-        ))}
-      </text>
-    </g>
-  );
-};
-
+import { TrendingUp, Zap, ArrowRight, CalendarDays, Wallet } from 'lucide-react';
 
 const Tip = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null;
@@ -40,6 +22,22 @@ const Tip = ({ active, payload, label }) => {
           </span>
         </div>
       ))}
+    </div>
+  );
+};
+
+const PieTip = ({ active, payload }) => {
+  if (!active || !payload?.length) return null;
+  const d = payload[0];
+  return (
+    <div className="chart-tip">
+      <div className="tip-row">
+        <span className="tip-dot" style={{ background: d.payload?.fill || d.color }}></span>
+        <span className="tip-label" style={{ color: 'var(--t1)' }}>{d.name}:</span>
+        <span className="tip-val mono" style={{ color: 'var(--t0)' }}>
+          ₹{d.value?.toLocaleString('en-IN')}
+        </span>
+      </div>
     </div>
   );
 };
@@ -72,6 +70,21 @@ function DateField({ value, onChange, inputRef, label }) {
   );
 }
 
+const PIE_COLORS = ['#10B981', '#F59E0B']; // Green for Cash, Amber for UPI
+
+const RADIAN = Math.PI / 180;
+const renderLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, name }) => {
+  const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+  const x = cx + radius * Math.cos(-midAngle * RADIAN);
+  const y = cy + radius * Math.sin(-midAngle * RADIAN);
+  if (percent < 0.05) return null;
+  return (
+    <text x={x} y={y} fill="#fff" textAnchor="middle" dominantBaseline="central" fontSize={12} fontWeight={700}>
+      {`${(percent * 100).toFixed(0)}%`}
+    </text>
+  );
+};
+
 export default function SalesPage() {
   const { settings } = useApp();
   const todayStr = new Date().toISOString().slice(0, 10);
@@ -82,7 +95,7 @@ export default function SalesPage() {
   const startInputRef = React.useRef(null);
   const endInputRef = React.useRef(null);
 
-  const [analytics, setAnalytics] = useState({ revenue: 0, count: 0, dailyData: [], topItems: [] });
+  const [analytics, setAnalytics] = useState({ revenue: 0, count: 0, dailyData: [], paymentBreakdown: { cash: 0, upi: 0 } });
   const [loading, setLoading] = useState(false);
 
   React.useEffect(() => {
@@ -127,6 +140,14 @@ export default function SalesPage() {
     if (type === 'start') setStartDate(val);
     else setEndDate(val);
   };
+
+  const pieData = useMemo(() => {
+    const pb = analytics.paymentBreakdown || { cash: 0, upi: 0 };
+    const data = [];
+    if (pb.cash > 0) data.push({ name: 'Cash', value: pb.cash });
+    if (pb.upi > 0) data.push({ name: 'UPI', value: pb.upi });
+    return data;
+  }, [analytics.paymentBreakdown]);
 
   return (
     <div className="fi sales-page">
@@ -180,16 +201,37 @@ export default function SalesPage() {
         </div>
 
         <div className="card chart-box">
-          <div className="chart-info"><TrendingUp size={16} style={{ color: 'var(--blue)' }} /><span>Top Items Sold</span></div>
+          <div className="chart-info"><Wallet size={16} style={{ color: '#10B981' }} /><span>Payment Breakdown</span></div>
           <ResponsiveContainer width="100%" height={280}>
             {loading ? <div style={{ height: 280, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--t2)' }}>Loading...</div> : (
-              <BarChart data={analytics.topItems} layout="vertical" margin={{ left: -35, right: 10, top: 10, bottom: 0 }}>
-                <XAxis type="number" axisLine={{ stroke: 'var(--b2)' }} tick={{ fill: 'var(--t1)', fontSize: 10 }} />
-                <YAxis dataKey="name" type="category" width={95} tick={<WrappedTick />} axisLine={{ stroke: 'var(--b2)' }} />
-                <Tooltip content={<Tip />} cursor={{ fill: 'var(--s2)', opacity: 0.4 }} />
-                {/* Changed color to var(--blue) */}
-                <Bar dataKey="qty" name="Qty" radius={[0, 4, 4, 0]} barSize={18} fill="var(--blue)" />
-              </BarChart>
+              pieData.length === 0 ? (
+                <div style={{ height: 280, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--t2)', fontSize: 13 }}>No payment data</div>
+              ) : (
+                <PieChart>
+                  <Pie
+                    data={pieData}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    label={renderLabel}
+                    outerRadius={100}
+                    innerRadius={45}
+                    dataKey="value"
+                    stroke="none"
+                  >
+                    {pieData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.name === 'Cash' ? PIE_COLORS[0] : PIE_COLORS[1]} />
+                    ))}
+                  </Pie>
+                  <Tooltip content={<PieTip />} />
+                  <Legend
+                    formatter={(value, entry) => {
+                      const item = pieData.find(d => d.name === value);
+                      return <span style={{ color: 'var(--t0)', fontSize: 12, fontWeight: 600 }}>{value}: ₹{item ? item.value.toLocaleString('en-IN') : 0}</span>;
+                    }}
+                  />
+                </PieChart>
+              )
             )}
           </ResponsiveContainer>
         </div>

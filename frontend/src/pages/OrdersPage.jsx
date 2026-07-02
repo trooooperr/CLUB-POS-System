@@ -1,8 +1,9 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { Search, CalendarDays, X, ShoppingCart } from 'lucide-react';
 import InvoiceModal from '../components/InvoiceModal';
 import TopNavBar from '../components/TopNavBar';
+import { apiUrl, authFetch } from '../lib/api';
 
 function DateField({ value, onChange, inputRef, label }) {
   const triggerPicker = () => {
@@ -37,11 +38,122 @@ function DateField({ value, onChange, inputRef, label }) {
   );
 }
 
+/* Payment Edit Popup */
+function PaymentEditPopup({ order, currency, onSave, onClose }) {
+  const [mode, setMode] = useState(order.paymentMode || 'cash');
+  const [cashAmt, setCashAmt] = useState(order.cashAmount ? String(order.cashAmount) : '');
+  const [upiAmt, setUpiAmt] = useState(order.upiAmount ? String(order.upiAmount) : '');
+  const [saving, setSaving] = useState(false);
+  const popupRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (popupRef.current && !popupRef.current.contains(e.target)) {
+        onClose();
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [onClose]);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      let cash = 0, upi = 0;
+      if (mode === 'cash') { cash = order.grandTotal; upi = 0; }
+      else if (mode === 'upi') { cash = 0; upi = order.grandTotal; }
+      else if (mode === 'split') {
+        cash = parseFloat(cashAmt) || 0;
+        upi = parseFloat(upiAmt) || 0;
+      }
+      await onSave(order._id, mode, cash, upi);
+      onClose();
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div ref={popupRef} style={{
+      position: 'absolute', top: '100%', right: 0, zIndex: 1000,
+      background: 'var(--s1)', border: '1px solid var(--b2)',
+      borderRadius: 12, padding: 14, minWidth: 220,
+      boxShadow: '0 8px 32px rgba(0,0,0,0.25)',
+      marginTop: 4
+    }} onClick={e => e.stopPropagation()}>
+      <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--t2)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Payment Mode</div>
+      <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+        {['cash', 'upi', 'split'].map(m => (
+          <button
+            key={m}
+            onClick={() => { setMode(m); if (m !== 'split') { setCashAmt(''); setUpiAmt(''); } }}
+            style={{
+              flex: 1, padding: '6px 0', borderRadius: 8, fontSize: 11, fontWeight: 700,
+              border: mode === m ? '2px solid var(--a)' : '1px solid var(--b1)',
+              background: mode === m ? 'rgba(245,158,11,0.12)' : 'var(--s2)',
+              color: mode === m ? 'var(--a)' : 'var(--t1)',
+              cursor: 'pointer', transition: 'all 0.15s'
+            }}
+          >
+            {m === 'split' ? 'SPLIT' : m.toUpperCase()}
+          </button>
+        ))}
+      </div>
+
+      {mode === 'split' && (
+        <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+          <div style={{ flex: 1 }}>
+            <label style={{ fontSize: 10, color: 'var(--t2)', fontWeight: 700, display: 'block', marginBottom: 2 }}>Cash {currency}</label>
+            <input
+              type="number" inputMode="numeric" placeholder="0" value={cashAmt}
+              onChange={e => {
+                const v = e.target.value;
+                setCashAmt(v);
+                if (v !== '') setUpiAmt(Math.max(0, order.grandTotal - (parseFloat(v) || 0)).toFixed(0));
+                else setUpiAmt('');
+              }}
+              style={{ width: '100%', padding: '5px 8px', borderRadius: 8, border: '1px solid var(--b1)', background: 'var(--s2)', color: 'var(--t0)', fontSize: 12, fontWeight: 700 }}
+            />
+          </div>
+          <div style={{ flex: 1 }}>
+            <label style={{ fontSize: 10, color: 'var(--t2)', fontWeight: 700, display: 'block', marginBottom: 2 }}>UPI {currency}</label>
+            <input
+              type="number" inputMode="numeric" placeholder="0" value={upiAmt}
+              onChange={e => {
+                const v = e.target.value;
+                setUpiAmt(v);
+                if (v !== '') setCashAmt(Math.max(0, order.grandTotal - (parseFloat(v) || 0)).toFixed(0));
+                else setCashAmt('');
+              }}
+              style={{ width: '100%', padding: '5px 8px', borderRadius: 8, border: '1px solid var(--b1)', background: 'var(--s2)', color: 'var(--t0)', fontSize: 12, fontWeight: 700 }}
+            />
+          </div>
+        </div>
+      )}
+
+      <button
+        onClick={handleSave}
+        disabled={saving}
+        style={{
+          width: '100%', padding: '7px 0', borderRadius: 8, border: 'none',
+          background: 'var(--a)', color: '#000', fontSize: 12, fontWeight: 800,
+          cursor: saving ? 'wait' : 'pointer', opacity: saving ? 0.7 : 1
+        }}
+      >
+        {saving ? 'Saving...' : 'Save'}
+      </button>
+    </div>
+  );
+}
+
 export default function OrdersPage() {
-  const { orderHistory, setInvoiceOrder, invoiceOrder, settings, deleteOrder, role, showToast } = useApp();
+  const { orderHistory, setInvoiceOrder, invoiceOrder, settings, deleteOrder, updateOrderPayment, role, showToast } = useApp();
   const [search, setSearch] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [editingPayment, setEditingPayment] = useState(null); // order._id being edited
   const c = settings.currency;
   const startInputRef = React.useRef(null);
   const endInputRef = React.useRef(null);
@@ -55,6 +167,15 @@ export default function OrdersPage() {
       } catch (err) {
         showToast(err.message || 'Failed to delete order', 'error');
       }
+    }
+  };
+
+  const handlePaymentSave = async (orderId, paymentMode, cashAmount, upiAmount) => {
+    try {
+      await updateOrderPayment(orderId, paymentMode, cashAmount, upiAmount);
+      showToast('Payment mode updated', 'success');
+    } catch (err) {
+      showToast(err.message || 'Failed to update payment', 'error');
     }
   };
 
@@ -73,10 +194,27 @@ export default function OrdersPage() {
 
   const payBadge = (mode, order) => {
     const cls = { cash: 'badge-cash', card: 'badge-card', upi: 'badge-upi', split: 'badge-split' };
-    if (mode === 'split' && order) {
-      return <span className={`badge badge-split`} title={`Cash: ${c}${(order.cashAmount||0).toFixed(0)}, UPI: ${c}${(order.upiAmount||0).toFixed(0)}`}>SPLIT (C:{(order.cashAmount||0).toFixed(0)} U:{(order.upiAmount||0).toFixed(0)})</span>;
-    }
-    return <span className={`badge ${cls[mode] || 'badge-cash'}`}>{mode?.toUpperCase()}</span>;
+    const isEditing = editingPayment === order._id;
+
+    const badge = mode === 'split' && order
+      ? <span className={`badge badge-split`} style={{ cursor: 'pointer' }} title={`Cash: ${c}${(order.cashAmount||0).toFixed(0)}, UPI: ${c}${(order.upiAmount||0).toFixed(0)}`}>SPLIT (C:{(order.cashAmount||0).toFixed(0)} U:{(order.upiAmount||0).toFixed(0)})</span>
+      : <span className={`badge ${cls[mode] || 'badge-cash'}`} style={{ cursor: 'pointer' }}>{mode?.toUpperCase()}</span>;
+
+    return (
+      <div style={{ position: 'relative', display: 'inline-block' }}>
+        <div onClick={(e) => { e.stopPropagation(); setEditingPayment(isEditing ? null : order._id); }}>
+          {badge}
+        </div>
+        {isEditing && (
+          <PaymentEditPopup
+            order={order}
+            currency={c}
+            onSave={handlePaymentSave}
+            onClose={() => setEditingPayment(null)}
+          />
+        )}
+      </div>
+    );
   };
 
   return (
