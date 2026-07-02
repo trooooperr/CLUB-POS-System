@@ -7,7 +7,7 @@ const ORDERS_CACHE_KEY = 'orders:all';
 const REPORT_SUMMARY_CACHE_KEY = 'reports:daily-summary';
 const TableSession = require('../models/TableSession');
 const KOT = require('../models/KOT');
-const { getBusinessDayBoundary } = require('../lib/businessDay');
+const { getBusinessDayBoundary, getISTHour } = require('../lib/businessDay');
 const {
   aggregateQuantities,
   broadcastInventoryUpdate,
@@ -16,11 +16,11 @@ const {
 } = require('../lib/inventoryStock');
 
 
-// Shift date to the previous business day if time is before 5 AM
+// Shift date to the previous business day if IST time is before 5 AM
 function getBusinessDate(originalDate = new Date()) {
   const d = new Date(originalDate);
-  const hour = d.getHours();
-  if (hour < 5) {
+  const istHour = getISTHour(d);
+  if (istHour < 5) {
     d.setDate(d.getDate() - 1);
   }
   return d;
@@ -287,7 +287,7 @@ router.post('/', async (req, res) => {
 // ── FINALIZE BILL (called when printing final bill) ─────────────
 router.patch('/:id/finalize-bill', async (req, res) => {
   try {
-    const { items, subtotal, sgst, cgst, discount, roundOff, grandTotal, waiterName, orderType, customerName, customerPhone } = req.body;
+    const { items, subtotal, sgst, cgst, discount, roundOff, grandTotal, waiterName, orderType, customerName, customerPhone, paymentMode, cashAmount, upiAmount } = req.body;
 
     const order = await Order.findById(req.params.id);
     if (!order) return res.status(404).json({ message: 'Order not found' });
@@ -306,6 +306,9 @@ router.patch('/:id/finalize-bill', async (req, res) => {
     if (orderType !== undefined) order.orderType = orderType;
     if (customerName !== undefined) order.customerName = customerName;
     if (customerPhone !== undefined) order.customerPhone = customerPhone;
+    if (paymentMode !== undefined) order.paymentMode = paymentMode;
+    if (cashAmount !== undefined) order.cashAmount = parseFloat(cashAmount) || 0;
+    if (upiAmount !== undefined) order.upiAmount = parseFloat(upiAmount) || 0;
 
     const saved = await order.save();
 
@@ -362,7 +365,7 @@ router.get('/history/all', async (req, res) => {
 // ── SETTLE PAYMENT (old flow preserved for compatibility) ───────
 router.patch('/:id/settle', async (req, res) => {
   try {
-    const { paidAmount, paymentMode } = req.body;
+    const { paidAmount, paymentMode, cashAmount, upiAmount } = req.body;
     const order = await Order.findById(req.params.id);
     if (!order) return res.status(404).json({ message: 'Order not found' });
 
@@ -374,6 +377,8 @@ router.patch('/:id/settle', async (req, res) => {
     if (paymentMode) {
       order.paymentMode = paymentMode;
     }
+    if (cashAmount !== undefined) order.cashAmount = parseFloat(cashAmount) || 0;
+    if (upiAmount !== undefined) order.upiAmount = parseFloat(upiAmount) || 0;
     
     // Mark order as paid when full payment received
     if (order.dueAmount <= 0) {

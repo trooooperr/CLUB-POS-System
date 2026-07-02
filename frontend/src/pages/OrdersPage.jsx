@@ -71,8 +71,11 @@ export default function OrdersPage() {
 
   const totalDue = filtered.reduce((s, o) => s + (o.dueAmount || 0), 0);
 
-  const payBadge = (mode) => {
-    const cls = { cash: 'badge-cash', card: 'badge-card', upi: 'badge-upi' };
+  const payBadge = (mode, order) => {
+    const cls = { cash: 'badge-cash', card: 'badge-card', upi: 'badge-upi', split: 'badge-split' };
+    if (mode === 'split' && order) {
+      return <span className={`badge badge-split`} title={`Cash: ${c}${(order.cashAmount||0).toFixed(0)}, UPI: ${c}${(order.upiAmount||0).toFixed(0)}`}>SPLIT (C:{(order.cashAmount||0).toFixed(0)} U:{(order.upiAmount||0).toFixed(0)})</span>;
+    }
     return <span className={`badge ${cls[mode] || 'badge-cash'}`}>{mode?.toUpperCase()}</span>;
   };
 
@@ -165,7 +168,7 @@ export default function OrdersPage() {
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <div className="card-total">{c}{o.grandTotal.toFixed(0)}</div>
-                  {payBadge(o.paymentMode)}
+                  {payBadge(o.paymentMode, o)}
                 </div>
               </div>
               <div className="card-footer-info">
@@ -214,7 +217,7 @@ export default function OrdersPage() {
                   <td style={{ textAlign: 'center' }}>T{o.tableNo}</td>
                   <td className="td-date">{o.customerName || 'Walk-in Customer'}</td>
                   <td style={{ textAlign: 'right', fontWeight: 800, color: 'var(--a)' }}>{c}{o.grandTotal.toFixed(2)}</td>
-                  <td style={{ textAlign: 'center' }}>{payBadge(o.paymentMode)}</td>
+                  <td style={{ textAlign: 'center' }}>{payBadge(o.paymentMode, o)}</td>
                   <td style={{ textAlign: 'center' }}>
                     <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
                       <button className="btn btn-primary btn-sm" onClick={() => setInvoiceOrder(o)}>View Bill</button>

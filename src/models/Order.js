@@ -7,6 +7,8 @@ const orderSchema = new mongoose.Schema({
   paidAmount:    { type: Number, default: 0 },
   dueAmount:     { type: Number, default: 0, index: true },
   paymentMode:   { type: String, required: true },
+  cashAmount:    { type: Number, default: 0 },
+  upiAmount:     { type: Number, default: 0 },
   tableNo:       { type: Number, required: true },
   items:         [{ name: String, quantity: Number, price: Number, notes: { type: String, default: '' } }],
   subtotal:      { type: Number, required: true },

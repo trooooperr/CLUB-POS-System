@@ -412,7 +412,7 @@ export function AppProvider({ children }) {
     }
   }, [settings, firePrint, buildKOTHtml]);
 
-  const printBillDocument = useCallback(async (tableNo, table, total, waiterName = '', billNoOverride = '', waiterObj = null) => {
+  const printBillDocument = useCallback(async (tableNo, table, total, waiterName = '', billNoOverride = '', waiterObj = null, paymentMode = 'cash', cashAmount = 0, upiAmount = 0) => {
     const tempBillNo = billNoOverride ? `HTB-${billNoOverride.split('-').pop()}` : ('HTB-' + String(Date.now()).slice(-5));
     
     const upiId = settings.upiId || 'dummy@upi';
@@ -517,6 +517,21 @@ export function AppProvider({ children }) {
             <span>TOTAL PAYABLE</span>
             <span>Rs. ${total.toFixed(0)}</span>
           </div>
+
+          <div class="row" style="font-size: 12px; margin: 2px 0;">
+            <span>PAID BY</span>
+            <span>${paymentMode === 'split' ? 'SPLIT' : paymentMode.toUpperCase()}</span>
+          </div>
+          ${paymentMode === 'split' ? `
+          <div class="row" style="font-size: 11px;">
+            <span>  Cash</span>
+            <span>Rs. ${Number(cashAmount || 0).toFixed(0)}</span>
+          </div>
+          <div class="row" style="font-size: 11px;">
+            <span>  UPI</span>
+            <span>Rs. ${Number(upiAmount || 0).toFixed(0)}</span>
+          </div>
+          ` : ''}
 
           <div class="thick-line"></div>
 
@@ -1332,12 +1347,12 @@ export function AppProvider({ children }) {
     }
   }, [socket, applyInventoryUpdate, setOrderHistory, setInvoiceOrder]);
 
-  const finalizeBill = useCallback(async (orderId, items, subtotal, sgst, cgst, discount, roundOff, grandTotal, waiterName = '', orderType = 'dine-in', customerName = '', customerPhone = '') => {
+  const finalizeBill = useCallback(async (orderId, items, subtotal, sgst, cgst, discount, roundOff, grandTotal, waiterName = '', orderType = 'dine-in', customerName = '', customerPhone = '', paymentMode = 'cash', cashAmount = 0, upiAmount = 0) => {
     try {
       const res = await authFetch(apiUrl(`/api/orders/${orderId}/finalize-bill`), {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ items, subtotal, sgst, cgst, discount, roundOff, grandTotal, waiterName, orderType, customerName, customerPhone })
+        body: JSON.stringify({ items, subtotal, sgst, cgst, discount, roundOff, grandTotal, waiterName, orderType, customerName, customerPhone, paymentMode, cashAmount, upiAmount })
       });
       if (!res.ok) throw new Error('Failed to finalize bill');
       const orderResponse = await res.json();

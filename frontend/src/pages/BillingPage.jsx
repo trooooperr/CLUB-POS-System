@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import { ArrowLeft, Search, Trash2, Printer, UtensilsCrossed, X, Menu } from 'lucide-react';
 import { apiUrl, authFetch } from '../lib/api';
-const PM = ['cash', 'card', 'upi'];
+const PM = ['cash', 'upi', 'split'];
 const qz = window.qz;
 
 /* COMPACT TABLE PILL */
@@ -196,6 +196,8 @@ export default function BillingPage() {
   } = useApp();
 
   const [pm, setPm] = useState('cash');
+  const [cashAmt, setCashAmt] = useState('');
+  const [upiAmt, setUpiAmt] = useState('');
   const [tableSearch, setTableSearch] = useState('');
   const [busy, setBusy] = useState(false);
   const [mobileBillOpen, setMobileBillOpen] = useState(false);
@@ -635,11 +637,24 @@ export default function BillingPage() {
         selectedWaiterObj?.name || '',
         orderType,
         table.customerName || '',
-        table.customerPhone || ''
+        table.customerPhone || '',
+        pm,
+        pm === 'split' ? (parseFloat(cashAmt) || 0) : (pm === 'cash' ? grandTotal : 0),
+        pm === 'split' ? (parseFloat(upiAmt) || 0) : (pm === 'upi' ? grandTotal : 0)
       );
 
       // Print bill
-      await printBillDocument(tableNo, { items: combinedItems.all }, grandTotal, selectedWaiterObj?.name || '', finalizedOrder?.billNo, selectedWaiterObj);
+      await printBillDocument(
+        tableNo,
+        { items: combinedItems.all },
+        grandTotal,
+        selectedWaiterObj?.name || '',
+        finalizedOrder?.billNo,
+        selectedWaiterObj,
+        pm,
+        pm === 'split' ? (parseFloat(cashAmt) || 0) : (pm === 'cash' ? grandTotal : 0),
+        pm === 'split' ? (parseFloat(upiAmt) || 0) : (pm === 'upi' ? grandTotal : 0)
+      );
 
       // Auto-send WhatsApp review message if customer phone is filled
       if (table.customerPhone && table.customerPhone.trim().length >= 10) {
@@ -1050,9 +1065,46 @@ export default function BillingPage() {
                 <div className="s-row total-big"><span>Total</span><span>{c}{grandTotal.toFixed(0)}</span></div>
               </div>
 
-              <select className="pm-select-mini" value={pm} onChange={e => setPm(e.target.value)}>
-                {PM.map(m => <option key={m} value={m}>{m.toUpperCase()}</option>)}
+              <select className="pm-select-mini" value={pm} onChange={e => { setPm(e.target.value); setCashAmt(''); setUpiAmt(''); }}>
+                {PM.map(m => <option key={m} value={m}>{m === 'split' ? 'SPLIT (Cash+UPI)' : m.toUpperCase()}</option>)}
               </select>
+
+              {pm === 'split' && (
+                <div style={{ display: 'flex', gap: 6, marginTop: 6, marginBottom: 4 }}>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ fontSize: 10, color: 'var(--t2)', fontWeight: 700, display: 'block', marginBottom: 2 }}>Cash ₹</label>
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      placeholder="0"
+                      value={cashAmt}
+                      onChange={e => {
+                        const v = e.target.value;
+                        setCashAmt(v);
+                        if (v !== '') setUpiAmt(Math.max(0, grandTotal - (parseFloat(v) || 0)).toFixed(0));
+                        else setUpiAmt('');
+                      }}
+                      style={{ width: '100%', padding: '6px 8px', borderRadius: 8, border: '1px solid var(--b1)', background: 'var(--s1)', color: 'var(--t0)', fontSize: 13, fontWeight: 700 }}
+                    />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ fontSize: 10, color: 'var(--t2)', fontWeight: 700, display: 'block', marginBottom: 2 }}>UPI ₹</label>
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      placeholder="0"
+                      value={upiAmt}
+                      onChange={e => {
+                        const v = e.target.value;
+                        setUpiAmt(v);
+                        if (v !== '') setCashAmt(Math.max(0, grandTotal - (parseFloat(v) || 0)).toFixed(0));
+                        else setCashAmt('');
+                      }}
+                      style={{ width: '100%', padding: '6px 8px', borderRadius: 8, border: '1px solid var(--b1)', background: 'var(--s1)', color: 'var(--t0)', fontSize: 13, fontWeight: 700 }}
+                    />
+                  </div>
+                </div>
+              )}
 
               {billError && (
                 <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 8, padding: '7px 11px', fontSize: 11, color: '#EF4444', marginBottom: 6 }}>

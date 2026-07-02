@@ -73,7 +73,14 @@ function buildReportHTML({ date, orders, settings, inventory }) {
   const paid    = orders.reduce((s,o)=>s+(o.paidAmount||o.grandTotal),0);
   const due     = orders.reduce((s,o)=>s+(o.dueAmount||0),0);
   const pmMap   = {};
-  orders.forEach(o=>{ pmMap[o.paymentMode]=(pmMap[o.paymentMode]||0)+o.grandTotal; });
+  orders.forEach(o=>{
+    if (o.paymentMode === 'split') {
+      pmMap['cash'] = (pmMap['cash'] || 0) + (o.cashAmount || 0);
+      pmMap['upi']  = (pmMap['upi']  || 0) + (o.upiAmount  || 0);
+    } else {
+      pmMap[o.paymentMode] = (pmMap[o.paymentMode] || 0) + o.grandTotal;
+    }
+  });
   const itemMap = {};
   orders.forEach(o=>o.items?.forEach(i=>{ itemMap[i.name]=(itemMap[i.name]||0)+i.quantity; }));
   const topItems = Object.entries(itemMap).sort((a,b)=>b[1]-a[1]).slice(0,5);
