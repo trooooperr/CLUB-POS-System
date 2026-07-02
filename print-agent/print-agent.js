@@ -7,7 +7,7 @@ const https = require('https');
 const http = require('http');
 
 // Initialize paths
-const execDir = path.dirname(process.execPath);
+const execDir = process.pkg ? path.dirname(process.execPath) : __dirname;
 const logFile = path.join(execDir, 'print-agent.log');
 
 // Setup logging

@@ -56,7 +56,7 @@ You can compile this code into a standalone `.exe` that does not require Node.js
 
 ## Set to Run on Startup
 To make the print agent start automatically when the client's PC turns on:
-1. Press `Win + R` on your keyboard, type `shell:startup`, and press Enter. (This opens the Windows Startup folder).
-2. Right-click your `print-agent.exe` and select **Create Shortcut**.
-3. Move/drag this new shortcut into the Startup folder.
-4. Now, the agent will launch silently in the background every time Windows boots!
+1. Double-click the `enable-startup.bat` script located in the `print-agent` folder.
+2. This will automatically create a startup shortcut (`HumTumPrintAgent.lnk`) pointing to the silent launcher (`start-silent.vbs`).
+3. The print agent will now launch completely silently in the background every time Windows boots, without showing any command prompt window.
+
