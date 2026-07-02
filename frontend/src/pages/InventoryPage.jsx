@@ -88,6 +88,16 @@ function StockModal({ item, onClose, onSave }) {
 
   const selectableInventory = (inventory || []).filter(inv => inv.trackStock !== false && inv._id !== item?._id);
 
+  // Sync stock from linked parent when parent changes
+  useEffect(() => {
+    if (form.linkInventoryId) {
+      const parent = inventory.find(inv => inv._id === form.linkInventoryId);
+      if (parent) {
+        set('stock', parent.stock);
+      }
+    }
+  }, [form.linkInventoryId, inventory]);
+
   const handleSave = async () => {
     if (saving) return;
     if (!form.name || !form.category || !form.unit) {
@@ -191,7 +201,7 @@ function StockModal({ item, onClose, onSave }) {
             <div className="frow2">
               <div className="fgroup">
                 <label className="lbl">Stock</label>
-                <input type="number" value={form.stock} onChange={e => set('stock', e.target.value)} />
+                <input type="number" value={form.stock} onChange={e => set('stock', e.target.value)} disabled={!!form.linkInventoryId} readOnly={!!form.linkInventoryId} />
               </div>
               <div className="fgroup">
                 <label className="lbl">Min Stock</label>
@@ -522,7 +532,7 @@ export default function InventoryPage() {
                             </div>
 
                              <div className="invRight">
-                              <div className="invStock">{i.trackStock === false ? '—' : i.stock}</div>
+                              <div className="invStock">{i.trackStock === false ? '—' : Number(i.stock).toFixed(2).replace(/\.0+$/, '')}</div>
                               <span className={`badge ${s.cls}`}>{s.text}</span>
                             </div>
                           </div>
@@ -628,7 +638,7 @@ export default function InventoryPage() {
                               <td>{i.shortcut ? <span className="invShortcut">{i.shortcut}</span> : '—'}</td>
                               <td>{i.category}</td>
                               <td>₹{i.price}</td>
-                               <td>{i.trackStock === false ? '—' : i.stock}</td>
+                               <td>{i.trackStock === false ? '—' : Number(i.stock).toFixed(2).replace(/\\.0+$/, '')}</td>
                               <td>
                                 <span className={`badge ${i.isAlcoholic || i.isAlcohol ? 'b-red' : 'b-green'}`}>
                                   {i.isAlcoholic || i.isAlcohol ? 'Alcoholic' : 'Non-Alcoholic'}

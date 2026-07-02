@@ -22,6 +22,21 @@ function aggregateQuantities(items = []) {
   return quantities;
 }
 
+async function syncChildStocks(parentIds) {
+  if (!parentIds?.length) return;
+  const children = await Inventory.find({ linkInventoryId: { $in: parentIds } });
+  if (!children.length) return;
+  const parents = await Inventory.find({ _id: { $in: parentIds } });
+  const parentMap = new Map(parents.map(p => [p._id.toString(), p.stock]));
+  const ops = children.map(child => ({
+    updateOne: {
+      filter: { _id: child._id },
+      update: { $set: { stock: parentMap.get(child.linkInventoryId.toString()) } }
+    }
+  }));
+  await Inventory.bulkWrite(ops, { ordered: false });
+}
+
 function itemsFromQuantityMap(quantities) {
   return [...quantities.entries()].map(([name, quantity]) => ({ name, quantity }));
 }
@@ -139,6 +154,8 @@ async function deductInventoryForItems(items = []) {
   if (ops.length) {
     await Inventory.bulkWrite(ops, { ordered: false });
   }
+  // Sync child stocks after parent changes
+  await syncChildStocks(parentIds);
   await updateMenuAvailability();
   await deleteCache([INVENTORY_CACHE_KEY, MENU_CACHE_KEY]);
   return getInventorySnapshot();
@@ -217,6 +234,8 @@ async function refundInventoryForItems(items = []) {
   if (ops.length) {
     await Inventory.bulkWrite(ops, { ordered: false });
   }
+  // Sync child stocks after refund
+  await syncChildStocks(parentIds);
   await updateMenuAvailability();
   await deleteCache([INVENTORY_CACHE_KEY, MENU_CACHE_KEY]);
   return getInventorySnapshot();
@@ -230,4 +249,5 @@ module.exports = {
   refundInventoryForItems,
   getInventorySnapshot,
   updateMenuAvailability,
+  syncChildStocks,
 };
