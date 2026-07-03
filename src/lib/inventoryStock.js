@@ -14,8 +14,11 @@ function itemKey(item) {
 }
 
 // Helper to compute effective deduction quantity with an upper bound (max 1000)
+// Allows fractional values (e.g. 0.4 for a 30ml pour from a bottle)
 function getEffectiveDeduction(item, baseQty) {
-  const dedQty = Math.max(1, Number(item?.stockDeductionQty) || 1);
+  const rawDedQty = Number(item?.stockDeductionQty);
+  // Use the configured value if it's a valid positive number; otherwise default to 1
+  const dedQty = (rawDedQty > 0) ? rawDedQty : 1;
   const cappedDedQty = Math.min(dedQty, 1000); // enforce upper limit as per user decision
   return baseQty * cappedDedQty;
 }
