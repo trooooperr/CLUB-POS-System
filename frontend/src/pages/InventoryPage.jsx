@@ -490,7 +490,15 @@ export default function InventoryPage() {
             {(provided) => (
               <div ref={provided.innerRef} {...provided.droppableProps}>
                 {filtered.map((i, index) => {
-                  const s = getStatus(i);
+                  const effectiveStock = (() => {
+                    if (i.linkInventoryId) {
+                      const parentId = typeof i.linkInventoryId === 'object' ? i.linkInventoryId._id : i.linkInventoryId;
+                      const parent = inventory.find(p => p._id === parentId);
+                      return parent ? { ...i, stock: parent.stock } : i;
+                    }
+                    return i;
+                  })();
+                  const s = getStatus(effectiveStock);
                   const open = expanded === i._id;
 
                   return (
@@ -532,7 +540,15 @@ export default function InventoryPage() {
                             </div>
 
                              <div className="invRight">
-                              <div className="invStock">{i.trackStock === false ? '—' : Number(i.stock).toFixed(2).replace(/\.0+$/, '')}</div>
+                               <div className="invStock">{i.trackStock === false ? '—' : (() => {
+                                 if (i.linkInventoryId) {
+                                   const parentId = typeof i.linkInventoryId === 'object' ? i.linkInventoryId._id : i.linkInventoryId;
+                                   const parent = inventory.find(p => p._id === parentId);
+                                   const parentStock = parent ? parent.stock : i.stock;
+                                   return Number(parentStock).toFixed(2).replace(/\.0+$/, '');
+                                 }
+                                 return Number(i.stock).toFixed(2).replace(/\.0+$/, '');
+                               })()}</div>
                               <span className={`badge ${s.cls}`}>{s.text}</span>
                             </div>
                           </div>
