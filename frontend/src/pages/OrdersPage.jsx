@@ -203,13 +203,30 @@ export default function OrdersPage() {
   };
 
   const filtered = useMemo(() => {
-    return (Array.isArray(orderHistory) ? orderHistory : []).filter(o => {
+    const list = (Array.isArray(orderHistory) ? orderHistory : []).filter(o => {
       const d = new Date(o.date);
       const matchDate = (!startDate || d >= new Date(startDate)) && (!endDate || d <= new Date(endDate + 'T23:59:59'));
       const matchSearch = !search ||
         (o.billNo && o.billNo.toLowerCase().includes(search.toLowerCase())) ||
         (o.customerName || 'Walk-in Customer').toLowerCase().includes(search.toLowerCase());
       return matchDate && matchSearch;
+    });
+
+    // Sort by billNo descending (extract suffix number if possible, e.g. HTB-015 -> 15)
+    return list.sort((a, b) => {
+      const aNo = a.billNo || '';
+      const bNo = b.billNo || '';
+      
+      const aMatch = aNo.match(/HTB-(\d+)/);
+      const bMatch = bNo.match(/HTB-(\d+)/);
+      
+      const aNum = aMatch ? parseInt(aMatch[1], 10) : 0;
+      const bNum = bMatch ? parseInt(bMatch[1], 10) : 0;
+      
+      if (aNum !== bNum) {
+        return bNum - aNum; // Descending: higher numbers first
+      }
+      return new Date(b.createdAt || b.date || 0) - new Date(a.createdAt || a.date || 0);
     });
   }, [orderHistory, search, startDate, endDate]);
 
