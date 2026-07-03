@@ -413,23 +413,32 @@ function setupDbChangeStreams(io) {
           if (doc.source === 'table') {
             try {
               const KOT = require('./src/models/KOT');
+              const Order = require('./src/models/Order');
               const { deductInventoryForItems, broadcastInventoryUpdate } = require('./src/lib/inventoryStock');
               
               const kotDoc = await KOT.findById(doc._id);
               if (kotDoc && !kotDoc.inventoryDeductedAt) {
-                console.log(`📡 Change Stream: Deducting inventory for table KOT ${kotDoc.kotNo}...`);
-                const updatedInventory = await deductInventoryForItems(kotDoc.items);
-                
-                kotDoc.inventoryDeducted = true;
-                kotDoc.inventoryDeductedAt = new Date();
-                await kotDoc.save();
-                
-                broadcastInventoryUpdate({ app: { locals: { io } } }, updatedInventory, {
-                  orderId: kotDoc.orderId,
-                  kotId: kotDoc._id,
-                  source: 'TABLE_KOT_STREAM'
-                });
-                console.log(`📡 Change Stream: Table KOT ${kotDoc.kotNo} inventory deducted successfully.`);
+                const order = await Order.findById(kotDoc.orderId);
+                if (order && order.inventoryFinalized) {
+                  console.log(`📡 Change Stream: Order ${order._id} is already inventoryFinalized. Skipping KOT ${kotDoc.kotNo} stock deduction.`);
+                  kotDoc.inventoryDeducted = true;
+                  kotDoc.inventoryDeductedAt = new Date();
+                  await kotDoc.save();
+                } else {
+                  console.log(`📡 Change Stream: Deducting inventory for table KOT ${kotDoc.kotNo}...`);
+                  const updatedInventory = await deductInventoryForItems(kotDoc.items);
+                  
+                  kotDoc.inventoryDeducted = true;
+                  kotDoc.inventoryDeductedAt = new Date();
+                  await kotDoc.save();
+                  
+                  broadcastInventoryUpdate({ app: { locals: { io } } }, updatedInventory, {
+                    orderId: kotDoc.orderId,
+                    kotId: kotDoc._id,
+                    source: 'TABLE_KOT_STREAM'
+                  });
+                  console.log(`📡 Change Stream: Table KOT ${kotDoc.kotNo} inventory deducted successfully.`);
+                }
               }
             } catch (err) {
               console.error(`❌ Change Stream: Error deducting inventory for table KOT:`, err.message);
