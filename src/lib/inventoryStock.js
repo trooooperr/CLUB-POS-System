@@ -13,6 +13,13 @@ function itemKey(item) {
   return normalizeName(item?.name);
 }
 
+// Helper to compute effective deduction quantity with an upper bound (max 1000)
+function getEffectiveDeduction(item, baseQty) {
+  const dedQty = Math.max(1, Number(item?.stockDeductionQty) || 1);
+  const cappedDedQty = Math.min(dedQty, 1000); // enforce upper limit as per user decision
+  return baseQty * cappedDedQty;
+}
+
 function aggregateQuantities(items = []) {
   const quantities = new Map();
 
@@ -149,7 +156,7 @@ async function deductInventoryForItems(items = []) {
     if (directInv.linkInventoryId) {
       const parentInv = inventoryById.get(directInv.linkInventoryId.toString());
       if (parentInv && parentInv.trackStock !== false) {
-        const deductQty = quantity * (directInv.stockDeductionQty || 1);
+        const deductQty = getEffectiveDeduction(directInv, quantity);
         ops.push({
           updateOne: {
             filter: { _id: parentInv._id },
@@ -248,7 +255,7 @@ async function refundInventoryForItems(items = []) {
     if (directInv.linkInventoryId) {
       const parentInv = inventoryById.get(directInv.linkInventoryId.toString());
       if (parentInv && parentInv.trackStock !== false) {
-        const refundQty = quantity * (directInv.stockDeductionQty || 1);
+        const refundQty = getEffectiveDeduction(directInv, quantity);
         ops.push({
           updateOne: {
             filter: { _id: parentInv._id },
