@@ -152,45 +152,33 @@ async function deductInventoryForItems(items = []) {
 
   const ops = [];
   const affectedParentIds = [];
-  // Aggregate deductions, using effective deduction for child items.
+  // Aggregate deductions for both parent items and child contributions.
   const parentDeductionMap = new Map(); // parentId -> total effective deduction
   for (const [name, quantity] of quantities.entries()) {
     const directInv = inventoryByName.get(normalizeName(name));
     if (!directInv) continue;
 
-    if (directInv.linkInventoryId) {
-      const parentId = directInv.linkInventoryId.toString();
-      const dedQty = getEffectiveDeduction(directInv, quantity);
-      const prev = parentDeductionMap.get(parentId) || 0;
-      parentDeductionMap.set(parentId, prev + dedQty);
-    } else {
-      if (directInv.trackStock !== false) {
-        ops.push({
-          updateOne: {
-            filter: { _id: directInv._id },
-            update: [
-              { $set: { stock: { $max: [0, { $subtract: ['$stock', quantity] }] } } }
-            ]
-          }
-        });
-        affectedParentIds.push(directInv._id);
-      }
-    }
+    // Determine the inventory record that should be deducted (parent for child items,
+    // self for standalone/parent items).
+    const targetId = directInv.linkInventoryId ? directInv.linkInventoryId.toString() : directInv._id.toString();
+    const dedQty = getEffectiveDeduction(directInv, quantity);
+    const prev = parentDeductionMap.get(targetId) || 0;
+    parentDeductionMap.set(targetId, prev + dedQty);
   }
 
-  // Apply accumulated parent deductions
-  for (const [parentId, totalDeduction] of parentDeductionMap.entries()) {
-    const parentInv = inventoryById.get(parentId);
-    if (!parentInv || parentInv.trackStock === false) continue;
+  // Apply accumulated deductions per inventory record.
+  for (const [invId, totalDeduction] of parentDeductionMap.entries()) {
+    const inv = inventoryById.get(invId);
+    if (!inv || inv.trackStock === false) continue;
     ops.push({
       updateOne: {
-        filter: { _id: parentInv._id },
+        filter: { _id: inv._id },
         update: [
           { $set: { stock: { $max: [0, { $subtract: ['$stock', totalDeduction] }] } } }
         ]
       }
     });
-    affectedParentIds.push(parentInv._id);
+    affectedParentIds.push(inv._id);
   }
 
   if (ops.length) {
