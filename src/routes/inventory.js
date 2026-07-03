@@ -204,6 +204,9 @@ router.patch('/:id/stock', requireRole(['admin', 'manager']), async (req, res) =
     if (!item) return res.status(404).json({ message: 'Item not found' });
     item.stock = Math.max(0, item.stock + quantityChange);
     const updated = await item.save();
+    // Sync child stocks if this is a parent inventory item
+    const { syncChildStocks } = require('../lib/inventoryStock');
+    await syncChildStocks([updated._id]);
     // Sync menu item availability
     await updateMenuAvailability();
     await deleteCache([INVENTORY_CACHE_KEY, MENU_CACHE_KEY]);

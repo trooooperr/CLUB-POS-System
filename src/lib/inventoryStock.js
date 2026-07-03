@@ -71,7 +71,7 @@ async function updateMenuAvailability() {
 }
 
 async function getInventorySnapshot() {
-  const items = await Inventory.find();
+  const items = await Inventory.find().populate('linkInventoryId');
   const Settings = require('../models/Settings');
   const settings = await Settings.findOne();
   const inventoryCategories = settings ? (settings.inventoryCategories || []) : [];
