@@ -254,7 +254,8 @@ async function refundInventoryForItems(items = []) {
     if (!directInv) continue;
 
     const targetId = directInv.linkInventoryId ? directInv.linkInventoryId.toString() : directInv._id.toString();
-    const refundQty = directInv.linkInventoryId ? getEffectiveDeduction(directInv, quantity) : quantity;
+    const refundQty = getEffectiveDeduction(directInv, quantity);
+
     const prev = parentRefundMap.get(targetId) || 0;
     parentRefundMap.set(targetId, prev + refundQty);
   }
