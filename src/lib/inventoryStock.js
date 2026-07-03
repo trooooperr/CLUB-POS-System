@@ -152,24 +152,17 @@ async function deductInventoryForItems(items = []) {
 
   const ops = [];
   const affectedParentIds = [];
+  // Aggregate deductions, using effective deduction for child items.
+  const parentDeductionMap = new Map(); // parentId -> total effective deduction
   for (const [name, quantity] of quantities.entries()) {
     const directInv = inventoryByName.get(normalizeName(name));
     if (!directInv) continue;
 
     if (directInv.linkInventoryId) {
-      const parentInv = inventoryById.get(directInv.linkInventoryId.toString());
-      if (parentInv && parentInv.trackStock !== false) {
-        const deductQty = getEffectiveDeduction(directInv, quantity);
-        ops.push({
-          updateOne: {
-            filter: { _id: parentInv._id },
-            update: [
-              { $set: { stock: { $max: [0, { $subtract: ['$stock', deductQty] }] } } }
-            ]
-          }
-        });
-        affectedParentIds.push(parentInv._id);
-      }
+      const parentId = directInv.linkInventoryId.toString();
+      const dedQty = getEffectiveDeduction(directInv, quantity);
+      const prev = parentDeductionMap.get(parentId) || 0;
+      parentDeductionMap.set(parentId, prev + dedQty);
     } else {
       if (directInv.trackStock !== false) {
         ops.push({
@@ -183,6 +176,21 @@ async function deductInventoryForItems(items = []) {
         affectedParentIds.push(directInv._id);
       }
     }
+  }
+
+  // Apply accumulated parent deductions
+  for (const [parentId, totalDeduction] of parentDeductionMap.entries()) {
+    const parentInv = inventoryById.get(parentId);
+    if (!parentInv || parentInv.trackStock === false) continue;
+    ops.push({
+      updateOne: {
+        filter: { _id: parentInv._id },
+        update: [
+          { $set: { stock: { $max: [0, { $subtract: ['$stock', totalDeduction] }] } } }
+        ]
+      }
+    });
+    affectedParentIds.push(parentInv._id);
   }
 
   if (ops.length) {
