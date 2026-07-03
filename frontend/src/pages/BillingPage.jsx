@@ -762,7 +762,9 @@ export default function BillingPage() {
       }
       if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
         e.preventDefault();
-        doGen(0);
+        if (localStorage.getItem('is_cashier_pos') !== 'false') {
+          doGen(0);
+        }
         return;
       }
       if (e.key === 'Backspace') {
@@ -1143,14 +1145,16 @@ export default function BillingPage() {
                 >
                   <Printer size={14} /> Print KOT
                 </button>
-                <button
-                  className="btn btn-primary btn-lg"
-                  style={{ flex: 1 }}
-                  onClick={() => doGen(0)}
-                  disabled={combinedItems.all.length === 0 || busy}
-                >
-                  {busy ? 'Processing…' : 'Print Bill'}
-                </button>
+                {localStorage.getItem('is_cashier_pos') !== 'false' && (
+                  <button
+                    className="btn btn-primary btn-lg"
+                    style={{ flex: 1 }}
+                    onClick={() => doGen(0)}
+                    disabled={combinedItems.all.length === 0 || busy}
+                  >
+                    {busy ? 'Processing…' : 'Print Bill'}
+                  </button>
+                )}
               </div>
               {/* CLR TABLE: clear table without saving to history */}
               <button

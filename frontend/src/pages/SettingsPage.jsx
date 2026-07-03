@@ -9,6 +9,14 @@ export default function SettingsPage() {
   const [saved, setSaved] = useState(false);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
+  const [isCashierPos, setIsCashierPos] = useState(localStorage.getItem('is_cashier_pos') !== 'false');
+
+  const handleToggleCashier = (checked) => {
+    setIsCashierPos(checked);
+    localStorage.setItem('is_cashier_pos', checked ? 'true' : 'false');
+    showToast(checked ? 'Device configured as Cashier POS' : 'Device configured as Mobile/Order POS', 'info');
+  };
+
   const [email, setEmail] = useState({ adminEmail: settings.adminEmail || '' });
   const setE = (k, v) => setEmail(prev => ({ ...prev, [k]: v }));
   const [sending, setSending] = useState(false);
@@ -387,6 +395,21 @@ export default function SettingsPage() {
             <label className="settings-toggle">
               <input type="checkbox" checked={!!form.darkMode} onChange={e => set('darkMode', e.target.checked)} />
               <span>Use dark mode by default</span>
+            </label>
+          </div>
+        </section>
+
+        <section className="settings-card">
+          <div className="settings-card-head">
+            <div>
+              <h2>Device Setting</h2>
+              <p>Configure options specific to this terminal browser.</p>
+            </div>
+          </div>
+          <div className="settings-fields">
+            <label className="settings-toggle">
+              <input type="checkbox" checked={isCashierPos} onChange={e => handleToggleCashier(e.target.checked)} />
+              <span>Enable Cashier POS features (Allow Bill Finalization)</span>
             </label>
           </div>
         </section>
