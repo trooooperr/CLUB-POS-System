@@ -400,7 +400,7 @@ function setupDbChangeStreams(io) {
 
     // Watch kots collection
     const kotStream = db.collection('kots').watch([], { fullDocument: 'updateLookup' });
-    kotStream.on('change', (change) => {
+    kotStream.on('change', async (change) => {
       if (change.operationType === 'insert') {
         const doc = change.fullDocument;
         if (doc) {
@@ -408,6 +408,33 @@ function setupDbChangeStreams(io) {
           io.emit('NEW_KOT', doc); // Broadcast globally
           io.emit('TABLE_SESSION_UPDATED', { tableNo: doc.tableNo });
           console.log('🎫 Change Stream: New KOT broadcast:', doc.kotNo);
+
+          // Handle stock deduction for table/guest KOTs!
+          if (doc.source === 'table') {
+            try {
+              const KOT = require('./src/models/KOT');
+              const { deductInventoryForItems, broadcastInventoryUpdate } = require('./src/lib/inventoryStock');
+              
+              const kotDoc = await KOT.findById(doc._id);
+              if (kotDoc && !kotDoc.inventoryDeductedAt) {
+                console.log(`📡 Change Stream: Deducting inventory for table KOT ${kotDoc.kotNo}...`);
+                const updatedInventory = await deductInventoryForItems(kotDoc.items);
+                
+                kotDoc.inventoryDeducted = true;
+                kotDoc.inventoryDeductedAt = new Date();
+                await kotDoc.save();
+                
+                broadcastInventoryUpdate({ app: { locals: { io } } }, updatedInventory, {
+                  orderId: kotDoc.orderId,
+                  kotId: kotDoc._id,
+                  source: 'TABLE_KOT_STREAM'
+                });
+                console.log(`📡 Change Stream: Table KOT ${kotDoc.kotNo} inventory deducted successfully.`);
+              }
+            } catch (err) {
+              console.error(`❌ Change Stream: Error deducting inventory for table KOT:`, err.message);
+            }
+          }
         }
       }
     });
