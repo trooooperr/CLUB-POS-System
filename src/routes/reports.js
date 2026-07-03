@@ -134,27 +134,14 @@ function buildReportHTML({ date, orders, settings, inventory }) {
     </tbody></table>
   </div>
 
+
+
   <div class="section">
-    <h3>🏆 Top 5 Selling Items</h3>
-    <table><thead><tr><th>#</th><th>Item</th><th>Qty Sold</th></tr></thead><tbody>
-      ${topItems.length===0?'<tr><td colspan="3" style="text-align:center;color:#525870">No sales today</td></tr>':topItems.map(([name,qty],i)=>`<tr><td style="color:#F59E0B;font-weight:700">${i+1}</td><td>${name}</td><td style="font-family:monospace;font-weight:700">${qty}</td></tr>`).join('')}
+    <h3>📦 Low Stock Items (${lowStock.length})</h3>
+    <table><thead><tr><th>Item</th><th>Stock</th><th>Min</th><th>Status</th></tr></thead><tbody>
+      ${lowStock.length===0?'<tr><td colspan="4" style="text-align:center;color:#64748B">All items are in stock</td></tr>':lowStock.map(i=>`<tr><td>${i.name}</td><td style="font-family:monospace">${i.stock} ${i.unit}</td><td style="font-family:monospace;color:#525870">${i.minStock}</td><td><span class="badge low">Low Stock</span></td></tr>`).join('')}
     </tbody></table>
   </div>
-
-  ${inventory.length>0?`<div class="section">
-    <h3>📦 Inventory Status (${inventory.length} items)</h3>
-    ${lowStock.length>0?`<div style="background:rgba(239,68,68,0.07);border:1px solid rgba(239,68,68,0.2);border-radius:7px;padding:8px 12px;margin-bottom:10px;font-size:12px;color:#EF4444"><b>Low Stock Alert:</b> ${lowStock.map(i=>i.name).join(', ')}</div>`:''}
-    <table><thead><tr><th>Item</th><th>Stock</th><th>Min</th><th>Status</th></tr></thead><tbody>
-      ${inventory.slice(0,10).map(i=>{
-        const isTracked = i.trackStock !== false;
-        const stockStr = isTracked ? `${i.stock} ${i.unit}` : '—';
-        const minStr = isTracked ? i.minStock : '—';
-        const statusClass = isTracked ? (i.stock <= i.minStock ? 'low' : 'ok') : 'ok';
-        const statusText = isTracked ? (i.stock <= i.minStock ? 'Low Stock' : 'OK') : 'Unlimited';
-        return `<tr><td>${i.name}</td><td style="font-family:monospace">${stockStr}</td><td style="font-family:monospace;color:#525870">${minStr}</td><td><span class="badge ${statusClass}">${statusText}</span></td></tr>`;
-      }).join('')}
-    </tbody></table>
-  </div>`:''}
 
   <div class="section">
     <h3>📋 Today's Orders (${orders.length})</h3>
