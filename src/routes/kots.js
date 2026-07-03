@@ -204,9 +204,6 @@ router.post('/', async (req, res) => {
     } catch (inventoryErr) {
       console.error('Inventory deduction error in POST /api/kots:', inventoryErr.message);
     }
-      } catch (inventoryErr) {
-      console.error('Inventory deduction error in POST /api/kots:', inventoryErr.message);
-    }
 
     // Add KOT to order
     await Order.findByIdAndUpdate(orderId, {
