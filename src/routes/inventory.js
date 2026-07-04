@@ -78,7 +78,7 @@ router.post(
   },
   async (req, res) => {
     try {
-      const { name, category, unit, stock, minStock, price, isAlcoholic, trackStock, linkInventoryId, stockDeductionQty } = req.body;
+      const { name, category, unit, stock, minStock, price, isAlcoholic, trackStock, linkInventoryId, stockDeductionQty, imageUrl } = req.body;
       const shortcut = (req.body.shortcut || '').toLowerCase().trim();
       const invItem = new Inventory({
         name,
@@ -88,6 +88,7 @@ router.post(
         minStock,
         price,
         shortcut,
+        imageUrl: imageUrl || '',
         isAlcoholic: !!isAlcoholic,
         isAlcohol: !!isAlcoholic,
         trackStock: trackStock !== false,
@@ -101,7 +102,7 @@ router.post(
       }
       await MenuItem.findOneAndUpdate(
         { name },
-        { name, category, price, available: trackStock === false ? true : (stock > 0), shortcut, department: 'bar' },
+        { name, category, price, available: trackStock === false ? true : (stock > 0), shortcut, department: 'bar', imageUrl: imageUrl || '' },
         { upsert: true, new: true, setDefaultsOnInsert: true }
       );
       await deleteCache([INVENTORY_CACHE_KEY, MENU_CACHE_KEY]);
@@ -189,6 +190,7 @@ router.put(
           available: updated.trackStock === false ? true : (updated.stock > 0),
           shortcut: (updated.shortcut || '').toLowerCase().trim(),
           department: 'bar',
+          imageUrl: updated.imageUrl || '',
         },
         { upsert: true, new: true, setDefaultsOnInsert: true }
       );

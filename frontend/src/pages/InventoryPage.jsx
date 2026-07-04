@@ -68,10 +68,11 @@ function StockModal({ item, onClose, onSave }) {
         trackStock: item.trackStock !== false,
         linkInventoryId: item.linkInventoryId?._id || item.linkInventoryId || '',
         stockDeductionQty: item.stockDeductionQty || 1,
+        imageUrl: item.imageUrl || '',
       };
     }
     return {
-      name: '', category: categories[0] || 'General', unit: 'Bottles', stock: 0, minStock: 5, price: '', shortcut: '', isAlcoholic: false, trackStock: true, linkInventoryId: '', stockDeductionQty: 1
+      name: '', category: categories[0] || 'General', unit: 'Bottles', stock: 0, minStock: 5, price: '', shortcut: '', isAlcoholic: false, trackStock: true, linkInventoryId: '', stockDeductionQty: 1, imageUrl: ''
     };
   });
   const [error, setError] = useState(null);
@@ -160,6 +161,7 @@ function StockModal({ item, onClose, onSave }) {
       minStock: form.trackStock ? (Number(form.minStock) || 0) : 0,
       price: Number(form.price) || 0,
       shortcut: (form.shortcut || '').toLowerCase().trim(),
+      imageUrl: form.imageUrl || '',
       isAlcoholic: !!form.isAlcoholic,
       trackStock: !!form.trackStock,
       linkInventoryId,
@@ -279,6 +281,12 @@ function StockModal({ item, onClose, onSave }) {
           <input value={form.shortcut || ''} onChange={e => set('shortcut', e.target.value.toLowerCase().trim())}
             placeholder="e.g. cp, pn, ff" maxLength={10} />
           <span className="modal-hint" style={{ fontSize: 10, color: 'var(--t2)', marginTop: 4, display: 'block' }}>Short code to quickly add this item</span>
+        </div>
+
+        <div className="fgroup">
+          <label className="lbl">Image URL</label>
+          <input value={form.imageUrl || ''} onChange={e => set('imageUrl', e.target.value)}
+            placeholder="https://images.unsplash.com/photo..." />
         </div>
 
         {error && <div style={{ color: 'red', marginBottom: 8, marginTop: 8 }}>{error}</div>}

@@ -8,6 +8,7 @@ const inventorySchema = new mongoose.Schema({
   minStock: { type: Number, default: 5, min: 0 },
   price: { type: Number, required: true, default: 0, min: 0 },
   shortcut: { type: String, default: '', lowercase: true, trim: true },
+  imageUrl: { type: String, default: '' },
   isAlcoholic: { type: Boolean, default: false },
   isAlcohol: { type: Boolean, default: false },
   trackStock: { type: Boolean, default: true },
