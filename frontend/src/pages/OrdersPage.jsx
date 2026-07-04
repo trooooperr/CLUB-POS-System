@@ -212,8 +212,15 @@ export default function OrdersPage() {
       return matchDate && matchSearch;
     });
 
-    // Sort by billNo descending (extract suffix number if possible, e.g. HTB-015 -> 15)
+    // Sort by date descending (latest first) as priority, then by billNo descending
     return list.sort((a, b) => {
+      const aTime = new Date(a.createdAt || a.date || 0).getTime();
+      const bTime = new Date(b.createdAt || b.date || 0).getTime();
+      
+      if (aTime !== bTime) {
+        return bTime - aTime; // Descending: latest date first
+      }
+
       const aNo = a.billNo || '';
       const bNo = b.billNo || '';
       
@@ -223,10 +230,7 @@ export default function OrdersPage() {
       const aNum = aMatch ? parseInt(aMatch[1], 10) : 0;
       const bNum = bMatch ? parseInt(bMatch[1], 10) : 0;
       
-      if (aNum !== bNum) {
-        return bNum - aNum; // Descending: higher numbers first
-      }
-      return new Date(b.createdAt || b.date || 0) - new Date(a.createdAt || a.date || 0);
+      return bNum - aNum; // Descending: higher numbers first
     });
   }, [orderHistory, search, startDate, endDate]);
 
