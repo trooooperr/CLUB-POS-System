@@ -493,12 +493,14 @@ export default function BillingPage() {
         pendingItemsForDb,
         totals.grandTotal,
         selectedWaiterObj?.name || '',
-        orderType
+        orderType,
+        table.customerName || '',
+        table.customerPhone || ''
       ).catch(() => { });
     }, 800); // 800ms debounce
 
     return () => clearTimeout(delayDebounceFn);
-  }, [table.items, selectedWaiterObj, orderType, activeTableId, activeOrder, totals.grandTotal]);
+  }, [table.items, selectedWaiterObj, orderType, activeTableId, activeOrder, totals.grandTotal, table.customerName, table.customerPhone]);
 
   // Listen to real-time socket events for current table
   useEffect(() => {

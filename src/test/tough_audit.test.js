@@ -97,7 +97,7 @@ describe('HumTum POS - Strict Sector Audit', () => {
     });
 
     it('TOUGH: Should clear remaining dues in History', async () => {
-      const activeOrder = (await request(app).get('/api/orders').set('Authorization', `Bearer ${adminToken}`)).body[0];
+      const activeOrder = (await request(app).get('/api/orders/active/all').set('Authorization', `Bearer ${adminToken}`)).body[0];
       
       const res = await request(app)
         .patch(`/api/orders/${activeOrder._id}/settle`)

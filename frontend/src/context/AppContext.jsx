@@ -1263,12 +1263,12 @@ export function AppProvider({ children }) {
     }
   }, [socket]);
 
-  const syncTableSession = useCallback(async (tableNo, pendingItems, totalAmount, waiterName = '', orderType = 'dine-in') => {
+  const syncTableSession = useCallback(async (tableNo, pendingItems, totalAmount, waiterName = '', orderType = 'dine-in', customerName = '', customerPhone = '') => {
     try {
       const res = await authFetch(apiUrl(`/api/orders/table/${tableNo}/session`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pendingItems, totalAmount, waiterName, orderType })
+        body: JSON.stringify({ pendingItems, totalAmount, waiterName, orderType, customerName, customerPhone })
       });
       if (!res.ok) throw new Error('Failed to sync session');
       const session = await res.json();
