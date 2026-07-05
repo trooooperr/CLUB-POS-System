@@ -6,7 +6,7 @@ const Settings = require('../models/Settings');
 const nodemailer = require('nodemailer');
 const { getCache, setCache } = require('../lib/redis');
 const { requireRole } = require('../middleware/auth');
-const { getBusinessDayBounds } = require('../lib/businessDay');
+const { getBusinessDayBounds, getBusinessDateString } = require('../lib/businessDay');
 
 const REPORT_SUMMARY_CACHE_KEY = 'reports:daily-summary';
 
@@ -171,8 +171,8 @@ async function sendDailyReportInternal(options = {}) {
     currency: options.settings?.currency || persistedSettings.currency || '₹',
   };
 
-  const { start, end } = getBusinessDayBounds();
-  const orders = await Order.find({ date: { $gte: start, $lt: end }, grandTotal: { $gt: 0 } });
+  const businessDateStr = getBusinessDateString(new Date());
+  const orders = await Order.find({ businessDate: businessDateStr, grandTotal: { $gt: 0 } });
   const inventory = await Inventory.find();
   const inventoryCategories = resolvedSettings.inventoryCategories || [];
   inventory.sort((a, b) => {
@@ -187,7 +187,7 @@ async function sendDailyReportInternal(options = {}) {
     return a.name.localeCompare(b.name);
   });
 
-  const html = buildReportHTML({ date: start, orders, settings: resolvedSettings, inventory });
+  const html = buildReportHTML({ date: new Date(businessDateStr), orders, settings: resolvedSettings, inventory });
   const transporter = await createTransport(resolvedEmailConfig);
   await transporter.verify();
 
@@ -234,8 +234,8 @@ router.get('/daily-html', async (req, res) => {
       currency: persistedSettings.currency || '₹',
     };
 
-    const { start, end } = getBusinessDayBounds();
-    const orders = await Order.find({ date: { $gte: start, $lt: end }, grandTotal: { $gt: 0 } });
+    const businessDateStr = getBusinessDateString(new Date());
+    const orders = await Order.find({ businessDate: businessDateStr, grandTotal: { $gt: 0 } });
     const inventory = await Inventory.find();
     const inventoryCategories = resolvedSettings.inventoryCategories || [];
     inventory.sort((a, b) => {
@@ -250,7 +250,7 @@ router.get('/daily-html', async (req, res) => {
       return a.name.localeCompare(b.name);
     });
 
-    const html = buildReportHTML({ date: start, orders, settings: resolvedSettings, inventory });
+    const html = buildReportHTML({ date: new Date(businessDateStr), orders, settings: resolvedSettings, inventory });
     res.send(html);
   } catch (err) {
     console.error('Error generating daily HTML:', err.message);
@@ -263,13 +263,13 @@ router.get('/daily-summary', requireRole(['admin', 'manager']), async (req, res)
     const cached = await getCache(REPORT_SUMMARY_CACHE_KEY);
     if (cached) return res.json(cached);
 
-    const { start, end } = getBusinessDayBounds();
-    const orders = await Order.find({ date: { $gte: start, $lt: end }, grandTotal: { $gt: 0 } });
+    const businessDateStr = getBusinessDateString(new Date());
+    const orders = await Order.find({ businessDate: businessDateStr, grandTotal: { $gt: 0 } });
     const total    = orders.reduce((s,o)=>s+o.grandTotal,0);
     const due      = orders.reduce((s,o)=>s+(o.dueAmount||0),0);
     const pmMap    = {};
     orders.forEach(o=>{ pmMap[o.paymentMode]=(pmMap[o.paymentMode]||0)+o.grandTotal; });
-    const summary = { ordersCount:orders.length, revenue:total, due, paymentBreakdown:pmMap, date:start };
+    const summary = { ordersCount:orders.length, revenue:total, due, paymentBreakdown:pmMap, date:new Date(businessDateStr) };
     await setCache(REPORT_SUMMARY_CACHE_KEY, summary, 120);
     res.json(summary);
   } catch (err) {
@@ -281,13 +281,8 @@ router.get('/analytics', requireRole(['admin', 'manager']), async (req, res) => 
   try {
     const { startDate, endDate } = req.query;
     if (!startDate || !endDate) return res.status(400).json({ message: 'startDate and endDate required' });
-    
-    const start = new Date(startDate);
-    start.setHours(0,0,0,0);
-    const end = new Date(endDate);
-    end.setHours(23,59,59,999);
 
-    const match = { date: { $gte: start, $lte: end }, grandTotal: { $gt: 0 } };
+    const match = { businessDate: { $gte: startDate, $lte: endDate }, grandTotal: { $gt: 0 } };
 
     // 1. Basic Stats
     const statsResult = await Order.aggregate([
@@ -300,7 +295,7 @@ router.get('/analytics', requireRole(['admin', 'manager']), async (req, res) => 
     const dailyResult = await Order.aggregate([
       { $match: match },
       { $group: {
-          _id: { $dateToString: { format: "%Y-%m-%d", date: "$date", timezone: "Asia/Kolkata" } },
+          _id: "$businessDate",
           sales: { $sum: "$grandTotal" }
       }},
       { $sort: { _id: 1 } }

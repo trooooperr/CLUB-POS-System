@@ -269,6 +269,22 @@ export default function OrdersPage() {
   const [editingPaymentOrder, setEditingPaymentOrder] = useState(null); // Full order object being edited
   const [editingDiscountOrder, setEditingDiscountOrder] = useState(null); // Discount edit
   const c = settings.currency;
+
+  const getLocalDateString = (dateObj) => {
+    if (!dateObj) return '';
+    const d = new Date(dateObj);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const formatBusinessDate = (dateStr) => {
+    if (!dateStr) return '';
+    const parts = dateStr.split('-');
+    if (parts.length !== 3) return dateStr;
+    return `${parts[2]}/${parts[1]}/${parts[0]}`;
+  };
   const startInputRef = React.useRef(null);
   const endInputRef = React.useRef(null);
 
@@ -303,18 +319,9 @@ export default function OrdersPage() {
   };
 
   const filtered = useMemo(() => {
-    const getLocalDateString = (dateObj) => {
-      if (!dateObj) return '';
-      const d = new Date(dateObj);
-      const year = d.getFullYear();
-      const month = String(d.getMonth() + 1).padStart(2, '0');
-      const day = String(d.getDate()).padStart(2, '0');
-      return `${year}-${month}-${day}`;
-    };
-
     const list = (Array.isArray(orderHistory) ? orderHistory : []).filter(o => {
       if (!o.billNo || o.billNo.trim() === '') return false;
-      const localDateStr = getLocalDateString(o.date);
+      const localDateStr = o.businessDate || getLocalDateString(o.date);
       const matchDate = (!startDate || localDateStr >= startDate) && (!endDate || localDateStr <= endDate);
       const matchSearch = !search ||
         (o.billNo && o.billNo.toLowerCase().includes(search.toLowerCase())) ||
@@ -464,7 +471,7 @@ export default function OrdersPage() {
               <div className="order-card-row">
                 <div>
                   <div className="bill-no-tag">HTB-{(o.billNo || '').split('-').pop()}</div>
-                  <div className="card-meta">{new Date(o.date).toLocaleDateString()} · Table {o.tableNo}</div>
+                  <div className="card-meta">{formatBusinessDate(o.businessDate || getLocalDateString(o.date))} · Table {o.tableNo}</div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <div className="card-total">{c}{o.grandTotal.toFixed(0)}</div>
@@ -519,7 +526,7 @@ export default function OrdersPage() {
             <tbody>
               {filtered.map(o => (
                 <tr key={o._id}>
-                  <td className="td-date">{new Date(o.date).toLocaleDateString()}</td>
+                  <td className="td-date">{formatBusinessDate(o.businessDate || getLocalDateString(o.date))}</td>
                   <td style={{ fontWeight: 700 }}>HTB-{(o.billNo || '').split('-').pop()}</td>
                   <td style={{ textAlign: 'center' }}>T{o.tableNo}</td>
                   <td className="td-date">{o.customerName || 'Walk-in Customer'}</td>

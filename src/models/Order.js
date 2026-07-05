@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const orderSchema = new mongoose.Schema({
   billNo:        { type: String, default: '', index: true },
   date:          { type: Date, default: Date.now, index: true },
+  businessDate:  { type: String, default: '', index: true },
   grandTotal:    { type: Number, required: true },
   paidAmount:    { type: Number, default: 0 },
   dueAmount:     { type: Number, default: 0, index: true },

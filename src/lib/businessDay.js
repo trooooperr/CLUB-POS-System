@@ -62,4 +62,16 @@ function getBusinessDayBounds() {
   return { start, end };
 }
 
-module.exports = { getBusinessDayBoundary, getBusinessDayBounds, getISTHour };
+function getBusinessDateString(date = new Date()) {
+  const d = new Date(date);
+  const istHour = getISTHour(d);
+  if (istHour < 5) {
+    d.setDate(d.getDate() - 1);
+  }
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+module.exports = { getBusinessDayBoundary, getBusinessDayBounds, getISTHour, getBusinessDateString };

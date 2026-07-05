@@ -7,7 +7,7 @@ const ORDERS_CACHE_KEY = 'orders:all';
 const REPORT_SUMMARY_CACHE_KEY = 'reports:daily-summary';
 const TableSession = require('../models/TableSession');
 const KOT = require('../models/KOT');
-const { getBusinessDayBoundary, getISTHour } = require('../lib/businessDay');
+const { getBusinessDayBoundary, getISTHour, getBusinessDateString } = require('../lib/businessDay');
 const {
   aggregateQuantities,
   broadcastInventoryUpdate,
@@ -15,36 +15,11 @@ const {
   deductInventoryForItems,
 } = require('../lib/inventoryStock');
 
-
-// Shift date to the previous business day if IST time is before 5 AM
-function getBusinessDate(originalDate = new Date()) {
-  const d = new Date(originalDate);
-  const istHour = getISTHour(d);
-  if (istHour < 5) {
-    d.setDate(d.getDate() - 1);
-  }
-  return d;
-}
-
-// Generate new Bill No based on boundary (only includes orders that have a valid bill number suffix)
-async function generateNextBillNo(businessDate = new Date()) {
-  // businessDate must already be the shifted business date from getBusinessDate()
-  
-  // Calculate IST calendar day bounds for this businessDate
-  const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000; // +5:30
-  const istTime = new Date(businessDate.getTime() + IST_OFFSET_MS);
-  const startIST = new Date(Date.UTC(
-    istTime.getUTCFullYear(),
-    istTime.getUTCMonth(),
-    istTime.getUTCDate(),
-    0, 0, 0, 0
-  ));
-  const start = new Date(startIST.getTime() - IST_OFFSET_MS);
-  const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
-
-  // Fetch all orders from today that have a valid billNo format
+// Generate new Bill No based on businessDateStr (e.g. "2026-07-04")
+async function generateNextBillNo(businessDateStr) {
+  // Fetch all orders from this business day that have a valid billNo format
   const todayOrders = await Order.find({
-    date: { $gte: start, $lt: end },
+    businessDate: businessDateStr,
     billNo: { $regex: /^HTB-\d+$/ }
   }).select('billNo');
 
@@ -127,7 +102,8 @@ router.post('/table/:tableNo/open', async (req, res) => {
       paymentMode: 'cash',
       orderStatus: 'OPEN',
       isActive: true,
-      date: getBusinessDate(),
+      date: new Date(),
+      businessDate: getBusinessDateString(),
       waiterName: waiterName || '',
       orderType: orderType || 'dine-in'
     });
@@ -245,14 +221,16 @@ router.post('/', async (req, res) => {
   try {
     const orderData = req.body;
 
+    const targetDate = orderData.date ? new Date(orderData.date) : new Date();
+    orderData.businessDate = getBusinessDateString(targetDate);
+    
     // Assign sequential bill number only if the order is already marked as finalized/inactive or completed
     const isCompleted = orderData.isActive === false || orderData.orderStatus === 'COMPLETED' || (orderData.dueAmount === 0 && Array.isArray(orderData.items) && orderData.items.length > 0);
     if (isCompleted) {
       if (orderData.grandTotal <= 0) {
         return res.status(400).json({ message: 'Cannot save completed order with grand total 0' });
       }
-      const targetDate = orderData.date ? new Date(orderData.date) : new Date();
-      orderData.billNo = await generateNextBillNo(getBusinessDate(targetDate));
+      orderData.billNo = await generateNextBillNo(orderData.businessDate);
     } else {
       orderData.billNo = '';
     }
@@ -262,7 +240,8 @@ router.post('/', async (req, res) => {
     // New KOT workflow: don't deduct inventory yet, only create order if items empty
     const order = new Order({
       ...orderData,
-      date: getBusinessDate(orderData.date ? new Date(orderData.date) : new Date()),
+      date: targetDate,
+      businessDate: orderData.businessDate,
       orderStatus: orderData.orderStatus || (isDirectOrder ? (orderData.dueAmount === 0 ? 'COMPLETED' : 'OPEN') : 'OPEN'),
       isActive: orderData.isActive !== undefined ? orderData.isActive : true,
       items: orderData.items || [],
@@ -351,7 +330,8 @@ router.patch('/:id/finalize-bill', async (req, res) => {
     order.grandTotal = grandTotal;
     order.orderStatus = 'COMPLETED';
     order.isActive = false;
-    order.date = getBusinessDate(new Date());
+    order.date = new Date();
+    order.businessDate = getBusinessDateString(order.date);
     if (waiterName !== undefined) order.waiterName = waiterName;
     if (orderType !== undefined) order.orderType = orderType;
     if (customerName !== undefined) order.customerName = customerName;
@@ -362,7 +342,7 @@ router.patch('/:id/finalize-bill', async (req, res) => {
 
     // Generate and assign sequential bill number at checkout
     if (!order.billNo || order.billNo === 'PENDING') {
-      order.billNo = await generateNextBillNo(order.date);
+      order.billNo = await generateNextBillNo(order.businessDate);
     }
 
     const saved = await order.save();
@@ -443,9 +423,10 @@ router.patch('/:id/settle', async (req, res) => {
     if (order.dueAmount <= 0) {
       order.orderStatus = 'PAID';
       order.isActive = false;
-      order.date = getBusinessDate(new Date());
+      order.date = new Date();
+      order.businessDate = getBusinessDateString(order.date);
       if (!order.billNo || order.billNo === 'PENDING') {
-        order.billNo = await generateNextBillNo(order.date);
+        order.billNo = await generateNextBillNo(order.businessDate);
       }
     }
     
@@ -544,9 +525,10 @@ router.patch('/:id/complete', async (req, res) => {
     // Mark order as completed
     order.orderStatus = 'COMPLETED';
     order.isActive = false;
-    order.date = getBusinessDate(new Date());
+    order.date = new Date();
+    order.businessDate = getBusinessDateString(order.date);
     if (!order.billNo || order.billNo === 'PENDING') {
-      order.billNo = await generateNextBillNo(order.date);
+      order.billNo = await generateNextBillNo(order.businessDate);
     }
     const saved = await order.save();
 
