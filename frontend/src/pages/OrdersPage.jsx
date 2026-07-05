@@ -171,12 +171,103 @@ function PaymentEditModal({ order, currency, onSave, onClose }) {
   );
 }
 
+function DiscountEditModal({ order, currency, onSave, onClose }) {
+  const [discountVal, setDiscountVal] = useState(order.discount ? String(order.discount) : '');
+  const [saving, setSaving] = useState(false);
+
+  const subtotalAndTax = order.subtotal + order.sgst + order.cgst;
+  const newGrandTotal = Math.round(Math.max(0, subtotalAndTax - (parseFloat(discountVal) || 0)));
+
+  const handleSave = async () => {
+    const val = parseFloat(discountVal) || 0;
+    if (val < 0 || val > subtotalAndTax) {
+      alert(`Discount must be between 0 and ${subtotalAndTax.toFixed(0)}`);
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await onSave(order._id, val);
+      onClose();
+    } catch (err) {
+      console.error(err);
+      alert(err.message || 'Failed to save discount');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="moverlay" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.85)' }} onClick={onClose}>
+      <div className="mbox" style={{ maxWidth: '340px', width: '92%', padding: '20px', position: 'relative' }} onClick={e => e.stopPropagation()}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+          <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 800, color: 'var(--t0)' }}>
+            Edit Discount (HTB-{(order.billNo || '').split('-').pop()})
+          </h3>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--t2)', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: 4 }}>
+            <X size={18} />
+          </button>
+        </div>
+
+        <div style={{ fontSize: '13px', color: 'var(--t1)', marginBottom: 8 }}>
+          Subtotal + Tax: <span style={{ fontWeight: 700, color: 'var(--t0)' }}>{currency}{subtotalAndTax.toFixed(2)}</span>
+        </div>
+        <div style={{ fontSize: '13px', color: 'var(--t1)', marginBottom: 16 }}>
+          New Grand Total: <span style={{ fontWeight: 800, color: 'var(--a)' }}>{currency}{newGrandTotal.toFixed(0)}</span>
+        </div>
+
+        <div style={{ marginBottom: 16 }}>
+          <label style={{ fontSize: 11, color: 'var(--t2)', fontWeight: 700, display: 'block', marginBottom: 6, textTransform: 'uppercase' }}>
+            Discount Amount ({currency})
+          </label>
+          <textarea
+            placeholder="Enter discount amount"
+            rows="2"
+            value={discountVal}
+            onChange={e => setDiscountVal(e.target.value.replace(/[^0-9.]/g, ''))}
+            style={{
+              width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--b1)',
+              background: 'var(--s2)', color: 'var(--t0)', fontSize: 14, fontWeight: 700,
+              resize: 'none', fontFamily: 'inherit'
+            }}
+          />
+        </div>
+
+        <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
+          <button
+            onClick={onClose}
+            style={{
+              flex: 1, padding: '10px 0', borderRadius: 8, border: '1px solid var(--b2)',
+              background: 'var(--s2)', color: 'var(--t1)', fontSize: 13, fontWeight: 700,
+              cursor: 'pointer'
+            }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            style={{
+              flex: 1, padding: '10px 0', borderRadius: 8, border: 'none',
+              background: 'var(--a)', color: '#000', fontSize: 13, fontWeight: 800,
+              cursor: saving ? 'wait' : 'pointer', opacity: saving ? 0.7 : 1
+            }}
+          >
+            {saving ? 'Saving...' : 'Save'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function OrdersPage() {
-  const { orderHistory, setInvoiceOrder, invoiceOrder, settings, deleteOrder, updateOrderPayment, role, showToast } = useApp();
+  const { orderHistory, setInvoiceOrder, invoiceOrder, settings, deleteOrder, updateOrderPayment, updateOrderDiscount, role, showToast } = useApp();
   const [search, setSearch] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [editingPaymentOrder, setEditingPaymentOrder] = useState(null); // Full order object being edited
+  const [editingDiscountOrder, setEditingDiscountOrder] = useState(null); // Discount edit
   const c = settings.currency;
   const startInputRef = React.useRef(null);
   const endInputRef = React.useRef(null);
@@ -202,8 +293,17 @@ export default function OrdersPage() {
     }
   };
 
+  const handleDiscountSave = async (orderId, discount) => {
+    try {
+      await updateOrderDiscount(orderId, discount);
+      showToast('Discount updated successfully', 'success');
+    } catch (err) {
+      showToast(err.message || 'Failed to update discount', 'error');
+    }
+  };
+
   const filtered = useMemo(() => {
-    const list = (Array.isArray(orderHistory) ? orderHistory : []).filter(o => {
+    return (Array.isArray(orderHistory) ? orderHistory : []).filter(o => {
       if (!o.billNo || o.billNo.trim() === '') return false;
       const d = new Date(o.date);
       const matchDate = (!startDate || d >= new Date(startDate)) && (!endDate || d <= new Date(endDate + 'T23:59:59'));
@@ -211,31 +311,6 @@ export default function OrdersPage() {
         (o.billNo && o.billNo.toLowerCase().includes(search.toLowerCase())) ||
         (o.customerName || 'Walk-in Customer').toLowerCase().includes(search.toLowerCase());
       return matchDate && matchSearch;
-    });
-
-    // Sort by date (calendar day only) descending, then by billNo descending
-    return list.sort((a, b) => {
-      const aDate = new Date(a.date || a.createdAt);
-      const bDate = new Date(b.date || b.createdAt);
-      
-      // Reset hours, minutes, seconds, milliseconds to compare only the calendar date
-      const aDay = new Date(aDate.getFullYear(), aDate.getMonth(), aDate.getDate()).getTime();
-      const bDay = new Date(bDate.getFullYear(), bDate.getMonth(), bDate.getDate()).getTime();
-      
-      if (aDay !== bDay) {
-        return bDay - aDay; // Descending: latest date first
-      }
-
-      const aNo = a.billNo || '';
-      const bNo = b.billNo || '';
-      
-      const aMatch = aNo.match(/HTB-(\d+)/);
-      const bMatch = bNo.match(/HTB-(\d+)/);
-      
-      const aNum = aMatch ? parseInt(aMatch[1], 10) : 0;
-      const bNum = bMatch ? parseInt(bMatch[1], 10) : 0;
-      
-      return bNum - aNum; // Descending: higher numbers first
     });
   }, [orderHistory, search, startDate, endDate]);
 
@@ -372,6 +447,13 @@ export default function OrdersPage() {
                   >
                     View Bill
                   </button>
+                  <button
+                    className="btn btn-blue btn-sm"
+                    style={{ padding: '2px 8px', fontSize: '11px', height: '24px' }}
+                    onClick={(e) => { e.stopPropagation(); setEditingDiscountOrder(o); }}
+                  >
+                    Edit
+                  </button>
                   {role === 'admin' && (
                     <button
                       className="btn btn-danger btn-sm"
@@ -412,6 +494,7 @@ export default function OrdersPage() {
                   <td style={{ textAlign: 'center' }}>
                     <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
                       <button className="btn btn-primary btn-sm" onClick={() => setInvoiceOrder(o)}>View Bill</button>
+                      <button className="btn btn-blue btn-sm" onClick={() => setEditingDiscountOrder(o)}>Edit</button>
                       {role === 'admin' && (
                         <button className="btn btn-danger btn-sm" onClick={() => handleDeleteOrder(o._id, o.billNo)}>Delete</button>
                       )}
@@ -431,6 +514,16 @@ export default function OrdersPage() {
           currency={c}
           onSave={handlePaymentSave}
           onClose={() => setEditingPaymentOrder(null)}
+        />
+      )}
+
+      {/* Discount Edit Modal Overlay */}
+      {editingDiscountOrder && (
+        <DiscountEditModal
+          order={editingDiscountOrder}
+          currency={c}
+          onSave={handleDiscountSave}
+          onClose={() => setEditingDiscountOrder(null)}
         />
       )}
     </div>

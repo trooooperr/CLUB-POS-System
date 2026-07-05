@@ -638,7 +638,7 @@ export function AppProvider({ children }) {
         setMenuItems(results[0].value);
       }
       if (results[1].status === 'fulfilled' && Array.isArray(results[1].value)) {
-        setOrderHistory([...results[1].value].sort((a,b)=>new Date(b.date)-new Date(a.date)));
+        setOrderHistory([...results[1].value].sort((a,b)=>new Date(b.updatedAt || b.date)-new Date(a.updatedAt || a.date)));
       }
       if (results[2].status === 'fulfilled' && Array.isArray(results[2].value)) {
         setWorkers(results[2].value);
@@ -1220,6 +1220,30 @@ export function AppProvider({ children }) {
     }
   }, []);
 
+  // ── Update order discount (from Orders page) ─────────────────────
+  const updateOrderDiscount = useCallback(async (orderId, discount) => {
+    try {
+      const res = await authFetch(apiUrl(`/api/orders/${orderId}/discount`), {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ discount })
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || 'Failed to update discount');
+      }
+      const updated = await res.json();
+      setOrderHistory(prev => {
+        const arr = Array.isArray(prev) ? prev : [];
+        return arr.map(o => o._id === orderId ? updated : o);
+      });
+      return updated;
+    } catch (err) {
+      console.error('Update discount error:', err);
+      throw err;
+    }
+  }, []);
+
   // ── Cancel (CLR) table session without saving to history ────────
   const cancelTableSession = useCallback(async (tableNo) => {
     try {
@@ -1483,7 +1507,7 @@ export function AppProvider({ children }) {
       getTableStatus, generateBill,
       activeSessions, getTableInfo,
       invoiceOrder, setInvoiceOrder,
-      saveMenuItem, deleteMenuItem, deleteOrder, updateOrderPayment,
+      saveMenuItem, deleteMenuItem, deleteOrder, updateOrderPayment, updateOrderDiscount,
       saveWorker, deleteWorker, updateWorkerStatus,
       toast, showToast,
       NUM_TABLES,

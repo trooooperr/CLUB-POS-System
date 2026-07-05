@@ -27,8 +27,8 @@ function getBusinessDate(originalDate = new Date()) {
 }
 
 // Generate new Bill No based on boundary (only includes orders that have a valid bill number suffix)
-async function generateNextBillNo(targetDate = new Date()) {
-  const businessDate = getBusinessDate(targetDate);
+async function generateNextBillNo(businessDate = new Date()) {
+  // businessDate must already be the shifted business date from getBusinessDate()
   
   // Calculate IST calendar day bounds for this businessDate
   const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000; // +5:30
@@ -67,7 +67,7 @@ router.get('/', async (req, res) => {
     const orders = await Order.find({
       grandTotal: { $gt: 0 },
       billNo: { $ne: '' }
-    }).sort({ createdAt: -1, billNo: -1 });
+    }).sort({ updatedAt: -1 });
     await setCache(ORDERS_CACHE_KEY, orders, 180);
     res.json(orders);
   } catch (err) { res.status(500).json({ message: err.message }); }
@@ -249,7 +249,7 @@ router.post('/', async (req, res) => {
     const isCompleted = orderData.isActive === false || orderData.orderStatus === 'COMPLETED' || (orderData.dueAmount === 0 && Array.isArray(orderData.items) && orderData.items.length > 0);
     if (isCompleted) {
       const targetDate = orderData.date ? new Date(orderData.date) : new Date();
-      orderData.billNo = await generateNextBillNo(targetDate);
+      orderData.billNo = await generateNextBillNo(getBusinessDate(targetDate));
     } else {
       orderData.billNo = '';
     }
@@ -403,7 +403,7 @@ router.patch('/:id/finalize-bill', async (req, res) => {
 // ── GET FULL ORDER HISTORY (including completed) ────────────────────
 router.get('/history/all', async (req, res) => {
   try {
-    const orders = await Order.find({ isActive: false, grandTotal: { $gt: 0 }, billNo: { $ne: '' } }).sort({ createdAt: -1, billNo: -1 }).populate('kotIds');
+    const orders = await Order.find({ isActive: false, grandTotal: { $gt: 0 }, billNo: { $ne: '' } }).sort({ updatedAt: -1 }).populate('kotIds');
     res.json(orders);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -455,6 +455,59 @@ router.patch('/:id/settle', async (req, res) => {
     await deleteCache([ORDERS_CACHE_KEY, REPORT_SUMMARY_CACHE_KEY]);
     res.json(saved);
   } catch (err) { res.status(500).json({ message: err.message }); }
+});
+
+// ── UPDATE DISCOUNT FOR ORDER ───────────────────────────────────
+router.patch('/:id/discount', async (req, res) => {
+  try {
+    const { discount } = req.body;
+    const order = await Order.findById(req.params.id);
+    if (!order) return res.status(404).json({ message: 'Order not found' });
+
+    const discountVal = parseFloat(discount) || 0;
+    if (discountVal < 0 || discountVal > (order.subtotal + order.sgst + order.cgst)) {
+      return res.status(400).json({ message: 'Invalid discount amount' });
+    }
+
+    order.discount = discountVal;
+    
+    // Recalculate grandTotal and roundOff
+    const rawTotal = order.subtotal + order.sgst + order.cgst - discountVal;
+    const rounded = Math.round(rawTotal);
+    order.roundOff = rounded - rawTotal;
+    order.grandTotal = rounded;
+
+    // Adjust payments if paid
+    if (order.dueAmount <= 0) {
+      order.paidAmount = rounded;
+      if (order.paymentMode === 'cash') {
+        order.cashAmount = rounded;
+        order.upiAmount = 0;
+      } else if (order.paymentMode === 'upi') {
+        order.cashAmount = 0;
+        order.upiAmount = rounded;
+      } else if (order.paymentMode === 'split') {
+        // Adjust splits proportionally
+        const totalSplit = order.cashAmount + order.upiAmount;
+        if (totalSplit > 0) {
+          const ratio = rounded / totalSplit;
+          order.cashAmount = Math.max(0, parseFloat((order.cashAmount * ratio).toFixed(2)));
+          order.upiAmount = Math.max(0, parseFloat((order.upiAmount * ratio).toFixed(2)));
+        } else {
+          order.cashAmount = rounded;
+          order.upiAmount = 0;
+        }
+      }
+    } else {
+      order.dueAmount = Math.max(0, rounded - order.paidAmount);
+    }
+
+    const saved = await order.save();
+    await deleteCache([ORDERS_CACHE_KEY, REPORT_SUMMARY_CACHE_KEY]);
+    res.json(saved);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
 });
 
 // ── COMPLETE ORDER & CLEAR TABLE ────────────────────────────────

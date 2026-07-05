@@ -41,6 +41,12 @@ describe('Orders API', () => {
     });
   }, 30000);
 
+  beforeEach(async () => {
+    await mongoose.model('Order').deleteMany({});
+    await mongoose.model('KOT').deleteMany({});
+    await mongoose.model('TableSession').deleteMany({});
+  });
+
   afterAll(async () => {
     await mongoose.connection.close();
     await mongo.stop();
@@ -241,5 +247,67 @@ describe('Orders API', () => {
 
     expect(res3.statusCode).toBe(201);
     expect(res3.body.billNo).toBe('HTB-001');
+
+    // 4. Create an order late at night on July 6th at 2:00 AM IST (which is July 5th 20:30 UTC)
+    // This order belongs to the July 5th business day.
+    // Verify it sequentially increments from the July 5th order (HTB-001) to HTB-002
+    // and does NOT shift twice (which would look at July 4th and generate a mismatch).
+    const orderData4 = {
+      tableNo: 8,
+      items: [{ name: 'Test Soda', quantity: 1, price: 50 }],
+      subtotal: 50,
+      sgst: 1.25,
+      cgst: 1.25,
+      discount: 0,
+      grandTotal: 52.5,
+      paidAmount: 52.5,
+      dueAmount: 0,
+      paymentMode: 'cash',
+      date: new Date('2026-07-05T20:30:00Z').toISOString()
+    };
+
+    const res4 = await request(app)
+      .post('/api/orders')
+      .set('Authorization', `Bearer ${token}`)
+      .send(orderData4);
+
+    expect(res4.statusCode).toBe(201);
+    expect(res4.body.billNo).toBe('HTB-002');
+  });
+
+  it('should update discount and recalculate grandTotal and payment fields', async () => {
+    const orderData = {
+      tableNo: 10,
+      items: [{ name: 'Test Soda', quantity: 2, price: 50 }],
+      subtotal: 100,
+      sgst: 2.5,
+      cgst: 2.5,
+      discount: 0,
+      grandTotal: 105,
+      paidAmount: 105,
+      dueAmount: 0,
+      paymentMode: 'cash'
+    };
+
+    const res = await request(app)
+      .post('/api/orders')
+      .set('Authorization', `Bearer ${token}`)
+      .send(orderData);
+
+    expect(res.statusCode).toBe(201);
+    const orderId = res.body._id;
+
+    // Apply ₹10 discount via PATCH
+    const discountRes = await request(app)
+      .patch(`/api/orders/${orderId}/discount`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ discount: 10 });
+
+    expect(discountRes.statusCode).toBe(200);
+    expect(discountRes.body.discount).toBe(10);
+    expect(discountRes.body.grandTotal).toBe(95);
+    expect(discountRes.body.paidAmount).toBe(95);
+    expect(discountRes.body.dueAmount).toBe(0);
+    expect(discountRes.body.cashAmount).toBe(95);
   });
 });
