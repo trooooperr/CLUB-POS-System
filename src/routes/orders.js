@@ -15,11 +15,11 @@ const {
   deductInventoryForItems,
 } = require('../lib/inventoryStock');
 
-// Generate new Bill No based on businessDateStr (e.g. "2026-07-04")
 async function generateNextBillNo(businessDateStr) {
-  // Fetch all orders from this business day that have a valid billNo format
+  // Fetch all finalized orders from this business day that have a valid billNo format
   const todayOrders = await Order.find({
     businessDate: businessDateStr,
+    isActive: false, // Ensure we ignore any active/open table sessions
     billNo: { $regex: /^HTB-\d+$/ }
   }).select('billNo');
 
@@ -243,7 +243,7 @@ router.post('/', async (req, res) => {
       date: targetDate,
       businessDate: orderData.businessDate,
       orderStatus: orderData.orderStatus || (isDirectOrder ? (orderData.dueAmount === 0 ? 'COMPLETED' : 'OPEN') : 'OPEN'),
-      isActive: orderData.isActive !== undefined ? orderData.isActive : true,
+      isActive: orderData.isActive !== undefined ? orderData.isActive : (isCompleted ? false : true),
       items: orderData.items || [],
       inventoryFinalized: isDirectOrder,
       ...(isDirectOrder && { inventoryFinalizedAt: new Date() })
