@@ -225,7 +225,7 @@ router.post('/', async (req, res) => {
     orderData.businessDate = getBusinessDateString(targetDate);
     
     // Assign sequential bill number only if the order is already marked as finalized/inactive or completed
-    const isCompleted = orderData.isActive === false || orderData.orderStatus === 'COMPLETED' || (orderData.dueAmount === 0 && Array.isArray(orderData.items) && orderData.items.length > 0);
+    const isCompleted = orderData.isActive !== true && (orderData.isActive === false || orderData.orderStatus === 'COMPLETED' || (orderData.dueAmount === 0 && Array.isArray(orderData.items) && orderData.items.length > 0));
     if (isCompleted) {
       if (orderData.grandTotal <= 0) {
         return res.status(400).json({ message: 'Cannot save completed order with grand total 0' });

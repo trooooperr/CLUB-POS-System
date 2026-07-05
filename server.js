@@ -59,6 +59,63 @@ function scheduleDailyReport() {
   console.log(`📅 Daily report cron scheduled: ${REPORT_TIME} IST`);
 }
 
+// ── Cron: Clean up empty inactive sessions ───────────────────────
+function scheduleCleanupCron() {
+  // Runs every hour
+  cron.schedule('0 * * * *', async () => {
+    console.log('🧹 Running empty inactive session cleanup...');
+    try {
+      const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
+      const TableSession = require('./src/models/TableSession');
+      const Order = require('./src/models/Order');
+      const KOT = require('./src/models/KOT');
+
+      // 1. Clean up inactive TableSessions and their linked orders if empty
+      const inactiveSessions = await TableSession.find({
+        pendingItems: { $size: 0 },
+        kotIds: { $size: 0 },
+        lastActivityAt: { $lt: twoHoursAgo }
+      });
+
+      let cleanedSessionsCount = 0;
+      for (const session of inactiveSessions) {
+        if (session.activeOrderId) {
+          const order = await Order.findById(session.activeOrderId);
+          if (order && (!order.items || order.items.length === 0)) {
+            await Order.findByIdAndDelete(order._id);
+            await KOT.deleteMany({ orderId: order._id });
+          }
+        }
+        await TableSession.findByIdAndDelete(session._id);
+        cleanedSessionsCount++;
+      }
+
+      // 2. Clean up orphaned active Orders with no items older than 2 hours
+      const activeOrders = await Order.find({
+        isActive: true,
+        items: { $size: 0 },
+        createdAt: { $lt: twoHoursAgo }
+      });
+
+      let cleanedOrdersCount = 0;
+      for (const order of activeOrders) {
+        const session = await TableSession.findOne({ activeOrderId: order._id });
+        if (!session) {
+          await Order.findByIdAndDelete(order._id);
+          cleanedOrdersCount++;
+        }
+      }
+
+      if (cleanedSessionsCount > 0 || cleanedOrdersCount > 0) {
+        console.log(`✅ Cleanup completed. Removed ${cleanedSessionsCount} empty sessions and ${cleanedOrdersCount} orphaned active orders.`);
+      }
+    } catch (err) {
+      console.error('❌ Failed to clean up empty inactive sessions:', err.message);
+    }
+  });
+  console.log('📅 Empty inactive session cleanup cron scheduled (hourly)');
+}
+
 // ── Cache warmup ─────────────────────────────────────────────────
 async function warmupCache() {
   try {
@@ -374,6 +431,7 @@ async function startServer() {
       console.log(`📡 Server running on port ${PORT}`);
       console.log(`🔗 Socket.IO ready`);
       scheduleDailyReport();
+      scheduleCleanupCron();
     });
 
   } catch (err) {
