@@ -3576,11 +3576,11 @@ textarea,
   }
   .tp-zone.zone-top .table-tile,
   .tp-zone.zone-bottom .table-tile {
-    min-height: 96px;
+    min-height: 76px;
   }
   .tp-zone.zone-top .table-tile-inner,
   .tp-zone.zone-bottom .table-tile-inner {
-    min-height: 96px;
+    min-height: 76px;
   }
 }
 
