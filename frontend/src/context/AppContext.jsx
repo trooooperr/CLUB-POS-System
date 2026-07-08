@@ -386,7 +386,7 @@ export function AppProvider({ children }) {
           ${(i.notes || i.note) ? `<div class="note">${i.notes || i.note}</div>` : ''}
         `).join('')}
         <div class="divider"></div>
-        ${isKitchen ? '<div style="height: 250mm;"></div>' : ''}
+        ${isKitchen ? '<div style="height: 40mm;"></div><div style="font-size: 1px; color: white; line-height: 1; margin: 0; padding: 0;">.</div>' : ''}
       </body>
     </html>
   `;
