@@ -539,21 +539,6 @@ export function AppProvider({ children }) {
             <span>Rs. ${total.toFixed(0)}</span>
           </div>
 
-          <div class="row" style="font-size: 12px; margin: 2px 0;">
-            <span>PAID BY</span>
-            <span>${paymentMode === 'split' ? 'SPLIT' : paymentMode.toUpperCase()}</span>
-          </div>
-          ${paymentMode === 'split' ? `
-          <div class="row" style="font-size: 11px;">
-            <span>  Cash</span>
-            <span>Rs. ${Number(cashAmount || 0).toFixed(0)}</span>
-          </div>
-          <div class="row" style="font-size: 11px;">
-            <span>  UPI</span>
-            <span>Rs. ${Number(upiAmount || 0).toFixed(0)}</span>
-          </div>
-          ` : ''}
-
           <div class="thick-line"></div>
 
           <div class="center">
