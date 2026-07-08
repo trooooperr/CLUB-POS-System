@@ -357,9 +357,7 @@ export function AppProvider({ children }) {
     const noteFontSize = isKitchen ? 9 : 10;
     
     const itemCount = items.length;
-    const pageHeight = isKitchen
-      ? Math.max(365, 300 + (itemCount * 14))
-      : Math.max(105, 70 + (itemCount * 9));
+    const pageHeight = isKitchen ? 297 : Math.max(105, 70 + (itemCount * 9));
 
     return `
     <html>
@@ -367,7 +365,15 @@ export function AppProvider({ children }) {
         <title>${printerLabel}</title>
         <style>
           @page { size: ${paperWidth}mm ${pageHeight}mm; margin: 0; }
-          body { font-family: monospace; width: ${bodyWidth}mm; margin: 0; padding: 0; font-size: ${fontSize}px; font-weight: bold; }
+          body { 
+            font-family: monospace; 
+            width: ${bodyWidth}mm; 
+            margin: 0; 
+            padding: 0; 
+            font-size: ${fontSize}px; 
+            font-weight: bold;
+            ${isKitchen ? 'height: 280mm; position: relative;' : ''}
+          }
           .header { text-align: center; font-weight: bold; margin-bottom: 6px; font-size: ${subFontSize}px; }
           .sub { text-align: center; font-size: ${subFontSize}px; margin-bottom: 4px; }
           .divider { border-top: 1px dashed #000; margin: 5px 0; }
@@ -386,7 +392,7 @@ export function AppProvider({ children }) {
           ${(i.notes || i.note) ? `<div class="note">${i.notes || i.note}</div>` : ''}
         `).join('')}
         <div class="divider"></div>
-        ${isKitchen ? '<div style="height: 40mm;"></div><div style="font-size: 1px; color: white; line-height: 1; margin: 0; padding: 0;">.</div>' : ''}
+        ${isKitchen ? '<div style="position: absolute; bottom: 5mm; left: 0; font-size: 1px; color: white; line-height: 1; margin: 0; padding: 0;">.</div>' : ''}
       </body>
     </html>
   `;
