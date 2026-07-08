@@ -358,7 +358,7 @@ export function AppProvider({ children }) {
     
     const itemCount = items.length;
     const pageHeight = isKitchen
-      ? Math.max(150, 110 + (itemCount * 14) + 35)
+      ? Math.max(125, 90 + (itemCount * 14) + 20)
       : Math.max(105, 70 + (itemCount * 9));
 
     return `
@@ -393,7 +393,7 @@ export function AppProvider({ children }) {
           ${(i.notes || i.note) ? `<div class="note">${i.notes || i.note}</div>` : ''}
         `).join('')}
         <div class="divider"></div>
-        ${isKitchen ? '<div style="margin-top: 130px; text-align: center; font-size: 10px; font-weight: bold; letter-spacing: 2px; color: #000;">*** END OF KOT ***</div>' : ''}
+        ${isKitchen ? '<div style="margin-top: 70px; font-size: 1px; color: white; line-height: 1; margin: 0; padding: 0;">.</div>' : ''}
       </body>
     </html>
   `;
