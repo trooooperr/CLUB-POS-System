@@ -7,6 +7,7 @@ const ORDERS_CACHE_KEY = 'orders:all';
 const REPORT_SUMMARY_CACHE_KEY = 'reports:daily-summary';
 const TableSession = require('../models/TableSession');
 const KOT = require('../models/KOT');
+const BillCounter = require('../models/BillCounter');
 const { getBusinessDayBoundary, getISTHour, getBusinessDateString } = require('../lib/businessDay');
 const {
   aggregateQuantities,
@@ -17,21 +18,45 @@ const {
 
 // Generate new Bill No based on businessDateStr (e.g. "2026-07-04")
 async function generateNextBillNo(businessDateStr) {
-  // Fetch all orders from this business day that have a valid billNo format
-  const todayOrders = await Order.find({
-    businessDate: businessDateStr,
-    billNo: { $regex: /^HTB-\d+$/ }
-  }).select('billNo');
+  // Try to find the counter first
+  let counter = await BillCounter.findOne({ businessDate: businessDateStr });
+  
+  if (!counter) {
+    // If counter document does not exist yet, initialize it based on the maximum existing bill number in DB
+    const todayOrders = await Order.find({
+      businessDate: businessDateStr,
+      billNo: { $regex: /^HTB-\d+$/ }
+    }).select('billNo');
 
-  let nextNumber = 1;
-  if (todayOrders.length > 0) {
-    const numbers = todayOrders.map(o => {
-      const match = o.billNo.match(/HTB-(\d+)/);
-      return match ? parseInt(match[1], 10) : 0;
-    });
-    nextNumber = Math.max(...numbers) + 1;
+    let maxNum = 0;
+    if (todayOrders.length > 0) {
+      const numbers = todayOrders.map(o => {
+        const match = o.billNo.match(/HTB-(\d+)/);
+        return match ? parseInt(match[1], 10) : 0;
+      });
+      maxNum = Math.max(...numbers);
+    }
+    
+    try {
+      counter = await BillCounter.findOneAndUpdate(
+        { businessDate: businessDateStr },
+        { $setOnInsert: { seq: maxNum } },
+        { upsert: true, new: true }
+      );
+    } catch (err) {
+      // Fetch in case of concurrent inserts
+      counter = await BillCounter.findOne({ businessDate: businessDateStr });
+    }
   }
-  return `HTB-${nextNumber.toString().padStart(3, '0')}`;
+
+  // Atomically increment counter and retrieve updated value
+  counter = await BillCounter.findOneAndUpdate(
+    { businessDate: businessDateStr },
+    { $inc: { seq: 1 } },
+    { new: true }
+  );
+
+  return `HTB-${counter.seq.toString().padStart(3, '0')}`;
 }
 
 router.get('/', async (req, res) => {

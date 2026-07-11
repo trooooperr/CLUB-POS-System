@@ -333,14 +333,11 @@ export default function OrdersPage() {
     // Group by business calendar day descending, then sort by billNo numeric value descending (newest prints on top)
     // This ensures sorting order is stable and does not shift when updating payment mode or discounts.
     return list.sort((a, b) => {
-      const aDate = new Date(a.date || a.createdAt);
-      const bDate = new Date(b.date || b.createdAt);
+      const aBiz = a.businessDate || getLocalDateString(a.date || a.createdAt);
+      const bBiz = b.businessDate || getLocalDateString(b.date || b.createdAt);
 
-      const aDay = new Date(aDate.getFullYear(), aDate.getMonth(), aDate.getDate()).getTime();
-      const bDay = new Date(bDate.getFullYear(), bDate.getMonth(), bDate.getDate()).getTime();
-
-      if (aDay !== bDay) {
-        return bDay - aDay; // Descending: latest date first
+      if (aBiz !== bBiz) {
+        return bBiz.localeCompare(aBiz); // Descending: latest business day first
       }
 
       const aNo = a.billNo || '';
