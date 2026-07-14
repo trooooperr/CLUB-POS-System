@@ -883,11 +883,12 @@ export default function SettingsPage() {
                 <div className="settings-field">
                   <label>Thank You Message Template</label>
                   <textarea
-                    rows={5}
+                    rows={10}
                     value={form.whatsappTemplate || ''}
                     onChange={e => set('whatsappTemplate', e.target.value)}
                     style={{
                       width: '100%',
+                      minHeight: '200px',
                       background: 'var(--b2)',
                       border: '1px solid var(--border)',
                       borderRadius: '8px',
@@ -899,13 +900,6 @@ export default function SettingsPage() {
                     }}
                     placeholder="Write your template..."
                   />
-                  <div style={{ fontSize: '11px', color: 'var(--t2)', marginTop: '4px', lineHeight: '1.4' }}>
-                    Available placeholders: <br/>
-                    <strong>{`{customerName}`}</strong> (e.g. John Doe) &bull;{' '}
-                    <strong>{`{googleReviewLink}`}</strong> &bull;{' '}
-                    <strong>{`{instagramLink}`}</strong> &bull;{' '}
-                    <strong>{`{facebookLink}`}</strong>
-                  </div>
                 </div>
               </div>
 
