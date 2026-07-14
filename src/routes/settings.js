@@ -102,6 +102,22 @@ async function getOrCreateSettings() {
       existing.printAgentToken = crypto.randomBytes(24).toString('hex');
       changed = true;
     }
+    if (!existing.googleReviewLink || existing.googleReviewLink === '') {
+      existing.googleReviewLink = 'https://g.page/r/CQnCGIPFlqaOEBM/review';
+      changed = true;
+    }
+    if (!existing.instagramLink || existing.instagramLink === '') {
+      existing.instagramLink = 'https://www.instagram.com/humtum.thebar/';
+      changed = true;
+    }
+    if (!existing.facebookLink || existing.facebookLink === '') {
+      existing.facebookLink = 'https://www.facebook.com/humtum.thebar/';
+      changed = true;
+    }
+    if (existing.whatsappEnabled !== true) {
+      existing.whatsappEnabled = true;
+      changed = true;
+    }
     if (changed) {
       await existing.save();
     }

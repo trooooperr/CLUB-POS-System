@@ -26,10 +26,10 @@ const settingsSchema = new mongoose.Schema({
   senderPassword: { type: String, default: '' },
   inventoryCategories: { type: [String], default: ['Spirits','Beer','Wine','Food','Mixers'] },
   menuCategories:      { type: [String], default: ['Spirits','Beer','Wine','Food','Mixers'] },
-  googleReviewLink:    { type: String, default: '' },
-  instagramLink:       { type: String, default: '' },
-  facebookLink:        { type: String, default: '' },
-  whatsappEnabled:     { type: Boolean, default: false },
+  googleReviewLink:    { type: String, default: 'https://g.page/r/CQnCGIPFlqaOEBM/review' },
+  instagramLink:       { type: String, default: 'https://www.instagram.com/humtum.thebar/' },
+  facebookLink:        { type: String, default: 'https://www.facebook.com/humtum.thebar/' },
+  whatsappEnabled:     { type: Boolean, default: true },
   whatsappTemplate:    { type: String, default: 'Thank you for dining with us, {customerName}! Your bill no. is {billNo} for {grandTotal}. Please share your review here: {googleReviewLink}. Follow us on Instagram: {instagramLink} and Facebook: {facebookLink}' },
 }, { timestamps: true });
 

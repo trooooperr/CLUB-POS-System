@@ -880,42 +880,6 @@ export default function SettingsPage() {
               
               {/* Left Column: Settings Configuration */}
               <div style={{ flex: '1 1 450px', display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                <label className="settings-toggle">
-                  <input
-                    type="checkbox"
-                    checked={!!form.whatsappEnabled}
-                    onChange={e => set('whatsappEnabled', e.target.checked)}
-                  />
-                  <span>Enable Automatic WhatsApp Notifications</span>
-                </label>
-
-                <div className="settings-field">
-                  <label>Google Review Link</label>
-                  <input
-                    value={form.googleReviewLink || ''}
-                    onChange={e => set('googleReviewLink', e.target.value)}
-                    placeholder="https://g.page/r/.../review"
-                  />
-                </div>
-
-                <div className="settings-field">
-                  <label>Instagram Page Link</label>
-                  <input
-                    value={form.instagramLink || ''}
-                    onChange={e => set('instagramLink', e.target.value)}
-                    placeholder="https://instagram.com/your_handle"
-                  />
-                </div>
-
-                <div className="settings-field">
-                  <label>Facebook Page Link</label>
-                  <input
-                    value={form.facebookLink || ''}
-                    onChange={e => set('facebookLink', e.target.value)}
-                    placeholder="https://facebook.com/your_page"
-                  />
-                </div>
-
                 <div className="settings-field">
                   <label>Thank You Message Template</label>
                   <textarea
