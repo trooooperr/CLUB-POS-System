@@ -391,7 +391,6 @@ export function AppProvider({ children }) {
           ${(i.notes || i.note) ? `<div class="note">${i.notes || i.note}</div>` : ''}
         `).join('')}
         <div class="divider"></div>
-        ${isKitchen ? '<div style="margin-top: 80px; text-align: center; font-size: 10px; font-weight: bold; letter-spacing: 2px; color: #000;">.</div>' : ''}
       </body>
     </html>
   `;
