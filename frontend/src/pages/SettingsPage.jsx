@@ -902,8 +902,6 @@ export default function SettingsPage() {
                   <div style={{ fontSize: '11px', color: 'var(--t2)', marginTop: '4px', lineHeight: '1.4' }}>
                     Available placeholders: <br/>
                     <strong>{`{customerName}`}</strong> (e.g. John Doe) &bull;{' '}
-                    <strong>{`{billNo}`}</strong> (e.g. HTB-001) &bull;{' '}
-                    <strong>{`{grandTotal}`}</strong> (e.g. ₹550) &bull;{' '}
                     <strong>{`{googleReviewLink}`}</strong> &bull;{' '}
                     <strong>{`{instagramLink}`}</strong> &bull;{' '}
                     <strong>{`{facebookLink}`}</strong>

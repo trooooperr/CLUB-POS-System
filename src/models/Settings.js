@@ -30,7 +30,7 @@ const settingsSchema = new mongoose.Schema({
   instagramLink:       { type: String, default: 'https://www.instagram.com/humtum.thebar/' },
   facebookLink:        { type: String, default: 'https://www.facebook.com/humtum.thebar/' },
   whatsappEnabled:     { type: Boolean, default: true },
-  whatsappTemplate:    { type: String, default: 'Thank you for dining with us, {customerName}! Your bill no. is {billNo} for {grandTotal}. Please share your review here: {googleReviewLink}. Follow us on Instagram: {instagramLink} and Facebook: {facebookLink}' },
+  whatsappTemplate:    { type: String, default: 'Hello {customerName}!\n\nThank you for visiting HumTum Bar & Club. We hope you had a wonderful time! 🍹✨\n\nCould you please take a moment to share your experience with us? It helps us grow!\nGoogle Review: {googleReviewLink}\n\nFollow us to stay updated with our events and offers:\nInstagram: {instagramLink}\nFacebook: {facebookLink}\n\nHope to see you again soon!\nTeam HumTum' },
 }, { timestamps: true });
 
 module.exports = mongoose.model('Settings', settingsSchema);
