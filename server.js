@@ -357,11 +357,11 @@ async function startServer() {
 
     setupSocketIO();
 
-    // Initialize WhatsApp Business Integration Service
-    const whatsappService = require('./src/lib/whatsappService');
-    await whatsappService.init(io).catch(err => {
-      console.error('[WhatsApp] Service initialization failed:', err.message);
-    });
+    // Initialize WhatsApp Business Integration Service (Temporarily disabled)
+    // const whatsappService = require('./src/lib/whatsappService');
+    // await whatsappService.init(io).catch(err => {
+    //   console.error('[WhatsApp] Service initialization failed:', err.message);
+    // });
 
     // Watch collections and broadcast socket updates on DB changes
     setupDbChangeStreams(io);

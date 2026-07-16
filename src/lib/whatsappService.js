@@ -151,9 +151,11 @@ async function connectToWhatsApp() {
       if (connection === 'close') {
         const error = lastDisconnect?.error;
         const statusCode = error?.output?.statusCode || error?.output?.payload?.statusCode;
-        const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+        const errorMsg = error?.message || error?.toString() || '';
+        const isQrTimeout = errorMsg.includes('QR refs attempts ended');
+        const shouldReconnect = statusCode !== DisconnectReason.loggedOut && !isQrTimeout;
 
-        console.log(`[WhatsApp] Connection closed. Reason: ${error?.message || error}. Reconnecting: ${shouldReconnect}`);
+        console.log(`[WhatsApp] Connection closed. Reason: ${errorMsg || error}. Reconnecting: ${shouldReconnect}`);
 
         connectionStatus = 'DISCONNECTED';
         qrCodeDataURL = null;
@@ -164,7 +166,7 @@ async function connectToWhatsApp() {
           await delay(5000);
           connectToWhatsApp();
         } else {
-          console.log('[WhatsApp] Logged out, clearing database session keys...');
+          console.log('[WhatsApp] Connection ended (no reconnect), clearing database session keys...');
           await WhatsAppSession.deleteMany({});
         }
       } else if (connection === 'open') {
@@ -270,8 +272,17 @@ async function init(io) {
   setSocketIo(io);
   const existingSession = await WhatsAppSession.findOne({ key: 'creds' });
   if (existingSession) {
-    console.log('[WhatsApp] Found saved credentials, auto-connecting...');
-    connectToWhatsApp();
+    try {
+      const creds = JSON.parse(existingSession.value, BufferJSON.reviver);
+      if (creds && creds.me && creds.me.id) {
+        console.log('[WhatsApp] Found authenticated session, auto-connecting...');
+        connectToWhatsApp();
+      } else {
+        console.log('[WhatsApp] Session exists but is unauthenticated, skipping auto-connect.');
+      }
+    } catch (err) {
+      console.error('[WhatsApp] Failed to parse credentials on init:', err.message);
+    }
   }
 }
 
