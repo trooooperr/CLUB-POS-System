@@ -311,9 +311,25 @@ export default function InventoryPage() {
     : ['General'];
   const getTodayLocalDate = () => {
     const d = new Date();
-    const offset = d.getTimezoneOffset();
-    const local = new Date(d.getTime() - (offset*60*1000));
-    return local.toISOString().split('T')[0];
+    // 5.5 hours offset for IST in milliseconds
+    const istTime = new Date(d.getTime() + 19800000);
+    
+    let year = istTime.getUTCFullYear();
+    let month = istTime.getUTCMonth();
+    let dateVal = istTime.getUTCDate();
+    let hour = istTime.getUTCHours();
+
+    if (hour < 5) {
+      const prevDay = new Date(Date.UTC(year, month, dateVal - 1));
+      year = prevDay.getUTCFullYear();
+      month = prevDay.getUTCMonth();
+      dateVal = prevDay.getUTCDate();
+    }
+
+    const yyyy = year;
+    const mm = String(month + 1).padStart(2, '0');
+    const dd = String(dateVal).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
   };
 
   const [modal, setModal] = useState(null);

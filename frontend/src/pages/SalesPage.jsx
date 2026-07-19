@@ -87,7 +87,31 @@ const renderLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, name
 
 export default function SalesPage() {
   const { settings } = useApp();
-  const todayStr = new Date().toISOString().slice(0, 10);
+  
+  const getBusinessTodayStr = () => {
+    const d = new Date();
+    // 5.5 hours offset for IST in milliseconds
+    const istTime = new Date(d.getTime() + 19800000);
+    
+    let year = istTime.getUTCFullYear();
+    let month = istTime.getUTCMonth();
+    let dateVal = istTime.getUTCDate();
+    let hour = istTime.getUTCHours();
+
+    if (hour < 5) {
+      const prevDay = new Date(Date.UTC(year, month, dateVal - 1));
+      year = prevDay.getUTCFullYear();
+      month = prevDay.getUTCMonth();
+      dateVal = prevDay.getUTCDate();
+    }
+
+    const yyyy = year;
+    const mm = String(month + 1).padStart(2, '0');
+    const dd = String(dateVal).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  };
+
+  const todayStr = getBusinessTodayStr();
 
   const [range, setRange] = useState('today');
   const [startDate, setStartDate] = useState(todayStr);
