@@ -686,14 +686,22 @@ export default function BillingPage() {
       // Print bill
       await printBillDocument(
         tableNo,
-        { items: combinedItems.all },
+        {
+          items: combinedItems.all,
+          subtotal,
+          sgst,
+          cgst,
+          discountAmount,
+          roundOff,
+          grandTotal
+        },
         grandTotal,
         selectedWaiterObj?.name || '',
         finalizedOrder?.billNo,
         selectedWaiterObj,
         pm,
         pm === 'cash' ? grandTotal : 0,
-        0
+        pm === 'upi' ? grandTotal : 0
       );
 
       // Auto-send WhatsApp review message — DISABLED

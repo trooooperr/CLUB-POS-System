@@ -6,7 +6,7 @@ import QRCode from 'qrcode';
 const qz = typeof window !== 'undefined' ? window.qz : null;
 
 export default function InvoiceModal() {
-  const { invoiceOrder, setInvoiceOrder, settings, showToast, workers, role, deleteKOT, removeKOTItem } = useApp();
+  const { invoiceOrder, setInvoiceOrder, settings, showToast, workers, role, deleteKOT, removeKOTItem, printBillDocument } = useApp();
   const [phone, setPhone] = useState(invoiceOrder?.customerPhone || '');
   const [sent, setSent] = useState(false);
   const [tab, setTab] = useState('whatsapp');
@@ -48,198 +48,31 @@ export default function InvoiceModal() {
   }, [o, s, waiterObj]);
 
   const handlePrint = async () => {
-    const html = `
-      <html>
-        <head>
-          <style>
-            @page { margin: 0; }
-            body { 
-              font-family: 'Courier New', Courier, monospace; 
-              padding: 15px; 
-              color: #000; 
-              width: 270px; /* Standard 58mm/80mm thermal width */
-              margin: auto; 
-              line-height: 1.2;
-              font-size: 13px;
-            }
-            .center { text-align: center; }
-            .bold { font-weight: 900; }
-            
-            /* Header Styling */
-            .brand { font-size: 18px; font-weight: 900; margin-bottom: 2px; text-transform: uppercase; }
-            .address { font-size: 11px; margin-bottom: 8px; line-height: 1.3; }
-            
-            /* Separators */
-            .dash-line { border-top: 1px dashed #000; margin: 10px 0; }
-            .thick-line { border-top: 2px solid #000; margin: 5px 0; }
-
-            /* Table Grid */
-            .row { display: flex; justify-content: space-between; margin-bottom: 3px; }
-            .item-header { font-size: 12px; font-weight: 900; display: flex; margin-bottom: 5px; border-bottom: 1px solid #000; padding-bottom: 3px; }
-            .item-row { display: flex; margin-bottom: 4px; align-items: flex-start; }
-            
-            /* Column Widths */
-            .col-name { flex: 1; padding-right: 5px; text-transform: uppercase; }
-            .col-qty { width: 35px; text-align: center; }
-            .col-amt { width: 65px; text-align: right; font-weight: bold; }
-
-            /* Final Amount Section */
-            .total-container {
-              text-align: center;
-            }
-            .total-label { font-size: 14px; font-weight: 600; letter-spacing: 1px; margin: 4px; }
-            .total-amount { font-size: 11px; }
-            
-            .footer-msg { font-size: 11px; margin-top: 15px; font-weight: bold; font-style: italic; }
-            .qr-code { width: 130px; height: 130px; margin: 8px auto 2px; display: block; }
-          </style>
-        </head>
-        <body>
-          <div class="center">
-            <div class="brand">${s.restaurantName}</div>
-            <div class="address">${s.address}<br>GSTIN: ${s.gstin}</div>
-          </div>
-
-          <div class="dash-line"></div>
-
-          <div class="row"><span>BILL: HTB-${(o.billNo || '').split('-').pop()}</span><span>TABLE: ${o.tableNo}</span></div>
-          <div class="row" style="font-size: 11px;">DATE: ${new Date(o.createdAt || o.date).toLocaleString('en-IN')}</div>
-          ${o.waiterName ? `<div class="row" style="font-size: 11px;">WAITER: ${o.waiterName.toUpperCase()}</div>` : ''}
-
-          <div class="dash-line"></div>
-
-          <div class="item-header">
-            <span class="col-name">ITEM DESCRIPTION</span>
-            <span class="col-qty">QTY</span>
-            <span class="col-amt">PRICE</span>
-          </div>
-
-          ${o.items.map(item => `
-            <div class="item-row">
-              <span class="col-name">${item.name}</span>
-              <span class="col-qty">${item.quantity}</span>
-              <span class="col-amt">${(item.price * item.quantity).toFixed(0)}</span>
-            </div>
-          `).join('')}
-
-          <div class="dash-line"></div>
-
-          <div class="row"><span>SUBTOTAL</span><span>${o.subtotal.toFixed(2)}</span></div>
-          <div class="row"><span>SGST (2.5%)</span><span>${o.sgst.toFixed(2)}</span></div>
-          <div class="row"><span>CGST (2.5%)</span><span>${o.cgst.toFixed(2)}</span></div>
-          ${o.discount > 0 ? `<div class="row"><span>DISCOUNT</span><span>-${o.discount.toFixed(2)}</span></div>` : ''}
-          ${(o.roundOff || 0) !== 0 ? `<div class="row"><span>ROUND OFF</span><span>${(o.roundOff > 0 ? '+' : '')}${o.roundOff.toFixed(2)}</span></div>` : ''}
-
-          <div class="total-container">
-            <div class="total-label">NET PAYABLE AMOUNT ${s.currency}${roundedGrandTotal}</div>
-          </div>
-
-          <div class="center" style="margin-top: 10px; font-size: 13px; font-weight: 900;">
-            PAID VIA ${o.paymentMode?.toUpperCase()}
-          </div>
-
-          <div class="dash-line"></div>
-
-          <div class="center" style="margin-top: 8px;">
-            <div style="font-size: 13px; font-weight: bold; margin-bottom: 4px;">SCAN TO PAY BILL</div>
-            <img class="qr-code" src="${qrCodeUrl}" alt="QR Code" />
-
-            ${waiterTipQrUrl ? `
-              <div class="dash-line" style="margin: 12px 0 8px 0;"></div>
-              <div style="font-size: 13px; font-weight: bold; margin-bottom: 2px;">TIP YOUR WAITER</div>
-              <div style="font-size: 11px; font-weight: bold; color: #555; margin-bottom: 4px;">Scan to Tip ${waiterObj.name.toUpperCase()} directly</div>
-              <img class="qr-code" style="width: 100px; height: 100px; margin: 4px auto 2px; display: block;" src="${waiterTipQrUrl}" alt="Tip QR Code" />
-            ` : ''}
-          </div>
-
-          <div class="dash-line"></div>
-          
-          <div class="center footer-msg">
-            *** ${s.thankYouMsg.toUpperCase()} ***
-          </div>
-        </body>
-      </html>
-    `;
-
-    const runBrowserPrint = () => {
-      try {
-        let iframe = document.getElementById('print-iframe-invoice');
-        if (!iframe) {
-          iframe = document.createElement('iframe');
-          iframe.id = 'print-iframe-invoice';
-          iframe.style.position = 'fixed';
-          iframe.style.right = '0';
-          iframe.style.bottom = '0';
-          iframe.style.width = '10px';
-          iframe.style.height = '10px';
-          iframe.style.opacity = '0.01';
-          iframe.style.zIndex = '-9999';
-          iframe.style.pointerEvents = 'none';
-          document.body.appendChild(iframe);
-        }
-        
-        const doc = iframe.contentDocument || iframe.contentWindow.document;
-        doc.open();
-        doc.write(html);
-        doc.close();
-        
-        // Wait for images / assets to load and print
-        setTimeout(() => {
-          iframe.contentWindow.focus();
-          iframe.contentWindow.print();
-        }, 50);
-      } catch (printErr) {
-        console.error('Browser print failed:', printErr);
-        showToast('Browser printing failed', 'error');
-      }
-    };
-
-    // QZ Tray local printing
-    const isQzActive = qz && (s.qzTrayEnabled || qz.websocket.isActive());
-    if (isQzActive) {
-      try {
-        // Configure digital certificate for secure silent printing (Must be set every time)
-        qz.security.setCertificatePromise(() => {
-          return authFetch(apiUrl('/api/qz/certificate'))
-            .then(res => res.text());
-        });
-
-        // Configure digital signature backend handler (Must be set every time)
-        qz.security.setSignaturePromise((toSign) => {
-          return new Promise((resolve, reject) => {
-            authFetch(apiUrl('/api/qz/sign'), {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ toSign })
-            })
-              .then(res => res.text())
-              .then(resolve)
-              .catch(reject);
-          });
-        });
-
-        if (!qz.websocket.isActive()) {
-          await qz.websocket.connect({ retries: 2, delay: 1 });
-        }
-        const targetPrinter = s.barPrinterName || null;
-        const config = qz.configs.create(targetPrinter);
-        const printData = [{
-          type: 'html',
-          format: 'plain',
-          data: html
-        }];
-        await qz.print(config, printData);
-        showToast(`Print sent to ${targetPrinter || 'default'} via QZ Tray`, 'success');
-        return;
-      } catch (err) {
-        showToast('QZ Tray disconnected, falling back to browser print...', 'error');
-        runBrowserPrint();
-        return;
-      }
+    try {
+      await printBillDocument(
+        o.tableNo,
+        {
+          items: o.items,
+          subtotal: o.subtotal,
+          sgst: o.sgst,
+          cgst: o.cgst,
+          discountAmount: o.discount || 0,
+          roundOff: o.roundOff || 0,
+          grandTotal: o.grandTotal
+        },
+        o.grandTotal,
+        o.waiterName || '',
+        o.billNo,
+        waiterObj,
+        o.paymentMode || 'cash',
+        o.cashAmount || 0,
+        o.upiAmount || 0,
+        o.createdAt || o.date
+      );
+    } catch (err) {
+      console.error(err);
+      showToast('Failed to print bill', 'error');
     }
-
-    // Fallback to browser print
-    runBrowserPrint();
   };
 
 const sendBill = () => {

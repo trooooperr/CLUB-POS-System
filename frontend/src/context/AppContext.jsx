@@ -430,7 +430,18 @@ export function AppProvider({ children }) {
     }
   }, [settings, firePrint, buildKOTHtml]);
 
-  const printBillDocument = useCallback(async (tableNo, table, total, waiterName = '', billNoOverride = '', waiterObj = null, paymentMode = 'cash', cashAmount = 0, upiAmount = 0) => {
+  const printBillDocument = useCallback(async (
+    tableNo, 
+    table, 
+    total, 
+    waiterName = '', 
+    billNoOverride = '', 
+    waiterObj = null, 
+    paymentMode = 'cash', 
+    cashAmount = 0, 
+    upiAmount = 0,
+    dateOverride = null
+  ) => {
     const tempBillNo = billNoOverride ? `HTB-${billNoOverride.split('-').pop()}` : ('HTB-' + String(Date.now()).slice(-5));
     
     const upiId = settings.upiId || 'dummy@upi';
@@ -455,16 +466,35 @@ export function AppProvider({ children }) {
       }
     }
 
-    const subtotal = table.items.reduce((s, i) => s + (i.price || 0) * (i.quantity || 0), 0);
-    const sgst = subtotal * (settings.sgstRate / 100);
-    const cgst = subtotal * (settings.cgstRate / 100);
-    const dv = (table.discount || '').trim();
-    const discountAmount = Math.round(dv.endsWith('%')
-      ? subtotal * (parseFloat(dv) / 100) || 0
-      : parseFloat(dv) || 0);
+    const subtotal = typeof table.subtotal === 'number'
+      ? table.subtotal
+      : table.items.reduce((s, i) => s + (i.price || 0) * (i.quantity || 0), 0);
+
+    const sgst = typeof table.sgst === 'number'
+      ? table.sgst
+      : subtotal * (settings.sgstRate / 100);
+
+    const cgst = typeof table.cgst === 'number'
+      ? table.cgst
+      : subtotal * (settings.cgstRate / 100);
+
+    let discountAmount = 0;
+    if (typeof table.discountAmount === 'number') {
+      discountAmount = table.discountAmount;
+    } else if (typeof table.discount === 'number') {
+      discountAmount = table.discount;
+    } else {
+      const dv = typeof table.discount === 'string' ? table.discount.trim() : '';
+      discountAmount = Math.round(dv.endsWith('%')
+        ? subtotal * (parseFloat(dv) / 100) || 0
+        : parseFloat(dv) || 0);
+    }
+
     const rawTotal = subtotal + sgst + cgst - discountAmount;
     const grandTotal = Math.max(0, Math.round(rawTotal));
-    const roundOff = grandTotal - rawTotal;
+    const roundOff = typeof table.roundOff === 'number'
+      ? table.roundOff
+      : grandTotal - rawTotal;
 
     const itemCount = table.items.length;
     const hasQr = grandTotal > 0 && settings.upiId;
@@ -503,7 +533,7 @@ export function AppProvider({ children }) {
           <div class="dash-line"></div>
 
           <div class="row"><span>BILL: ${tempBillNo}</span><span>TABLE: ${tableNo}</span></div>
-          <div class="row">DATE: ${new Date().toLocaleString('en-IN')}</div>
+          <div class="row">DATE: ${new Date(dateOverride || Date.now()).toLocaleString('en-IN')}</div>
           ${waiterName ? `<div class="row">WAITER: ${waiterName.toUpperCase()}</div>` : ''}
 
           <div class="dash-line"></div>
@@ -537,6 +567,13 @@ export function AppProvider({ children }) {
           </div>
 
           <div class="thick-line"></div>
+
+          ${paymentMode ? `
+            <div class="center" style="margin-top: 6px; font-size: 13px; font-weight: 900; text-transform: uppercase;">
+              PAID VIA ${paymentMode === 'split' ? `SPLIT (CASH: Rs.${cashAmount.toFixed(0)} UPI: Rs.${upiAmount.toFixed(0)})` : paymentMode}
+            </div>
+            <div class="thick-line"></div>
+          ` : ''}
 
           <div class="center">
             <div style="font-size: 13px; font-weight: bold; margin-bottom: 4px;">SCAN TO PAY BILL</div>
