@@ -5,7 +5,6 @@ const whatsappSessionSchema = new mongoose.Schema({
   value: { type: mongoose.Schema.Types.Mixed, required: true }
 }, { timestamps: true });
 
-// Add index on key for faster lookups
-whatsappSessionSchema.index({ key: 1 });
+// unique: true on the key field already creates an index, no manual index needed
 
 module.exports = mongoose.model('WhatsAppSession', whatsappSessionSchema);
