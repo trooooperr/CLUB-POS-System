@@ -867,6 +867,7 @@ export default function SettingsPage() {
           </div>
         </section>
 
+        {/*
         {currentUser?.role === 'admin' && (
           <section className="settings-card settings-full">
             <div className="settings-card-head">
@@ -1010,6 +1011,7 @@ export default function SettingsPage() {
             </div>
           </section>
         )}
+        */}
 
         <section className="settings-card settings-full settings-security-card">
           <div className="settings-card-head">
