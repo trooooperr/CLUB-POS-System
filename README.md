@@ -1,4 +1,4 @@
-# HumTum POS System (V3.0 — Enterprise-Grade Hospitality ERP)
+# HumTum POS System (V2.0 — Enterprise-Grade Hospitality ERP)
 
 A **premium, production-ready Restaurant & Bar POS ERP System** engineered specifically for **HumTum Bar & Restaurant**. 
 Built with **enterprise-level architecture, atomic data integrity, role-secured API security, custom silent desktop printing, and an automated stock & financial engine**, this platform delivers high concurrency safety and real-time operational control.
@@ -14,7 +14,7 @@ Built with **enterprise-level architecture, atomic data integrity, role-secured 
 
 ---
 
-## 🎮 How to Showcase & Demo (Without Exposing Live Production Data)
+## Demo Credentials
 
 Because this POS system is deployed live in an active restaurant, **live production credentials and customer databases are strictly protected**. Reviewers, recruiters, and clients can demonstrate and evaluate 100% of the platform's capabilities using the following safe approaches:
 
@@ -47,7 +47,7 @@ For live public demos, deploy a separate staging branch (e.g., Render / Railway)
 
 ---
 
-## 🏗️ System Architecture & Layered Overview
+## System Architecture & Layered Overview
 
 ```mermaid
 graph TD
@@ -100,7 +100,7 @@ graph TD
 
 ---
 
-## 🔄 End-to-End Workflow & Dataflow Diagrams
+## End-to-End Workflow & Dataflow Diagrams
 
 ### 1. Order Creation & Kitchen KOT Workflow
 This dataflow illustrates how a table order is initiated, items are split across Food vs. Bar categories, inventory is deducted, and a silent print job is dispatched to the kitchen.
@@ -199,7 +199,7 @@ flowchart TD
 
 ---
 
-## 🚀 Key Production Capabilities
+## Key Production Capabilities
 
 ### 1. Separation of Concerns Architecture
 - **Kitchen Menu (Food Layer):** Fast order fulfillment for kitchen items (Biryanis, Starters, Main Course). Decoupled from stock tracking to eliminate billing latency.
@@ -228,7 +228,7 @@ flowchart TD
 
 ---
 
-## 🔒 Security & Role-Based Access Control (RBAC)
+## Security & Role-Based Access Control (RBAC)
 
 The system enforces strict permission boundaries across all API endpoints:
 
@@ -257,11 +257,11 @@ graph LR
 
 ---
 
-## 🧪 Comprehensive Automated Testing & Audit Metrics
+## Comprehensive Automated Testing & Audit Metrics
 
 The repository includes a comprehensive Jest & Supertest automated audit suite running on an in-memory MongoDB environment.
 
-### 📊 Overall Audit Results
+### Overall Audit Results
 - **Test Suites Passed:** `10 / 10` (100% Pass Rate)
 - **Total Automated Tests Passed:** `56 / 56` (0 Failures)
 - **Suite Execution Time:** `~6.24 seconds`
@@ -279,7 +279,7 @@ PASS  src/test/auth.test.js                (2 tests)
 PASS  src/test/health.test.js              (1 test)
 ```
 
-### 📋 Detailed Test Suite Breakdown
+### Detailed Test Suite Breakdown
 
 #### 1. Security & RBAC Audit (`rigorous_pos_audit.test.js` & `tough_audit.test.js`) — 29 Tests
 - ✅ **Admin Privilege Verification:** Verified Admin can clear cache, update business settings, add/remove settings categories, and reset passwords.
@@ -307,7 +307,7 @@ PASS  src/test/health.test.js              (1 test)
 
 ---
 
-## ⚡ Performance & Load Benchmarks
+## Performance & Load Benchmarks
 
 - **Concurrency Load:** Validated with **100+ parallel order transactions** without race conditions or stock mismatches.
 - **Virtual User Capacity:** Stress-tested with **7,500 simulated user sessions** (Artillery test suite).
@@ -315,7 +315,7 @@ PASS  src/test/health.test.js              (1 test)
 
 ---
 
-## 🧹 Repository Cleanliness
+## Repository Cleanliness
 
 To maintain a clean production repository:
 - ❌ **Removed `check_db.js`:** Obsolete manual debug script removed from source control.
@@ -324,7 +324,7 @@ To maintain a clean production repository:
 
 ---
 
-## 💻 Tech Stack
+## Tech Stack
 
 - **Frontend:** React 18, Vite, Tailwind CSS, Lucide Icons, Socket.IO Client
 - **Backend:** Node.js, Express 4, Socket.IO
@@ -335,7 +335,7 @@ To maintain a clean production repository:
 
 ---
 
-## 🛠️ Installation & Setup
+## Installation & Setup
 
 ### 1. Prerequisites
 - Node.js (v18+ recommended)
@@ -397,6 +397,6 @@ docker-compose up --build -d
 
 ---
 
-## 📄 License
+## License
 
 Built for **HumTum Bar & Restaurant**. All rights reserved.
