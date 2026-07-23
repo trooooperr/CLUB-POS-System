@@ -51,133 +51,159 @@ For live public demos, deploy a separate staging branch (e.g., Render / Railway)
 
 ```mermaid
 graph TD
-    subgraph Client Layer [Frontend Client - React 18 + Vite]
-        POS[Billing Page]
-        KDS[Kitchen Display System]
-        INV_UI[Inventory Dashboard]
-        REP_UI[Sales & Audit Reports]
-        SET_UI[Settings & RBAC UI]
+    subgraph Customer & Staff Interfaces [Client & Device Layer]
+        CUST_MOB["Customer Smartphone (QR Code Digital Menu / Self-Order)"]
+        WAITER_UI["Waiter Mobile / POS Tablet"]
+        POS_TERM["Cashier POS Billing Terminal"]
+        KDS_UI["Kitchen Display System (KDS)"]
+        INV_REP_UI["Inventory & Financial Analytics Dashboard"]
     end
 
     subgraph Hardware Layer [Local PC Thermal Printing]
-        PA[HumTum Custom Silent Print Agent]
-        EDGE[Headless MS Edge / Chrome PDF Engine]
-        SUMATRA[SumatraPDF Spooler]
-        PRINTER[ESC/POS Thermal Receipt & KOT Printers]
+        PA["HumTum Silent Desktop Print Agent (Port 5001)"]
+        EDGE["Headless MS Edge / Chrome PDF Engine"]
+        SUMATRA["SumatraPDF Spooler"]
+        KOT_PRINTER["ESC/POS Kitchen Thermal Printer"]
+        BILL_PRINTER["ESC/POS Cashier Thermal Receipt Printer"]
     end
 
-    subgraph Application Server [Backend Server - Node.js + Express 4]
-        AUTH_MW[JWT Auth & RBAC Security Guard]
-        BILL_ENG[Unified Billing & Financial Engine]
-        KOT_ENG[KOT Lifecycle & Socket.IO Broadcast]
-        STOCK_ENG[Delta Stock Deduction Engine]
-        CRON_ENG[Daily Stock Snapshot & Report Engine]
+    subgraph Application Server [Node.js + Express 4 ERP Backend]
+        AUTH_MW["JWT Auth & RBAC Security Guard"]
+        ORDER_ENG["Order Processing & Digital Menu Engine"]
+        KOT_ENG["KOT Lifecycle & Socket.IO Real-time Engine"]
+        BILL_ENG["Unified Billing & Financial Tax Engine"]
+        STOCK_ENG["Delta Stock Deduction & Inventory Engine"]
+        CRON_ENG["Daily Stock Snapshot & Report Engine"]
     end
 
-    subgraph Database & Cache Layer [Data Store]
-        MONGO[(MongoDB Atlas - Core ERP Store)]
-        REDIS[(Upstash Redis / In-Memory Fallback)]
+    subgraph Data Store Layer [Database & Cache]
+        MONGO[("MongoDB Atlas - Core ERP Store")]
+        REDIS[("Upstash Redis / In-Memory Counter")]
     end
 
     %% Interactions
-    POS -->|HTTP/REST & WebSockets| AUTH_MW
-    KDS -->|WebSocket Events| KOT_ENG
-    INV_UI -->|Restricted API| AUTH_MW
-    REP_UI -->|Restricted API| AUTH_MW
+    CUST_MOB -->|Order Request & Menu Sync| ORDER_ENG
+    WAITER_UI -->|KOT & Order Creation| AUTH_MW
+    POS_TERM -->|Settle Order & Payment Call| AUTH_MW
+    KDS_UI -->|WebSocket Events| KOT_ENG
+    INV_REP_UI -->|Restricted API Calls| AUTH_MW
 
-    AUTH_MW --> BILL_ENG
+    AUTH_MW --> ORDER_ENG
     AUTH_MW --> KOT_ENG
+    AUTH_MW --> BILL_ENG
     AUTH_MW --> STOCK_ENG
 
-    BILL_ENG -->|Atomic Counter INCR| REDIS
-    BILL_ENG -->|bulkWrite Orders & Transactions| MONGO
-    STOCK_ENG -->|Inventory Deduction & Refunds| MONGO
-    CRON_ENG -->|Daily Stock Summaries| MONGO
+    KOT_ENG -->|Real-time Order Status Sync| KDS_UI
+    KOT_ENG -->|Status Updates| CUST_MOB
 
-    POS -->|HTTP Direct Local Call port 5001| PA
-    PA --> EDGE --> SUMATRA --> PRINTER
+    BILL_ENG -->|Atomic Bill # INCR| REDIS
+    BILL_ENG -->|Order & Settle bulkWrite| MONGO
+    STOCK_ENG -->|Real-time Inventory Deduction & Refunds| MONGO
+    CRON_ENG -->|Daily Stock Summaries & Audit| MONGO
+
+    POS_TERM -->|POST http://localhost:5001/print| PA
+    WAITER_UI -->|POST http://localhost:5001/print| PA
+    PA --> EDGE --> SUMATRA
+    SUMATRA --> KOT_PRINTER
+    SUMATRA --> BILL_PRINTER
 ```
 
 ---
 
 ## End-to-End Workflow & Dataflow Diagrams
 
-### 1. Order Creation & Kitchen KOT Workflow
-This dataflow illustrates how a table order is initiated, items are split across Food vs. Bar categories, inventory is deducted, and a silent print job is dispatched to the kitchen.
+### 1. Complete Customer-to-Cashier Process Flow
+This flowchart maps the entire operational pipeline from the customer ordering on their phone to cashier settlement, thermal receipt printing, and real-time inventory/database sync.
 
 ```mermaid
-sequenceDiagram
-    autonumber
-    actor Staff as POS Staff / Waiter
-    participant Client as React 18 POS App
-    participant Server as Express Backend API
-    participant DB as MongoDB Atlas
-    participant PrintAgent as HumTum Silent Print Agent (Port 5001)
-    participant KDS as Kitchen Display (Socket.IO)
-
-    Staff->>Client: Open Table Session & Select Items
-    Client->>Server: POST /api/kots (Items, TableNo)
-    Server->>Server: Validate JWT Auth & RBAC (Staff L1+)
+flowchart TD
+    A["Customer Scans QR Code on Phone"] --> B["Browse Digital Menu & Select Food / Bar Items"]
+    B --> C["Submit Order Request from Customer Phone"]
+    C --> D["Waiter / POS Terminal Confirms Order & Assigns Table"]
+    D --> E["Express Server Validates JWT & User Permissions"]
     
-    rect rgb(240, 248, 255)
-        Note over Server,DB: Bar Inventory Stock Verification
-        Server->>DB: Check Inventory stock for Bar items
-        Server->>DB: Deduct stock for KOT items immediately
-    end
-
-    Server->>DB: Save KOT Record (Status: 'Pending')
-    Server->>KDS: Broadcast 'kot:created' via Socket.IO
-    Server-->>Client: 201 Created (KOT Payload & HTML Template)
-
-    rect rgb(255, 245, 238)
-        Note over Client,PrintAgent: Custom Silent Printing Flow
-        Client->>PrintAgent: POST http://localhost:5001/print (HTML, PrinterName)
-        PrintAgent->>PrintAgent: Render HTML to PDF via Headless Edge/Chrome
-        PrintAgent->>PrintAgent: Spool PDF silently via SumatraPDF
-        PrintAgent-->>Client: Print Status 200 OK (Printed to KOT Printer)
-    end
+    E --> F{"Check Bar Inventory Stock"}
+    F -- Stock Low/Insufficient --> G["Return Warning / Out of Stock Error"]
+    F -- Stock Available --> H["Deduct Bar Inventory Stock & Create KOT (Status: Pending)"]
+    
+    H --> I["Broadcast 'kot:created' via Socket.IO to Kitchen KDS"]
+    H --> J["Dispatch KOT HTML Payload to HumTum Silent Print Agent (Port 5001)"]
+    J --> K["Silent Print KOT Ticket via SumatraPDF to Kitchen Thermal Printer"]
+    
+    I --> L["Kitchen Staff Prepares Food & Updates KDS Status (Pending -> Preparing -> Ready -> Served)"]
+    L --> M["Customer Enjoys Meal & Requests Final Bill"]
+    
+    M --> N["Cashier Opens Active Table Session on POS Terminal"]
+    N --> O["Click 'Settle / Generate Bill' (Select Discounts & Payment Mode)"]
+    
+    O --> P["Fetch Atomic Sequential Bill # from Upstash Redis (INCR bill_counter)"]
+    P --> Q["Calculate Subtotal, CGST (2.5%), SGST (2.5%), Discounts & Grand Total"]
+    Q --> R{"Any Delta / Additional Non-KOT Items?"}
+    R -- Yes --> S["Execute bulkWrite Stock Deduction for Delta Items in MongoDB"]
+    R -- No --> T["Bypass Double Stock Deduction (Stock Already Deducted on KOT)"]
+    
+    S --> U["Update Order Status: Completed & Persist Transaction in MongoDB"]
+    T --> U
+    
+    U --> V["Send Thermal Receipt HTML Payload to HumTum Silent Print Agent"]
+    V --> W["Silent Print Final Customer Bill Receipt on Cashier ESC/POS Printer"]
+    W --> X["Real-Time System Sync: Stock Levels, Sales Analytics & Daily Snapshot Engine Updated"]
 ```
 
 ---
 
-### 2. Bill Settlement & Delta Stock Deduction Dataflow
-This flow highlights how final bills are calculated, enforcing atomic bill numbers, preventing double stock deduction for previously sent KOTs, and settling full payments.
+### 2. Customer Phone to Cashier Settlement Sequence Dataflow
+This sequence diagram details the exact API payloads, socket events, atomic counters, and hardware spooling calls executed across the full lifecycle.
 
 ```mermaid
 sequenceDiagram
     autonumber
-    actor Staff as POS Staff / Cashier
-    participant Client as React 18 POS App
+    actor Customer as Customer (Smartphone)
+    actor Waiter as Waiter / POS Mobile
+    actor Cashier as Cashier (POS Terminal)
     participant Server as Express Backend API
-    participant Redis as Upstash Redis / In-Memory Counter
-    participant DB as MongoDB Atlas
-    participant PrintAgent as HumTum Silent Print Agent (Port 5001)
+    participant KDS as Kitchen Display (Socket.IO)
+    participant Redis as Upstash Redis Counter
+    participant DB as MongoDB Atlas Store
+    participant PrintAgent as HumTum Print Agent (Port 5001)
+    participant Printer as ESC/POS Thermal Printers
 
-    Staff->>Client: Click 'Settle / Generate Bill'
-    Client->>Server: POST /api/orders/settle (OrderId, PaymentMode, Discount)
-    
+    rect rgb(240, 248, 255)
+        Note over Customer, Printer: Phase 1: Customer Phone Order, KOT Creation & Silent Kitchen Print
+        Customer->>Waiter: Scan QR Code / Send Order Selection from Phone
+        Waiter->>Server: POST /api/kots (Items, TableNo, Remarks)
+        Server->>DB: Check Inventory stock for Bar items
+        Server->>DB: Deduct stock for initial KOT items immediately
+        Server->>DB: Save KOT Record (Status: 'Pending')
+        Server->>KDS: Broadcast 'kot:created' event via WebSockets
+        Server-->>Waiter: 201 Created (KOT Payload & Thermal HTML Template)
+        Waiter->>PrintAgent: POST http://localhost:5001/print (KOT HTML, PrinterName)
+        PrintAgent->>Printer: Render PDF silently via Edge & Print to Kitchen Thermal Printer
+    end
+
+    rect rgb(255, 250, 240)
+        Note over KDS, Customer: Phase 2: Kitchen KDS Fulfillment & Live Status Updates
+        KDS->>Server: Update KOT Status ('Pending' -> 'Preparing' -> 'Ready' -> 'Served')
+        Server->>Customer: Socket.IO Live Broadcast: Order Ready / Served
+    end
+
     rect rgb(240, 255, 240)
-        Note over Server,Redis: Atomic Sequential Bill Numbering
+        Note over Cashier, Printer: Phase 3: Cashier Bill Generation, Delta Stock & Silent Receipt Print
+        Customer->>Cashier: Request Bill Payment
+        Cashier->>Server: POST /api/orders/settle (OrderId, PaymentMode, Discount)
         Server->>Redis: INCR bill_counter:{businessDate}
-        Redis-->>Server: Next Atomic Bill Number (e.g. #1042)
-    end
-
-    rect rgb(255, 250, 205)
-        Note over Server,DB: Delta Inventory Stock Deduction Engine
-        Server->>DB: Fetch order items & existing KOT deductions
-        Server->>Server: Calculate Delta = (Final Bill Quantities) - (KOT Deducted Quantities)
-        alt Delta > 0 (New non-KOT items added)
-            Server->>DB: Execute bulkWrite stock deduction for Delta items only
+        Redis-->>Server: Return Atomic Bill Number (e.g. #1042)
+        Server->>DB: Calculate Delta Stock = (Final Bill Quantities) - (KOT Deducted Quantities)
+        alt Delta > 0 (New items added at cashier stage)
+            Server->>DB: Execute bulkWrite stock deduction for Delta items
         end
+        Server->>Server: Compute Subtotal, SGST (2.5%), CGST (2.5%), Discounts & Grand Total
+        Server->>DB: Persist Completed Order (isActive: false, orderStatus: 'Completed', billNo)
+        Server-->>Cashier: 200 OK (Settled Order Payload & Customer Receipt HTML)
+        Cashier->>PrintAgent: POST http://localhost:5001/print (Receipt HTML, CashierPrinter)
+        PrintAgent->>Printer: Spool PDF silently & Print Customer Thermal Receipt
+        Server->>DB: Sync Financial Ledger, Stock Snapshots & Sales Dashboard Reports
     end
-
-    Server->>Server: Calculate Subtotal, SGST, CGST, Grand Total
-
-    Server->>DB: Update Order (isActive: false, orderStatus: 'Completed', billNo)
-    Server-->>Client: 200 OK (Settled Order & Thermal Receipt HTML)
-    
-    Client->>PrintAgent: POST http://localhost:5001/print (Receipt HTML)
-    PrintAgent-->>Client: 200 OK (Receipt Printed Silently)
 ```
 
 ---
