@@ -17,6 +17,39 @@ Built with **enterprise-level architecture, atomic data integrity, role-secured 
 
 ---
 
+## 🎮 How to Showcase & Demo (Without Exposing Live Production Data)
+
+Because this POS system is deployed live in an active restaurant, **live production credentials and customer databases are strictly protected**. Reviewers, recruiters, and clients can demonstrate and evaluate 100% of the platform's capabilities using the following safe approaches:
+
+### 1. Local One-Command Sandbox Environment
+When running locally, the server automatically synchronizes pre-configured demo user accounts on startup. Anyone cloning the repository can log in instantly with these local sandbox credentials:
+
+| Role | Username | Password | Access Level & Permissions |
+| :--- | :--- | :--- | :--- |
+| **Admin** | `admin` | `admin123` | Full access: Settings, User Mgmt, Categories, Cache Clear |
+| **Manager** | `manager` | `manager123` | Operations: Inventory, Workers, Payroll, Reports, Staff Reset |
+| **Staff** | `staff` | `staff123` | POS Billing & KOT Creation (Blocked from Admin/Settings) |
+
+```bash
+# Clone & run isolated local sandbox
+npm install
+cd frontend && npm install && cd ..
+npm run dev
+```
+
+### 2. Zero-Setup Automated In-Memory Audit (`npm test`)
+To inspect full system capabilities (order flow, KOT refunds, delta stock deduction, RBAC security) without spinning up databases or servers, run the automated test suite powered by `mongodb-memory-server`:
+
+```bash
+npm test
+```
+*Executes all 56 E2E test cases across 10 test suites in ~6 seconds with zero cloud dependency.*
+
+### 3. Separate Staging Environment
+For live public demos, deploy a separate staging branch (e.g., Render / Railway) connected to a **MongoDB Sandbox Database** (`humtum-demo-db`) pre-populated with sample menu items (e.g., "Butter Chicken", "Kingfisher Beer"). This ensures zero risk to live restaurant data.
+
+---
+
 ## 🏗️ System Architecture & Layered Overview
 
 ```mermaid
