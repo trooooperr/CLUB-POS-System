@@ -1,4 +1,4 @@
-# HumTum POS System (V2.0 — Enterprise-Grade Hospitality ERP)
+# Club POS System (V2.0 — Production-Grade ERP)
 
 A **premium, production-ready Restaurant & Bar POS ERP System** engineered specifically for **HumTum Bar & Restaurant**. 
 Built with **enterprise-level architecture, atomic data integrity, role-secured API security, custom silent desktop printing, and an automated stock & financial engine**, this platform delivers high concurrency safety and real-time operational control.
