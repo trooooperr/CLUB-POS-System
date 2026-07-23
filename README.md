@@ -12,11 +12,6 @@ Built with **enterprise-level architecture, atomic data integrity, role-secured 
   <img width="48%" src="https://github.com/user-attachments/assets/621d111b-0233-4059-b4a9-59750787e537" alt="Inventory Managment"/>
 </p>
 
-<p align="center">
-  <img src="https://github.com/user-attachments/assets/f61f5527-2164-4af4-90c0-4caca78f3c43" width="48%" alt="Inventory Management" />
-  <img src="https://github.com/user-attachments/assets/6640c4b4-7817-4cee-bb2e-3f0b77f40d16" width="48%" alt="Sales & Analytics" />
-</p>
-
 ---
 
 ## 🎮 How to Showcase & Demo (Without Exposing Live Production Data)
