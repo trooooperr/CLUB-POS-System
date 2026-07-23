@@ -6,8 +6,10 @@ Built with **enterprise-level architecture, atomic data integrity, role-secured 
 ---
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/1594da58-5a05-4d37-9dbd-b36255a9597a" width="48%" alt="Billing Dashboard" />
-  <img src="https://github.com/user-attachments/assets/13e80c05-75ef-442a-8c5d-aadaabde5a87" width="48%" alt="Kitchen Display System" />
+  <img width="48%" src="https://github.com/user-attachments/assets/3e511ae4-b483-445c-9fa7-ce4b09098175" alt="Table Management" />
+  <img width="48%" src="https://github.com/user-attachments/assets/568310af-b824-44fa-9786-b6aa041de85c" alt="Billing Dashboard" />
+  <img width="48%" src="https://github.com/user-attachments/assets/a4599772-bdae-4d87-ae7f-cdd024de8547" alt="order history"/>
+  <img width="48%" src="https://github.com/user-attachments/assets/621d111b-0233-4059-b4a9-59750787e537" alt="Inventory Managment"/>
 </p>
 
 <p align="center">
